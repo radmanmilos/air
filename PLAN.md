@@ -21,6 +21,8 @@ This plan was updated after external reviews (see `project_reviews/`). Conflicts
 - **Initial scope:** Claude says reduce to aider + one, drop kilocode until headless confirmed. Adopt.
 - **Process spawning:** Claude requires cross-spawn, array args, no shell, tree kill. Adopt.
 - **Delta review 2 (R2-01..R2-12):** Phase-order gate, dirty-tree policy, unified error taxonomy, result states, reproducible package metadata, test packaging, status/health semantics, platform paths, untrusted repo config, MCP lifecycle/consent, crash-safe persistence, script portability.
+- **DeepSeek review (G-01..G-06):** Secret redaction layer, structured JSONL observability, formal `AgentAdapter` contract + conformance suite, concurrency/resource governance, executable `docs/behavior-spec.md`, config schema versioning + `air config migrate`.
+- **Grok review (G-01..G-12):** Phase 0 adapter spike docs, Phase 2/3 gate enforcement, canonical error taxonomy in `src/types/errors.ts`, result states in `src/types/result.ts`, dirty-tree policy, process runner requirements, config/paths, handoff/security, MCP semantics, package/test hygiene, observability, router simplicity.
 
 ## Goal
 
@@ -43,15 +45,17 @@ Create a single terminal entrypoint that routes tasks to the best available tool
 ### Components
 
 1. **CLI (air)** - bin/air.ts with commands: run, status (canonical), health (alias), route-test, config, mcp
-2. **Config** - Zod schema is the single source of truth. Platform-appropriate global config + optional repo .airrc.yaml. Precedence: CLI > env > repo > global > defaults. Repo config is untrusted by default.
+2. **Config** - Zod schema is the single source of truth. Versioned (`version: 1`); `air config migrate` upgrades older configs. Platform-appropriate global config + optional repo .airrc.yaml. Precedence: CLI > env > repo > global > defaults. Repo config is untrusted by default.
 3. **Task Classifier** - Deferred until after vertical slice; start with ordered priority list
 4. **Router** - Priority list first, scoring later if needed. Cooldowns keyed by (provider, model)
-5. **Adapters** - Per-tool connector implementing IAirAdapter: detect, getCapabilities, buildCommand, parseOutput, classifyError
+5. **Adapters** - Per-tool connector implementing `AgentAdapter` (src/adapters/adapter.ts): id, provider, model, capabilities, canHandle, buildCommand, parseOutput, classifyError. Conformance suite in src/adapters/conformance.ts gates registration.
 6. **Context Packer** - Build handoff from git state (not model summary)
 7. **Health Tracker** - Keyed by (provider, model), persisted to platform cache dir with atomic writes
 8. **MCP Server** - Async jobs, stdio, no prompting in MCP mode
 9. **Execution** - Shared process runner with cross-spawn, timeouts, tree kill
-10. **Security** - Redaction, provider allow-list, secret scanning
+10. **Security** - Redaction (src/security/redact.ts), provider allow-list, secret scanning
+11. **Observability** - Structured JSONL traces; `air status --json`; `air route-test --explain`
+12. **Concurrency** - Per-config-dir lock/semaphore; `maxConcurrentAgents` (default 1); atomic health/cooldown writes
 
 ### Types
 
@@ -218,3 +222,40 @@ When a proposed replacement changes provider, the approval response must disclos
 - Do not execute `verify.command` from repo config by default. Require an explicit user trust decision or global policy first.
 - Execute approved commands with argument arrays and `shell: false`; never concatenate user-controlled strings into shell commands.
 - `air route-test` and `air run` disclose when a verification command will execute.
+
+### Secrets and redaction (G-01)
+
+- A redaction layer runs on all captured stdout/stderr before it is written to logs, displayed, or used for context handoff (src/security/redact.ts).
+- Config files never contain raw secrets in version-controlled examples. Use `.env.example` and put secrets in environment variables or an OS keychain.
+- Error messages and debug logs never include full command lines that may contain `--api-key` flags.
+- `air status` (including `--json`) and `air config` never print secret values.
+
+### Observability (G-02, G-11)
+
+- Structured JSONL traces for every routing decision, tool launch, failure classification, and failover event.
+- `air status --json` returns machine-readable health/cooldown state.
+- Skip reasons are logged exactly (e.g. `cooldown_active`, `capability_mismatch`), never a generic "not available".
+
+### Adapter contract (G-03)
+
+Every adapter implements `AgentAdapter` (src/adapters/adapter.ts):
+- `id`, `provider`, `model`, `capabilities`
+- `canHandle(task)`, `buildCommand(task)`, `parseOutput(chunk)`, `classifyError(exitCode, stderr, structured?)`
+- A conformance suite (src/adapters/conformance.ts) must pass before an adapter is registered.
+
+### Concurrency and resource governance (G-04)
+
+- Global lock/semaphore per config directory prevents concurrent mutation of shared cooldown/health state.
+- `maxConcurrentAgents` (default 1) bounds child processes.
+- Cooldown state is persisted atomically (write-temp-then-rename).
+
+### Config schema evolution (G-06)
+
+- Config is versioned (`version: 1` in `config.yaml`).
+- `air config migrate` upgrades older configs to the current schema.
+- Repo `.airrc.yaml` is validated against the same schema and rejects unknown top-level keys by default (`--allow-unknown` escape hatch).
+
+### Executable documentation (G-05)
+
+- `docs/behavior-spec.md` is the authoritative spec in Given/When/Then format.
+- A test validates `air --help` output against the commands documented there.

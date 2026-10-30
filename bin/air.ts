@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
 
@@ -15,15 +14,29 @@ program
   .argument('<task>', 'Task description')
   .option('-f, --files <files...>', 'Files to include')
   .option('--auto', 'Auto-switch on failover')
+  .option('--allow-dirty', 'Allow running on a dirty working tree (non-destructive)')
+  .option('--read-only', 'Treat the task as read-only; empty diff is a valid outcome')
   .action((task, options) => {
     console.log(chalk.cyan('air run'));
     console.log(chalk.gray('Task:'), task);
     console.log(chalk.yellow('Not implemented yet'));
   });
 
-// `status` and `health` are merged (R-14): status shows tools/providers/models
-// and active cooldowns; `health` shows failure history and summary statistics.
-const showStatus = () => {
+// `status` and `health` are merged (R-14, R2-07): status shows tools/providers/models
+// and active cooldowns; `health` is a true alias showing the identical report.
+const showStatus = (options: { json?: boolean }) => {
+  if (options.json) {
+    process.stdout.write(JSON.stringify({
+      command: 'status',
+      version: '0.1.0',
+      tools: [],
+      providers: [],
+      models: [],
+      cooldowns: [],
+      health: [],
+    }) + '\n');
+    return;
+  }
   console.log(chalk.cyan('air status'));
   console.log(chalk.yellow('Not implemented yet'));
 };
@@ -31,13 +44,13 @@ const showStatus = () => {
 program
   .command('status')
   .description('Show tools, providers, models, and active cooldowns')
+  .option('--json', 'Emit machine-readable JSON')
   .action(showStatus);
 
-// `health` is a true alias for `air status` (R-14, R2-07): identical report,
-// same description. Do not maintain it as a distinct failure-history view.
 program
   .command('health')
   .description('Alias for `air status` (tools, providers, models, and active cooldowns)')
+  .option('--json', 'Emit machine-readable JSON')
   .action(showStatus);
 
 program
@@ -55,7 +68,13 @@ program
   .command('config')
   .description('Show or edit configuration')
   .option('--validate', 'Validate config and report errors')
+  .option('--migrate', 'Upgrade config to the current schema version')
   .action((options) => {
+    if (options.migrate) {
+      console.log(chalk.cyan('air config migrate'));
+      console.log(chalk.yellow('Not implemented yet'));
+      return;
+    }
     console.log(chalk.cyan('air config'));
     console.log(chalk.yellow('Not implemented yet'));
   });
