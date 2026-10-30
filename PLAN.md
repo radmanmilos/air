@@ -41,7 +41,7 @@ Create a single terminal entrypoint that routes tasks to the best available tool
 
 ### Components
 
-1. **CLI (air)** - bin/air.ts with commands: run, status, route-test, mcp, config, health
+1. **CLI (air)** - bin/air.ts with commands: run, status/health (merged, R-14), route-test, mcp, config
 2. **Config** - Platform-appropriate global config + optional repo .airrc.yaml. Zod schema validation. Precedence: CLI > env > repo > global > defaults
 3. **Task Classifier** - Deferred until after vertical slice; start with ordered priority list
 4. **Router** - Priority list first, scoring later if needed. Cooldowns keyed by (provider, model)

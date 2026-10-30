@@ -25,10 +25,9 @@ air --help
 ## Commands (planned)
 
 - `air run "<task>"` - Route and run task
-- `air status` - Show tool health/cooldowns
-- `air route-test "<task>"` - Test routing without executing
-- `air config` - Show/edit config
-- `air health` - Show health stats
+- `air status` / `air health` - Show tools, cooldowns, and health history (merged, see PLAN.md R-14)
+- `air route-test "<task>" --explain` - Test routing without executing
+- `air config --validate` - Show/edit config
 - `air mcp` - Start MCP server (stdio)
 
 ## Configuration
