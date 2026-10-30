@@ -1,143 +1,130 @@
-# Plan: air - Unified AI Tool Orchestrator
+﻿# Plan: air - Unified AI Tool Orchestrator
 
-**Name:** `air`  
-**Location (new repo):** `E:\GitHub\air` (new repo to be pushed to `https://github.com/radmanmilos/air`)  
+**Name:** ir  
+**Location (new repo):** E:\GitHub\air (new repo to be pushed to https://github.com/radmanmilos/air)  
 **Runtime:** Node/TypeScript  
 **Interfaces:** CLI + MCP server (both)  
-**Initial tools:** aider, goose, opencode, kilocode  
+**Initial tools:** aider + one other (TBD after spike)  
 **Failover:** Ask before switching by default, with option to enable auto-switch  
-**Development rule:** Develop and test entirely in `E:\GitHub\air`. No changes to existing projects until integration is ready.
+**Development rule:** Develop and test entirely in E:\GitHub\air. No changes to existing projects until integration is ready.
+
+## Conflicts between reviews
+- **Phase order:** ChatGPT says implement Phase 1 first (foundation). Claude says vertical slice first (spikes + mock). Adopt Claude's order (spikes first) - build adapters against mocks before abstractions.
+- **TUI vs headless:** ChatGPT says don't replace TUIs but also spawn with pipes. Claude says air is headless-only (out of scope) to avoid stdin conflicts with MCP. Adopt Claude's position.
+- **Cooldown keys:** Both agree provider/model level; Claude is explicit about shared provider limits. Adopt (provider, model) keys.
+- **Error classification:** Claude requires exit code + stderr + structured, never stdout prose. Adopt.
+- **Handoff:** Claude says mechanical from git state (don't depend on failed model summary). Adopt.
+- **MCP:** Claude requires async jobs and no prompting in MCP mode. Adopt.
+- **Initial scope:** Claude says reduce to aider + one, drop kilocode until headless confirmed. Adopt.
+- **Process spawning:** Claude requires cross-spawn, array args, no shell, tree kill. Adopt.
 
 ## Goal
 Create a single terminal entrypoint that routes tasks to the best available tool/model, detects rate limits/quota issues, and proposes/switches to the next suitable tool with context preserved so work continues.
 
 ## Design Principles
-- Don't replace TUIs - spawn existing CLIs
+- **Headless-only** - Air operates headless-only. Interactive TUI use is out of scope.
 - Graceful degradation with explicit user control
-- Reusable across projects via global config + env
+- Reusable across projects via global config + env (self-contained)
 - Extensible: easy to add new connectors
 - Observability: health tracking, cooldowns, logs
 - Respect project rules (YAGNI, surgical, git safety)
+- **Self-contained** - All configuration, model lists, and data live inside ir/. No imports from other repos.
+- **Safety first** - Never discard user changes, preserve work, separate routing approval from permissions
+- **Cross-platform** - Windows, macOS, Linux
 
 ## Architecture
 
 ### Components
-1. **CLI (`air`)** - `bin/air.ts` with commands: `run`, `status`, `route-test`, `mcp`, `config`, `health`
-2. **Config** - `~/.config/air/config.yaml` (global) + optional repo `.airrc.yaml`. Schema validated. Imports from existing sources.
-3. **Task Classifier** - Keyword + file pattern based routing (small-edit, multi-file, debug, ui/css, screenshot, tests, docs)
-4. **Router** - Scores tools by fit, availability, health, cooldown. Respects user preference (ask vs auto)
-5. **Adapters** - Per-tool connector: spawn CLI, pass context/files, parse output for rate limits/errors
-6. **Context Packer** - Build minimal handoff (goal, changed files, git diff, relevant rules) on failover
-7. **Health Tracker** - Success/fail/rate-limit counts, cooldown timers (persisted to `~/.cache/air/`)
-8. **MCP Server** - Expose `route_task`, `get_status`, `propose_switch`, `switch_tool` for other agents
+1. **CLI (ir)** - in/air.ts with commands: un, status, oute-test, mcp, config, health
+2. **Config** - Platform-appropriate global config + optional repo .airrc.yaml. Zod schema validation. Precedence: CLI > env > repo > global > defaults
+3. **Task Classifier** - Deferred until after vertical slice; start with ordered priority list
+4. **Router** - Priority list first, scoring later if needed. Cooldowns keyed by (provider, model)
+5. **Adapters** - Per-tool connector implementing IAirAdapter: detect, getCapabilities, buildCommand, parseOutput, classifyError
+6. **Context Packer** - Build handoff from git state (not model summary)
+7. **Health Tracker** - Keyed by (provider, model), persisted to ~/.cache/air/ with atomic writes
+8. **MCP Server** - Async jobs, stdio, no prompting in MCP mode
+9. **Execution** - Shared process runner with cross-spawn, timeouts, tree kill
+10. **Security** - Redaction, provider allow-list, secret scanning
 
-### Tool Adapters (initial)
-| Tool | Invocation | Rate limit detection | Notes |
-|------|-------------|---------------------|-------|
-| aider | `aider --model ... --yes --message "..." [files]` | "rate limit", "429", "quota", "overloaded", "model not available" | Headless capable. Stream + buffer. |
-| goose | `goose run --recipe ...` or build prompt file | Similar patterns + provider errors | May need recipe/prompt file. Stream + buffer. |
-| opencode | `opencode run ...` or TUI wrapper (check flags) | Parse stderr/stdout | Prefer non-interactive if available. Stream + buffer. |
-| kilocode | Check CLI availability; prefer VSCode extension fallback if no headless mode | TBD | May need different approach; mark CLI-limited if no headless. Stream + buffer where possible. |
+### Types
+`	s
+export type ErrorCategory = 'rate_limit' | 'auth' | 'context_length' | 'model_unavailable' | 'task_failure' | 'timeout' | 'unknown';
+export interface ToolCapabilities { headlessExecution: boolean; structuredOutput: boolean; fileEditing: boolean; shellAccess: boolean; imageInput: boolean; supportsCancellation: boolean; }
+`
+
+### Connector I/O
+- Use cross-spawn with array args, no shell: true
+- stdio: ['pipe','pipe','pipe'], close stdin
+- Stream to terminal + rolling buffer
+- Tree kill on cancel/timeout (	askkill /T /F on Windows, process group on Unix)
+- Per-tool timeouts
+
+### Error Classification
+Based on exit code + stderr + structured output. Never scan stdout prose for rate limit keywords.
 
 ### Failover Flow
-1. User: `air run "fix mobile nav"`
-2. Classify -> UI/single-file -> prefer aider
-3. Spawn aider with context
-4. If rate limit detected -> show proposal: "aider hit rate limit. Switch to goose (Nemotron)?" [y/N/auto]
-5. If user agrees (or auto enabled) -> pack context, spawn goose, resume
-6. Update health/cooldown
+1. Checkpoint (git branch/worktree) before attempt
+2. Spawn tool headlessly
+3. Classify errors
+4. If switch warranted and approval needed (and not in MCP) -> propose with reasoning, cooldowns, alternatives
+5. If approved and provider in allow-list -> build handoff from git state, spawn next tool
+6. Enforce hop cap (max 3), prevent revisits, update (provider,model) cooldowns
 
-## File Structure (new repo)
-```
+## File Structure
+`
 air/
-├── bin/air.ts           # CLI entry
+├── bin/air.ts
 ├── src/
-│   ├── adapters/        # tool connectors
-│   ├── classifier/      # task routing
-│   ├── config/          # schema + loader
-│   ├── mcp/             # MCP server
-│   ├── router/          # routing logic
-│   ├── context/         # handoff packing
-│   └── utils/           # spawn, parse, health
+│   ├── adapters/
+│   ├── config/
+│   ├── context/
+│   ├── execution/
+│   ├── health/
+│   ├── mcp/
+│   ├── router/
+│   ├── security/
+│   ├── types/
+│   └── utils/
 ├── config/
-│   ├── schema.json
-│   └── default.yaml
+│   ├── default.yaml
+│   └── schema.json
+├── docs/adapters/
+├── tests/unit/ tests/integration/
 ├── package.json
 ├── tsconfig.json
 └── README.md
-```
+`
 
-## Config Schema (key parts)
-```yaml
-failover:
-  mode: ask  # ask | auto
-  cooldown_minutes: 30
-tools:
-  aider:
-    enabled: true
-    priority: 1
-    models: [from tools/aider-free-models.yml]
-  ...
-routing:
-  rules:
-    - match: {files: ["*.css", "*.html"], count: 1} -> prefer: [aider, goose]
-    - match: {paths: ["game/shared/**"]} -> prefer: [opencode, kilocode]
-```
+## Revised Phases
 
-## Implementation Steps
-
-### Phase 1: Setup (separate repo - E:\GitHub\air)
-1. Initialize git repo in `E:\GitHub\air` (if not already)
-2. Initialize package.json, tsconfig, basic structure
-3. Add CLI scaffold with commander/yargs
-4. Add config loader with schema validation
-5. Set up remote to `https://github.com/radmanmilos/air` (create repo on GitHub when ready, but don't push existing projects)
-
-### Phase 2: Core
-1. Task classifier
-2. Health tracker (JSON in cache)
-3. Context packer
-4. Router logic
-
-### Phase 3: Adapters
-1. Implement aider adapter (test first)
-2. Implement goose adapter
-3. Implement opencode adapter
-4. Implement kilocode adapter (may be limited)
-
-### Phase 4: Failover + MCP
-1. Rate limit detection + proposal flow
-2. Context handoff
-3. MCP server implementation
-4. Integration tests
-
-### Phase 5: Polish
-1. Import existing model lists from Games for kids
-2. Documentation
-3. Global install instructions
+| Phase | Scope | Done when |
+|---|---|---|
+| 0 Spikes | R-09 for aider + one other; mock adapter (R-02); vitest setup | docs/adapters/*.md exist; mock covers success/limit/hang/false-positive/exit0-no-changes |
+| 1 Skeleton | Package fixes (main/index, engines, files), cross-spawn, zod config, paths, logger+redaction, atomic health file, tests | 
+pm test, 
+pm run build, 
+pm run typecheck pass |
+| 2 Vertical slice | aider adapter, ir run, stream+buffer, error classification (R-04), checkpoint (R-05), failover to second with (provider,model) cooldowns (R-03), hop cap/exit codes (R-11), traces (R-13) | Forced-failover passes with mock and real tool |
+| 3 Handoff and safety | task state .air/tasks/, mechanical handoff, redaction (R-06), provider allow-list (R-07) | Redaction and allow-list tests pass |
+| 4 MCP | Async jobs, no-prompt in MCP, approval/cancel tools (R-08) | MCP tests pass |
+| 5 Expand | Additional adapters after verification, verify hook, scoring only if misroutes observed | Tests pass |
 
 ## Implementation Notes
-- **I/O:** Use `child_process.spawn` with `stdio: ['pipe','pipe','pipe']`, pipe stdout/stderr to process.stdout/stderr in real-time and also collect into buffers for parsing
-- **Rate limit detection:** Configurable regex patterns per adapter + global patterns; mark tool/model in cooldown on detection
-- **Failover UX:** Show clear proposal with reasoning (why switching, next tool/model), ask for confirmation unless `failover.mode: auto`
-- **Context handoff:** Include goal, repo root, git branch/status, changed files, last N KB of output, relevant AGENTS.md snippets, error summary
-- **MCP:** Run as stdio server by default; expose tools for routing/status/switching
-- **Extensibility:** Adapter interface `IAirAdapter` with `canRun()`, `run()`, `detectRateLimit()`, `getHealth()`
+- **Spawning:** cross-spawn, array args, no shell
+- **Cooldowns:** Keyed by (provider, model), respect Retry-After
+- **Handoff:** From git state only, redact secrets
+- **Checkpoints:** Before each attempt, don't auto-commit by default
+- **MCP:** Async jobs, stdout protocol only, stderr for logs
+- **Privacy:** Provider allow-list, default to first-attempt provider only
+- **Success:** Exit 0 with non-empty diff or task-complete signal; exit 0 empty diff = no_changes
 
-## Risks & Mitigations
-- **TUI-only tools**: Some may not have headless mode -> mark as CLI-limited, skip auto-routing
-- **Context loss**: Mitigate with detailed handoff summary
-- **Auth issues**: Tools handle their own auth; air just spawns them
-- **Rate limit detection varies**: Make patterns configurable
-- **Cross-platform**: Handle Windows/Unix differences in spawning
-- **Repo isolation**: All development in `E:\GitHub\air` only, no changes to existing repos until explicitly integrated
+## Testing
+- vitest, no network/real tools
+- Mock binary with env-controlled behavior
+- Temp git repos, fake clocks
+- Windows process tests
 
-## Open Questions (resolved)
-- Name: air ✓
-- Interfaces: CLI + MCP ✓  
-- Runtime: Node/TypeScript ✓
-- Failover: ask before switch with auto option ✓
-- Initial tools: aider, goose, opencode, kilocode ✓
-- Location: `E:\GitHub\air` (new repo) ✓
-- I/O: Stream + buffer ✓
-- Development: Separate repo only ✓
+## Risks
+- TUI-only tools out of scope unless headless confirmed
+- False positives mitigated by classification rules
+- Shared provider limits handled by (provider,model) keys
