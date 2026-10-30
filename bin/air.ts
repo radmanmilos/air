@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
 
@@ -32,9 +33,11 @@ program
   .description('Show tools, providers, models, and active cooldowns')
   .action(showStatus);
 
+// `health` is a true alias for `air status` (R-14, R2-07): identical report,
+// same description. Do not maintain it as a distinct failure-history view.
 program
   .command('health')
-  .description('Show health/failure history and summary statistics (alias for `air status`)')
+  .description('Alias for `air status` (tools, providers, models, and active cooldowns)')
   .action(showStatus);
 
 program

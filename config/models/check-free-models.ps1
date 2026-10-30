@@ -1,28 +1,41 @@
 ﻿# Check OpenRouter free models availability
-param(
-    [string]$Tool = "all"
-)
+#
+# Resolves the models file and .env relative to this script's location
+# (config/models/), so it works regardless of the caller's working directory.
+#
+# Usage: ./check-free-models.ps1
+# Env:   OPENROUTER_API_KEY (required)
 
-$envPath = ".\.env"
-if (Test-Path $envPath) {
-    foreach ($line in Get-Content $envPath) {
-        if ($line -match '^\s*([^#][^=]+)\s*=\s*(.*)$') {
-            [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim(), "Process")
-        }
-    }
-}
+$ErrorActionPreference = "Stop"
 
-Write-Host "=== OpenRouter Free Models Availability Check ===" -ForegroundColor Cyan
-Write-Host "Checking at $(Get-Date)" -ForegroundColor Gray
-
-# Resolve the models file relative to this script's location (config/models/)
+# Resolve repo root from this script's location: config/models/<this> -> repo root
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$RepoRoot = Split-Path -Parent $ScriptDir
 $modelsFile = Join-Path $ScriptDir "aider-free-models.yml"
+$envFile = Join-Path $RepoRoot ".env"
 
 if (-not (Test-Path $modelsFile)) {
     Write-Host "Models file not found: $modelsFile" -ForegroundColor Red
     exit 1
 }
+
+if (-not $env:OPENROUTER_API_KEY) {
+    if (Test-Path $envFile) {
+        foreach ($line in Get-Content $envFile) {
+            if ($line -match '^\s*([^#][^=]+)\s*=\s*(.*)$') {
+                [Environment]::SetEnvironmentVariable($matches[1].Trim(), $matches[2].Trim(), "Process")
+            }
+        }
+    }
+}
+
+if (-not $env:OPENROUTER_API_KEY) {
+    Write-Host "Error: OPENROUTER_API_KEY is not set. Set it in your environment or in .env at $envFile" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "=== OpenRouter Free Models Availability Check ===" -ForegroundColor Cyan
+Write-Host "Checking at $(Get-Date)" -ForegroundColor Gray
 
 try {
     $headers = @{
@@ -38,7 +51,7 @@ try {
 
     Write-Host "`nChecking saved models..." -ForegroundColor Cyan
 
-    # Parse YAML deliberately: lines are either `key: value` or `  - model`
+    # Parse deliberately: `default: value` or indented `- model`
     $defaultModel = $null
     $backupModels = [System.Collections.Generic.List[string]]::new()
     Get-Content $modelsFile | ForEach-Object {

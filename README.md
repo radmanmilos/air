@@ -25,16 +25,25 @@ air --help
 ## Commands (planned)
 
 - `air run "<task>"` - Route and run task
-- `air status` / `air health` - Show tools, cooldowns, and health history (merged, see PLAN.md R-14)
+- `air status` / `air health` - Show tools, providers, models, and active cooldowns (health is a true alias)
 - `air route-test "<task>" --explain` - Test routing without executing
 - `air config --validate` - Show/edit config
 - `air mcp` - Start MCP server (stdio)
 
 ## Configuration
 
-Global config: `~/.config/air/config.yaml`  
-Repo config: `.airrc.yaml`  
-Cache: `~/.cache/air/`
+Configuration lives in a platform-appropriate directory, resolved by a single
+central path module:
+
+| Platform | Config | Cache/State |
+|---|---|---|
+| Linux | `$XDG_CONFIG_HOME/air` (fallback `~/.config/air`) | `$XDG_CACHE_HOME/air` (fallback `~/.cache/air`) |
+| macOS | `~/Library/Application Support/air` | `~/Library/Caches/air` |
+| Windows | `%APPDATA%/air` | `%LOCALAPPDATA%/air` |
+
+Global config: platform config directory / `config.yaml`  
+Repo config: `.airrc.yaml` (untrusted by default; validation required)  
+Cache: platform cache directory / `air/`
 
 ## Development
 
