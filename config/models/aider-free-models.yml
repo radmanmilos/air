@@ -1,0 +1,10 @@
+﻿# Aider/OpenRouter Free Models - updated 2026-10-30
+default: google/gemma-4-31b-it:free
+backups:
+  - google/gemma-4-26b-a4b-it:free
+  - nvidia/nemotron-3.5-super-vl:free
+  - nvidia/nemotron-3.5-lightning:free
+  - recursive/flint-v1.0:free
+  - dots-studio/dots-3-note-preview:free
+  - cohere/north-mini-code:free
+  - thinkingmachines/inkling:free

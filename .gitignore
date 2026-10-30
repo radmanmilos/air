@@ -1,0 +1,10 @@
+# .gitignore
+
+node_modules/
+dist/
+*.log
+.DS_Store
+.cache/
+*.tgz
+.env
+.env.local

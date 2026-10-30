@@ -1,0 +1,33 @@
+{
+  "name": "air",
+  "version": "0.1.0",
+  "description": "Unified AI tool orchestrator with smart routing and failover",
+  "type": "module",
+  "bin": {
+    "air": "./dist/bin/air.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx bin/air.ts",
+    "start": "node dist/bin/air.js",
+    "mcp": "node dist/bin/air.js mcp"
+  },
+  "keywords": ["ai", "orchestrator", "router", "cli", "mcp"],
+  "author": "radmanmilos",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "yaml": "^2.4.2",
+    "ajv": "^8.12.0",
+    "chalk": "^5.3.0",
+    "inquirer": "^9.2.23",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/inquirer": "^9.0.7",
+    "typescript": "^5.4.5",
+    "tsx": "^4.7.2"
+  }
+}
