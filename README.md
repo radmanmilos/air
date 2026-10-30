@@ -1,10 +1,10 @@
-# README
-
 # air
+
+**Status:** Early development - scaffold only. Commands below are planned, not implemented.
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider, goose, opencode, and kilocode with automatic failover on rate limits.
 
-## Features
+## Features (planned)
 
 - **Smart routing** - Classifies tasks and picks the best tool/model
 - **Failover with control** - Asks before switching by default, optional auto-switch
@@ -22,7 +22,7 @@ npm link
 air --help
 ```
 
-## Commands
+## Commands (planned)
 
 - `air run "<task>"` - Route and run task
 - `air status` - Show tool health/cooldowns

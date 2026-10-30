@@ -7,11 +7,21 @@
     "air": "./dist/bin/air.js"
   },
   "main": "./dist/index.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "config",
+    "docs"
+  ],
   "scripts": {
     "build": "tsc",
-    "dev": "tsx bin/air.ts",
-    "start": "node dist/bin/air.js",
-    "mcp": "node dist/bin/air.js mcp"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "dev": "tsx bin/air.ts"
   },
   "keywords": ["ai", "orchestrator", "router", "cli", "mcp"],
   "author": "radmanmilos",
@@ -28,6 +38,7 @@
     "@types/node": "^20.12.7",
     "@types/inquirer": "^9.0.7",
     "typescript": "^5.4.5",
-    "tsx": "^4.7.2"
+    "tsx": "^4.7.2",
+    "vitest": "^1.6.0"
   }
 }
