@@ -12,7 +12,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(root, 'src'),
-      '@tests': resolve(root, 'tests'),
     },
     extensions: ['.ts', '.js', '.mjs', '.json'],
   },

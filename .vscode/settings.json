@@ -1,0 +1,11 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib/typescript.js",
+  "typescript.enablePromptExplicitProject": false,
+  "files.associations": {
+    "tests/**/*.ts": "tsconfig.test.json",
+    "vitest.config.ts": "tsconfig.test.json"
+  },
+  "typescript.project": "tsconfig.json",
+  "typescript.validate": true,
+  "typescript.tsserver.maxTsServerMemory": 4096
+}
