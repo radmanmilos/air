@@ -17,7 +17,7 @@ const NOT_FOUND_RE = /not found|not installed|enoent/i;
 export class OpenCodeAdapter implements AgentAdapter {
   id = 'opencode';
   provider = 'openrouter';
-  model = 'openrouter/gemma-4-31b-it:free';
+  model = 'gemma-4-31b-it:free';
 
   capabilities = {
     headlessExecution: true,

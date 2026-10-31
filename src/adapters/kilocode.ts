@@ -17,7 +17,7 @@ const NOT_FOUND_RE = /not found|not installed|enoent/i;
 export class KilocodeAdapter implements AgentAdapter {
   id = 'kilocode';
   provider = 'openrouter';
-  model = 'openrouter/gemma-4-31b-it:free';
+  model = 'gemma-4-31b-it:free';
 
   capabilities = {
     headlessExecution: true,
