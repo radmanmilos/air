@@ -14,10 +14,17 @@ CLI but not documented here, the conformance test in
 ### `air run "<task>"`
 - Given a task description,
 - When `air run` is executed,
-- Then it discovers installed tools, routes to the best candidate, spawns it
+- Then it discovers installed adapters, routes to the best candidate, spawns it
   headlessly, streams output, classifies errors, and proposes failover (Phase 2)
   or performs safe cross-agent continuation (Phase 3+).
-- Options: `-f, --files <files...>`, `--auto`.
+- Options:
+  - `-f, --files <files...>` — files to include.
+  - `--auto` — auto-switch on failover (opt-in; default is ask).
+  - `--allow-dirty` — allow running on a dirty working tree. Non-destructive:
+    AIR never auto-resets, stashes, checks out, cleans, or reverts. Attribution
+    of overlapping edits is uncertain and may require user intervention.
+  - `--read-only` — treat the task as read-only. An empty diff is a valid
+    outcome (`SUCCEEDED_READ_ONLY`).
 
 ### `air status` (canonical)
 - Given a request for status,
@@ -36,6 +43,7 @@ CLI but not documented here, the conformance test in
 - When `air route-test --explain` is run,
 - Then it prints the routing reasoning (classification, candidates considered
   and skip reasons, chosen candidate, alternatives) without executing.
+- `--json` returns the same data as machine-readable JSON.
 
 ### `air config --validate`
 - Given a config request,
@@ -46,7 +54,7 @@ CLI but not documented here, the conformance test in
 ### `air config migrate`
 - Given an older config version,
 - When `air config migrate` is run,
-- Then it upgrades the config to the current schema version (G-06).
+- Then it upgrades the config to the current schema version.
 
 ### `air mcp`
 - Given a request for the MCP server,

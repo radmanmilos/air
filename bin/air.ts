@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
 
@@ -58,24 +59,33 @@ program
   .description('Test routing without executing')
   .argument('<task>', 'Task description')
   .option('--explain', 'Print routing reasoning without executing')
+  .option('--json', 'Emit machine-readable JSON')
   .action((task, options) => {
     console.log(chalk.cyan('air route-test'));
     console.log(chalk.gray('Task:'), task);
     console.log(chalk.yellow('Not implemented yet'));
   });
 
-program
+// `air config` shows/validates; `air config migrate` upgrades schema versions.
+const configCmd = program
   .command('config')
   .description('Show or edit configuration')
   .option('--validate', 'Validate config and report errors')
-  .option('--migrate', 'Upgrade config to the current schema version')
   .action((options) => {
-    if (options.migrate) {
-      console.log(chalk.cyan('air config migrate'));
+    if (options.validate) {
+      console.log(chalk.cyan('air config --validate'));
       console.log(chalk.yellow('Not implemented yet'));
       return;
     }
     console.log(chalk.cyan('air config'));
+    console.log(chalk.yellow('Not implemented yet'));
+  });
+
+configCmd
+  .command('migrate')
+  .description('Upgrade config to the current schema version')
+  .action(() => {
+    console.log(chalk.cyan('air config migrate'));
     console.log(chalk.yellow('Not implemented yet'));
   });
 

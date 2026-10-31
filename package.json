@@ -6,16 +6,19 @@
   "bin": {
     "air": "./dist/bin/air.js"
   },
-  "main": "./dist/index.js",
+  "main": "./dist/src/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/src/index.js"
+    }
+  },
   "engines": {
     "node": ">=18.0.0"
   },
   "files": [
     "dist",
-    "bin",
     "config",
-    "docs",
-    "src"
+    "docs"
   ],
   "scripts": {
     "build": "tsc",

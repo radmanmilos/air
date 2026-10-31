@@ -1,4 +1,4 @@
-import { MockAdapter, runMock } from '@/adapters/mock';
+import { MockAdapter, runMock } from './mock-adapter';
 import { classifyError } from '@/adapters/conformance';
 import type { AgentAdapter } from '@/adapters/adapter';
 import { describe, it, expect } from 'vitest';
@@ -29,6 +29,13 @@ describe('AgentAdapter conformance (G-03)', () => {
   it('never classifies stdout prose as RATE_LIMIT (false_positive exits 0)', async () => {
     const r = await runMock('false_positive');
     expect(r.code).toBe(0);
+    expect(adapter.classifyError(r.code, r.stderr)).not.toBe('RATE_LIMIT');
+  });
+
+  it('does not label success exits as failure categories', async () => {
+    const r = await runMock('succeed');
+    expect(r.code).toBe(0);
+    expect(adapter.classifyError(r.code, r.stderr)).not.toBe('TASK_FAILURE');
     expect(adapter.classifyError(r.code, r.stderr)).not.toBe('RATE_LIMIT');
   });
 

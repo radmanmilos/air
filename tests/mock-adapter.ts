@@ -1,17 +1,20 @@
 // Mock adapter implementing AgentAdapter for tests. Wraps tests/fixtures/mock-tool.js.
-// Behavior is controlled by env vars set on the CommandSpec.
+//
+// NOTE: This file lives under tests/ and is test-only. It must not be part of
+// the published runtime package (see R3-08). Production adapters must use the
+// shared process runner (src/execution/runner.ts), not spawn directly.
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import type { AgentAdapter } from './adapter';
-import type { ErrorCategory, CommandSpec, ParsedEvent, TaskInput } from '../types';
+import type { AgentAdapter } from '../src/adapters/adapter';
+import type { ErrorCategory, CommandSpec, ParsedEvent, TaskInput } from '../src/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MOCK_TOOL = join(__dirname, '..', '..', 'tests', 'fixtures', 'mock-tool.js');
+const MOCK_TOOL = join(__dirname, 'fixtures', 'mock-tool.js');
 
 const RATE_LIMIT_RE = /rate limit|429|too many requests/i;
-const AUTH_RE = /invalid api key|401|unauthorized|authentication failed/i;
+const AUTH_RE = /invalid api key|401|unauthorized|authentication failed|auth failed/i;
 
 export class MockAdapter implements AgentAdapter {
   id = 'mock';
@@ -45,12 +48,23 @@ export class MockAdapter implements AgentAdapter {
     return [{ type: 'stdout', data: text }];
   }
 
+  /**
+   * Classify a failure from exit code + stderr + structured evidence.
+   *
+   * Success exits (exitCode === 0) are NOT classified as failures. This
+   * method is only meaningful on non-zero / signal / timeout paths. Callers
+   * must check the ProcessOutcome first (timedOut, cancelled, spawnError) and
+   * only delegate to classifyError for normal non-zero exits with provider
+   * evidence. Returning a failure category on exit 0 would mislead callers.
+   */
   classifyError(exitCode: number | null, stderr: string, _structured?: unknown): ErrorCategory {
+    if (exitCode === 0) {
+      return 'UNKNOWN';
+    }
     if (exitCode === null) return 'PROCESS_CRASH';
-    if (exitCode === 0) return 'TASK_FAILURE';
     if (AUTH_RE.test(stderr)) return 'AUTH_ERROR';
     if (RATE_LIMIT_RE.test(stderr)) return 'RATE_LIMIT';
-    if (/timeout/i.test(stderr)) return 'TIMEOUT';
+    if (/timeout|timed out/i.test(stderr)) return 'TIMEOUT';
     if (/not found|not installed|enoent/i.test(stderr)) return 'TOOL_NOT_INSTALLED';
     return 'UNKNOWN';
   }

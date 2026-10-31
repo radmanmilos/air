@@ -8,7 +8,7 @@
 
 import type { AgentAdapter } from './adapter';
 import type { ErrorCategory } from '../types/errors';
-import { getErrorAction, NO_FAILOVER_CATEGORIES, triggersFailover } from '../types/errors';
+import { getErrorAction } from '../types/errors';
 
 const AUTH_RE = /invalid api key|401|unauthorized|authentication failed|auth failed/i;
 const RATE_LIMIT_RE = /rate limit|429|too many requests/i;
@@ -60,4 +60,4 @@ export function classifyError(
   return category;
 }
 
-export { getErrorAction, NO_FAILOVER_CATEGORIES, triggersFailover };
+export { getErrorAction };

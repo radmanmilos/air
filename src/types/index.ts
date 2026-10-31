@@ -1,7 +1,6 @@
-// Shared domain types for air.
-
 export * from './errors';
 export * from './result';
+export * from './outcome';
 
 export interface ToolCapabilities {
   headlessExecution: boolean;

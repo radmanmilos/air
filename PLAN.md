@@ -23,6 +23,64 @@ This plan was updated after external reviews (see `project_reviews/`). Conflicts
 - **Delta review 2 (R2-01..R2-12):** Phase-order gate, dirty-tree policy, unified error taxonomy, result states, reproducible package metadata, test packaging, status/health semantics, platform paths, untrusted repo config, MCP lifecycle/consent, crash-safe persistence, script portability.
 - **DeepSeek review (G-01..G-06):** Secret redaction layer, structured JSONL observability, formal `AgentAdapter` contract + conformance suite, concurrency/resource governance, executable `docs/behavior-spec.md`, config schema versioning + `air config migrate`.
 - **Grok review (G-01..G-12):** Phase 0 adapter spike docs, Phase 2/3 gate enforcement, canonical error taxonomy in `src/types/errors.ts`, result states in `src/types/result.ts`, dirty-tree policy, process runner requirements, config/paths, handoff/security, MCP semantics, package/test hygiene, observability, router simplicity.
+- **Grok delta 2 (G2-01..G2-12):** Shared execution runner, health tracker with atomic persistence, Zod config loader, router priority-list, context/dirty-tree handoff, CLI command logic, aider adapter, MCP server, redaction hardening, structured observability, second adapter, concurrency lock.
+- **ChatGPT delta 3 (R3-01..R3-08):** Phase 0 spike evidence, `package.json` `main` path fix, CLI shebang, unified error action policy, `ProcessOutcome` evidence, redaction determinism/quoted-secrets, CLI/behavior-spec alignment, test-only mock kept out of published package.
+
+## Canonical types
+
+- `ErrorCategory` + `ERROR_POLICY` (the single action authority) — `src/types/errors.ts`.
+- `ResultState` — `src/types/result.ts`.
+- `ProcessOutcome` (timedOut, cancelled, spawnError, signal) — `src/types/outcome.ts`.
+- Shared domain types (`TaskInput`, `CommandSpec`, `ToolCapabilities`, `ExecutionCandidate`, `ParsedEvent`) — `src/types/index.ts`.
+
+## Adapter contract
+
+`AgentAdapter` (`src/adapters/adapter.ts`) is the only surface the router may depend on:
+`id`, `provider`, `model`, `capabilities`, `canHandle`, `buildCommand`, `parseOutput`, `classifyError`.
+A conformance suite (`src/adapters/conformance.ts`) must pass before an adapter is registered.
+Test-only mock adapter lives under `tests/` (not in the published package).
+
+## Redaction
+
+`src/security/redact.ts` is the single choke point for all outbound text (terminal, log, trace, handoff).
+Redaction is idempotent and deterministic. The `allow` option protects allowlisted values.
+`--api-key=value` and quoted `.env` values are handled.
+
+## Config schema
+
+Zod is the single source of truth. Config is versioned (`version: 1`); `air config migrate` upgrades older versions.
+Precedence: CLI > env > repo `.airrc.yaml` > global > defaults. Repo config is untrusted by default.
+
+## File Structure
+
+```
+air/
+├── bin/air.ts
+├── src/
+│   ├── adapters/         # adapter.ts (contract), conformance.ts
+│   ├── config/           # schema.ts, loader.ts, paths.ts (planned)
+│   ├── execution/        # runner.ts (planned)
+│   ├── health/           # tracker.ts (planned)
+│   ├── mcp/              # server.ts (planned)
+│   ├── router/           # router.ts (planned)
+│   ├── security/         # redact.ts
+│   ├── types/            # errors.ts, result.ts, outcome.ts, index.ts
+│   └── utils/
+├── config/
+│   └── models/
+├── docs/
+│   ├── behavior-spec.md
+│   └── adapters/         # aider.md, goose.md
+├── tests/
+│   ├── fixtures/         # mock-tool.js
+│   ├── mock-adapter.ts
+│   └── *.test.ts
+├── package.json
+├── tsconfig.json
+├── tsconfig.test.json
+├── vitest.config.ts
+└── README.md
+```
 
 ## Goal
 
