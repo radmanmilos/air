@@ -5,8 +5,7 @@ import { loadConfig, migrateConfig } from '../src/config/loader';
 import { createHealthTracker } from '../src/health/tracker';
 import { selectCandidate, formatRouteDecision } from '../src/router/router';
 import { AiderAdapter } from '../src/adapters/aider';
-import { GooseAdapter } from '../src/adapters/goose';
-import { MockAdapter } from '../tests/mock-adapter';
+import { availableAdapters, adapterStatus } from '../src/adapters/registry';
 import { runProcess } from '../src/execution/runner';
 import { classifyOutcome } from '../src/types/outcome';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../src/types/errors';
@@ -28,9 +27,9 @@ program
   .version('0.1.0');
 
 function listAdapters(): any[] {
-  // MVP: mock + goose adapters are registered. Aider requires the real
-  // binary on PATH; it is included when available.
-  return [new MockAdapter(), new GooseAdapter()];
+  // Production registry: real adapters only, discovered from PATH.
+  // MockAdapter is test-only and injected explicitly by tests.
+  return availableAdapters();
 }
 
 async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean }) {
@@ -67,6 +66,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
   const visited = new Set<string>();
   let hops = 0;
   const maxHops = config.failover.maxHops;
+  let lastCategory: ErrorCategory = 'UNKNOWN';
 
   // Failover loop: try candidates until success, abort, or hop cap.
   while (hops < maxHops) {
@@ -88,6 +88,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     hops++;
 
     const spec = adapter.buildCommand(taskInput);
+    const beforeSnap = snapshotGit(cwd);
     const state = {
       runId,
       task,
@@ -112,16 +113,40 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
     const fact = classifyOutcome(outcome);
     let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr);
+    lastCategory = category;
 
+    // Update health tracker before the next routing decision (R4-03).
+    if (outcome.cancelled) {
+      tracker.recordFailure(adapter.provider, adapter.model, 'PROCESS_CRASH');
+    } else if (outcome.timedOut) {
+      tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
+      tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, 'TIMEOUT');
+    } else if (outcome.spawnError) {
+      tracker.recordFailure(adapter.provider, adapter.model, 'TOOL_NOT_INSTALLED');
+    } else if (outcome.exitCode === 0) {
+      tracker.recordSuccess(adapter.provider, adapter.model);
+    } else {
+      tracker.recordFailure(adapter.provider, adapter.model, category);
+      if (category === 'RATE_LIMIT' || category === 'QUOTA_EXCEEDED') {
+        tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, category);
+      }
+    }
+    await tracker.flush();
+
+    // Determine result from actual workspace delta, not stdout length (G3-03).
+    const afterSnap = snapshotGit(cwd);
+    const changed = afterSnap.staged.length > 0 || afterSnap.unstaged.length > 0 || afterSnap.untracked.length > 0;
     let result: ResultState;
     if (outcome.cancelled) {
       result = 'CANCELLED';
-    } else if (outcome.timedOut) {
-      result = 'FAILED';
-    } else if (outcome.spawnError) {
+    } else if (outcome.timedOut || outcome.spawnError) {
       result = 'FAILED';
     } else if (outcome.exitCode === 0) {
-      result = defaultStateForTask(!!options.readOnly, outcome.stdout.length > 0);
+      if (isWriteTask) {
+        result = changed ? 'SUCCEEDED_WITH_CHANGES' : 'NO_CHANGES';
+      } else {
+        result = changed ? 'NEEDS_USER_REVIEW' : 'SUCCEEDED_READ_ONLY';
+      }
     } else {
       result = 'FAILED';
     }
@@ -129,15 +154,15 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     const endedAt = new Date().toISOString();
     await writeTaskState({
       ...state,
-      state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' ? 'COMPLETED' : 'FAILED',
+      state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
       result,
       endedAt,
-      error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY'
+      error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
         ? { category, message: outcome.stderr.slice(0, 500) }
         : undefined,
     });
 
-    trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops });
+    trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed });
 
     if (outcome.cancelled) {
       console.log(chalk.yellow('Cancelled by user.'));
@@ -152,6 +177,10 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       process.exit(1);
     }
     if (outcome.exitCode === 0) {
+      if (result === 'NO_CHANGES') {
+        console.log(chalk.yellow('Tool exited 0 but no workspace changes detected (NO_CHANGES).'));
+        process.exit(0);
+      }
       console.log(chalk.green(`Succeeded (${result}).`));
       process.exit(0);
     }
@@ -160,7 +189,6 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     const action = getErrorAction(category);
     if (triggersFailover(category)) {
       if (options.auto && hops < maxHops) {
-        // Find the next candidate and check the allow-list.
         const nextDecision = selectCandidate(
           { ...taskInput, preferredTool: undefined },
           adapters.filter((a) => a.id !== adapter.id),
@@ -172,22 +200,20 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
           process.exit(2);
         }
         const nextAdapter = adapters.find((a) => a.id === next.id)!;
-        const handoff = buildHandoff(taskInput, adapter, nextAdapter);
         const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
         if (!allowCheck.ok) {
           console.log(chalk.yellow(`Handoff blocked: ${allowCheck.reason}. Action: ${action}`));
           process.exit(2);
         }
-        if (allowCheck.ok && options.auto) {
-          console.log(chalk.yellow(`Auto-switching to ${next.id} (${category}).`));
-          console.log(chalk.gray(handoff));
-          continue;
-        }
-        console.log(chalk.yellow(`Failover proposed (${category}). Action: ${action}. Next: ${next.id}`));
-        process.exit(2);
+        // Inject handoff into the next run's task prompt.
+        const handoff = buildHandoff(taskInput, adapter, nextAdapter);
+        taskInput.prompt = `${task}\n\n--- handoff ---\n${handoff}`;
+        console.log(chalk.yellow(`Auto-switching to ${next.id} (${category}).`));
+        console.log(chalk.gray(handoff));
+        continue;
       }
-      console.log(chalk.red(`Failed (${category}). Action: ${action}`));
-      process.exit(1);
+      console.log(chalk.yellow(`Failover proposed (${category}). Action: ${action}.`));
+      process.exit(2);
     }
     console.log(chalk.red(`Failed (${category}). Action: ${action}`));
     process.exit(1);
@@ -212,9 +238,7 @@ function showStatus(options: { json?: boolean }) {
     const data = {
       command: 'status',
       version: '0.1.0',
-      tools: [{ id: 'mock', provider: 'openrouter', model: 'mock-model', available: true }],
-      providers: ['openrouter'],
-      models: ['mock-model'],
+      tools: adapterStatus(),
       cooldowns: tracker.getCooldowns().map((c) => ({
         provider: c.provider,
         model: c.model,
@@ -228,7 +252,7 @@ function showStatus(options: { json?: boolean }) {
       return;
     }
     console.log(chalk.cyan('air status'));
-    console.log(chalk.gray('Tools:'), data.tools.map((t) => t.id).join(', ') || 'none');
+    console.log(chalk.gray('Tools:'), data.tools.map((t) => `${t.id}${t.available ? '' : ' (unavailable)'}`).join(', ') || 'none');
     console.log(chalk.gray('Cooldowns:'), data.cooldowns.length);
   });
 }

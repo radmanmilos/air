@@ -12,7 +12,7 @@
 //   take precedence over adapter stderr matching
 
 import { execSync } from 'node:child_process';
-import { redact } from '../security/redact';
+import { StreamingRedactor } from '../security/streaming-redact';
 import type { CommandSpec, ProcessOutcome } from '../types';
 
 // cross-spawn has no published @types package and ships as ESM-only.
@@ -52,12 +52,19 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
       cwd: spec.cwd,
       env: spec.env ? { ...process.env, ...spec.env } : process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
+      // On Unix, spawn detached so the child becomes a new process group
+      // leader. This makes process.kill(-pid, ...) reliable for tree-kill.
+      // On Windows, taskkill /T /F handles the tree regardless.
+      detached: process.platform !== 'win32',
     });
 
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
     let timedOut = false;
     let cancelled = false;
+
+    const stdoutRedactor = new StreamingRedactor();
+    const stderrRedactor = new StreamingRedactor();
 
     const finish = (outcome: ProcessOutcome) => {
       if (settled) return;
@@ -102,7 +109,7 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     }
 
     child.stdout?.on('data', (buf: Buffer) => {
-      const text = redact(buf.toString());
+      const text = stdoutRedactor.feed(buf);
       if (stdout.length < maxBuffer) {
         const remaining = maxBuffer - stdout.length;
         stdout += text.slice(0, remaining);
@@ -114,7 +121,7 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     });
 
     child.stderr?.on('data', (buf: Buffer) => {
-      const text = redact(buf.toString());
+      const text = stderrRedactor.feed(buf);
       if (stderr.length < maxBuffer) {
         const remaining = maxBuffer - stderr.length;
         stderr += text.slice(0, remaining);
@@ -126,6 +133,8 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     });
 
     child.on('error', (err: NodeJS.ErrnoException) => {
+      stdout += stdoutRedactor.flush();
+      stderr += stderrRedactor.flush();
       finish({
         exitCode: null,
         signal: null,
@@ -141,6 +150,8 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     });
 
     child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
+      stdout += stdoutRedactor.flush();
+      stderr += stderrRedactor.flush();
       finish({
         exitCode: code,
         signal,

@@ -22,6 +22,9 @@ const NOT_FOUND_RE = /not found|not installed|enoent/i;
  * Throws if the adapter returns an unknown category, or if the category
  * contradicts obvious evidence (e.g. RATE_LIMIT for stderr containing an
  * auth error).
+ *
+ * Process facts (timedOut, cancelled, spawnError) take precedence over
+ * stderr matching and are passed as `structured`.
  */
 export function classifyError(
   adapter: AgentAdapter,

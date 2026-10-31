@@ -1,18 +1,27 @@
 # air
 
-**Status:** Phases 0-5 complete. 94 tests passing. CLI + MCP server functional.
+**Status:** Phases 0-5 implemented. 94 tests passing. CLI + MCP server functional.
 
-Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider, goose, opencode, and kilocode with automatic failover on rate limits.
+Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
-## Features
+## What works today
 
-- **Smart routing** - Priority-list candidate selection with exact skip reasons (cooldown_active, capability_mismatch, cannot_handle, tool_not_registered)
+- **Routing** - Priority-list candidate selection with exact skip reasons (cooldown_active, capability_mismatch, cannot_handle, tool_not_registered)
 - **Failover with control** - Asks before switching by default, optional auto-switch (`--auto`)
 - **Stream + buffer** - Live output while parsing for rate limits; bounded rolling buffer with truncation metadata
 - **Context handoff** - Builds handoff from git state (never model summary); redacts secrets
 - **MCP server** - Expose routing to other agents via stdio JSON-RPC
-- **Self-contained** - All configs and model lists bundled
 - **Safety** - Dirty-tree refusal by default (`--allow-dirty` opt-in); provider allow-list; hop cap; revisit prevention
+- **Success detection** - Uses actual workspace delta (git status/diff), not stdout length
+- **Process facts** - Timeout, cancellation, and spawn errors take precedence over stderr matching
+- **Streaming redaction** - Secrets redacted per-chunk with overlap to catch split tokens
+
+## Known limitations
+
+- MCP `approve_failover` flips state to SWITCHING but does not yet continue execution (pending G3-02)
+- MCP `run_task` awaits the full process inside the tool handler (pending G3-12)
+- opencode and kilocode are not implemented; README reflects only aider + goose
+- `npm run lint` is not configured (eslint not installed)
 
 ## Quick Start
 
@@ -41,7 +50,7 @@ central path module:
 |---|---|---|
 | Linux | `$XDG_CONFIG_HOME/air` (fallback `~/.config/air`) | `$XDG_CACHE_HOME/air` (fallback `~/.cache/air`) |
 | macOS | `~/Library/Application Support/air` | `~/Library/Caches/air` |
-| Windows | `%APPDATA%/air` | `%LOCALAPPDATA%/air` |
+| Windows | `%APPDATA%/air` | `%LOCALAPPDATA/air` |
 
 Global config: platform config directory / `config.yaml`  
 Repo config: `.airrc.yaml` (untrusted by default; validation required)  
@@ -66,3 +75,5 @@ npm run dev            # tsx bin/air.ts
 | aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
 | goose | `goose` | `goose run --text` | 1.57.0 |
 | mock (test-only) | `node tests/fixtures/mock-tool.js` | env-controlled | n/a |
+
+Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code.

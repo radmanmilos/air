@@ -71,7 +71,12 @@ export class AiderAdapter implements AgentAdapter {
    * success, but it is also never a failure category. This method is only
    * meaningful on non-zero / signal / timeout paths.
    */
-  classifyError(exitCode: number | null, stderr: string, _structured?: unknown): ErrorCategory {
+  classifyError(exitCode: number | null, stderr: string, structured?: unknown): ErrorCategory {
+    // Process facts take precedence over stderr matching (R4-03).
+    const s = structured as { timedOut?: boolean; cancelled?: boolean; spawnError?: { code?: string } } | undefined;
+    if (s?.timedOut) return 'TIMEOUT';
+    if (s?.cancelled) return 'USER_CANCELLED';
+    if (s?.spawnError) return 'TOOL_NOT_INSTALLED';
     if (exitCode === 0) return 'UNKNOWN';
     if (exitCode === null) return 'PROCESS_CRASH';
     if (AUTH_RE.test(stderr)) return 'AUTH_ERROR';

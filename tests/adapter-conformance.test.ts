@@ -1,7 +1,33 @@
-import { MockAdapter, runMockThroughRunner, classifyOutcomeMock } from './mock-adapter';
+import { MockAdapter } from '../src/adapters/mock';
+import { runProcess } from '../src/execution/runner';
 import { classifyError } from '../src/adapters/conformance';
-import type { AgentAdapter } from '../src/adapters/adapter';
+import type { AgentAdapter, ProcessOutcome, TaskInput } from '../src/types';
 import { describe, it, expect } from 'vitest';
+
+async function runMockThroughRunner(mode: string, options: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<ProcessOutcome> {
+  const adapter = new MockAdapter();
+  const spec = adapter.buildCommand({
+    id: 'test-task',
+    prompt: 'mock',
+    cwd: process.cwd(),
+    mode: 'ask',
+  } as TaskInput);
+  spec.env = { ...spec.env, MOCK_MODE: mode };
+  const { outcome } = await runProcess(spec, {
+    timeoutMs: options.timeoutMs,
+    signal: options.signal,
+  });
+  return outcome;
+}
+
+function classifyOutcomeMock(outcome: ProcessOutcome): string {
+  const adapter = new MockAdapter();
+  return classifyError(adapter, outcome.exitCode, outcome.stderr, {
+    timedOut: outcome.timedOut,
+    cancelled: outcome.cancelled,
+    spawnError: outcome.spawnError,
+  });
+}
 
 describe('AgentAdapter conformance (G-03)', () => {
   const adapter = new MockAdapter();
