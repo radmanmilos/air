@@ -16,6 +16,7 @@ import { snapshotGit, formatDirtyReport } from '../src/context/checkpoint';
 import { makeRunId, writeTaskState, appendTaskIndex } from '../src/execution/task-state';
 import { trace } from '../src/observability/trace';
 import { redact } from '../src/security/redact';
+import { runVerify, formatVerifyReport } from '../src/context/verify';
 import { startMcp } from '../src/mcp/server';
 import { defaultAllowList, checkHandoffAllowlist, buildHandoff } from '../src/security/allowlist';
 
@@ -314,6 +315,17 @@ program
     // MCP speaks JSON-RPC on stdout; diagnostics go to stderr only.
     process.stderr.write('air mcp: starting MCP server on stdio\n');
     await startMcp();
+  });
+
+program
+  .command('verify')
+  .description('Run an approved verification command (array args, no shell)')
+  .argument('<cmd...>', 'Command and arguments')
+  .option('--cwd <dir>', 'Working directory')
+  .action((cmd: string[], options: { cwd?: string }) => {
+    const result = runVerify(cmd, options.cwd ?? process.cwd());
+    console.log(formatVerifyReport(result));
+    process.exit(result.ok ? 0 : 1);
   });
 
 program.parse();

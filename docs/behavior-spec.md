@@ -56,6 +56,15 @@ CLI but not documented here, the conformance test in
 - When `air config migrate` is run,
 - Then it upgrades the config to the current schema version.
 
+### `air verify <cmd...>`
+- Given a verification command,
+- When `air verify` is run,
+- Then it executes the command with argument arrays and `shell: false`, never
+  concatenating user-controlled strings into shell commands, and reports
+  PASS/FAIL with exit code.
+- Options:
+  - `--cwd <dir>` — working directory.
+
 ### `air mcp`
 - Given a request for the MCP server,
 - When `air mcp` is run,

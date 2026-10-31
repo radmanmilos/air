@@ -1,1 +1,1 @@
-export { snapshotGit, formatDirtyReport, type GitSnapshot } from './checkpoint';
+export { runVerify, formatVerifyReport, type VerifyResult } from './verify';

@@ -18,6 +18,7 @@ function buildProgram() {
   program.command('status').option('--json');
   program.command('health').option('--json');
   program.command('route-test').argument('<task>').option('--explain').option('--json');
+  program.command('verify').argument('<cmd...>').option('--cwd <dir>');
 
   const configCmd = program.command('config').option('--validate');
   configCmd.command('migrate');
