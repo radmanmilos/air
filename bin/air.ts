@@ -17,7 +17,8 @@ import { trace } from '../src/observability/trace';
 import { redact } from '../src/security/redact';
 import { runVerify, formatVerifyReport } from '../src/context/verify';
 import { startMcp } from '../src/mcp/server';
-import { defaultAllowList, checkHandoffAllowlist, buildHandoff } from '../src/security/allowlist';
+import { buildHandoffPack } from '../src/context/handoff';
+import { defaultAllowList, checkHandoffAllowlist } from '../src/security/allowlist';
 
 const program = new Command();
 
@@ -205,8 +206,18 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
           console.log(chalk.yellow(`Handoff blocked: ${allowCheck.reason}. Action: ${action}`));
           process.exit(2);
         }
-        // Inject handoff into the next run's task prompt.
-        const handoff = buildHandoff(taskInput, adapter, nextAdapter);
+        // Inject mechanical git-state handoff into the next run's task prompt.
+        const handoff = buildHandoffPack({
+          cwd,
+          prompt: task,
+          from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
+          to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
+          mode: options.auto ? 'auto' : 'ask',
+          files: options.files,
+          category,
+          summary: outcome.stderr.slice(0, 200),
+          outputTail: outcome.stderr.slice(-2048),
+        });
         taskInput.prompt = `${task}\n\n--- handoff ---\n${handoff}`;
         console.log(chalk.yellow(`Auto-switching to ${next.id} (${category}).`));
         console.log(chalk.gray(handoff));

@@ -38,6 +38,15 @@ export function classifyError(
     throw new Error(`Adapter ${adapter.id} returned unknown category: ${category}`);
   }
 
+  // When process facts (timedOut, cancelled, spawnError) drive the
+  // classification, the stderr evidence is irrelevant — skip consistency
+  // checks so a timeout with "rate limit" in stderr doesn't trip the
+  // evidence guard.
+  const s = structured as { timedOut?: boolean; cancelled?: boolean; spawnError?: unknown } | undefined;
+  if (s?.timedOut || s?.cancelled || s?.spawnError) {
+    return category;
+  }
+
   // Evidence consistency checks.
   if (AUTH_RE.test(stderr) && category !== 'AUTH_ERROR' && category !== 'UNKNOWN') {
     throw new Error(
@@ -54,9 +63,9 @@ export function classifyError(
       `Adapter ${adapter.id} returned ${category} but stderr contains a timeout`,
     );
   }
-  if (NOT_FOUND_RE.test(stderr) && category !== 'TOOL_NOT_INSTALLED' && category !== 'UNKNOWN') {
+  if (NOT_FOUND_RE.test(stderr) && category !== 'TOOL_NOT_INSTALLED' && category !== 'MODEL_UNAVAILABLE' && category !== 'UNKNOWN') {
     throw new Error(
-      `Adapter ${adapter.id} returned ${category} but stderr indicates the tool is missing`,
+      `Adapter ${adapter.id} returned ${category} but stderr indicates the tool or model is missing`,
     );
   }
 
