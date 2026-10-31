@@ -18,6 +18,7 @@ import { redact } from '../src/security/redact';
 import { runVerify, formatVerifyReport } from '../src/context/verify';
 import { startMcp } from '../src/mcp/server';
 import { buildHandoffPack } from '../src/context/handoff';
+import { EXIT_CODES, type ExitCode } from '../src/types/exit-codes';
 import { defaultAllowList, checkHandoffAllowlist } from '../src/security/allowlist';
 
 const program = new Command();
@@ -43,7 +44,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
   if (isWriteTask && snap.dirty && !options.allowDirty) {
     console.log(chalk.red(formatDirtyReport(snap)));
-    process.exit(4);
+    process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
   }
 
   const { config } = await loadConfig({ cwd });
@@ -75,7 +76,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     if (!decision.chosen) {
       console.log(chalk.red('No eligible candidate.'));
       console.log(chalk.gray(formatRouteDecision(decision)));
-      process.exit(2);
+      process.exit(EXIT_CODES.ALL_EXHAUSTED);
     }
 
     const chosen = decision.chosen;
@@ -83,7 +84,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     const key = `${adapter.provider}/${adapter.model}`;
     if (visited.has(key)) {
       console.log(chalk.red(`Candidate ${chosen.id} already visited; refusing to loop.`));
-      process.exit(2);
+      process.exit(EXIT_CODES.ALL_EXHAUSTED);
     }
     visited.add(key);
     hops++;
@@ -167,23 +168,23 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
     if (outcome.cancelled) {
       console.log(chalk.yellow('Cancelled by user.'));
-      process.exit(3);
+      process.exit(EXIT_CODES.USER_CANCELLED);
     }
     if (outcome.timedOut) {
       console.log(chalk.red('Timed out.'));
-      process.exit(1);
+      process.exit(EXIT_CODES.TIMEOUT);
     }
     if (outcome.spawnError) {
       console.log(chalk.red(`Tool not available: ${outcome.spawnError.message}`));
-      process.exit(1);
+      process.exit(EXIT_CODES.TASK_FAILURE);
     }
     if (outcome.exitCode === 0) {
       if (result === 'NO_CHANGES') {
         console.log(chalk.yellow('Tool exited 0 but no workspace changes detected (NO_CHANGES).'));
-        process.exit(0);
+        process.exit(EXIT_CODES.NO_CHANGES);
       }
       console.log(chalk.green(`Succeeded (${result}).`));
-      process.exit(0);
+      process.exit(EXIT_CODES.SUCCESS);
     }
 
     // Non-zero exit: decide failover.
@@ -198,13 +199,13 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
         const next = nextDecision.chosen;
         if (!next) {
           console.log(chalk.red(`No alternative candidate (${category}). Action: ${action}`));
-          process.exit(2);
+          process.exit(EXIT_CODES.ALL_EXHAUSTED);
         }
         const nextAdapter = adapters.find((a) => a.id === next.id)!;
         const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
         if (!allowCheck.ok) {
           console.log(chalk.yellow(`Handoff blocked: ${allowCheck.reason}. Action: ${action}`));
-          process.exit(2);
+          process.exit(EXIT_CODES.ALL_EXHAUSTED);
         }
         // Inject mechanical git-state handoff into the next run's task prompt.
         const handoff = buildHandoffPack({
@@ -224,14 +225,14 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
         continue;
       }
       console.log(chalk.yellow(`Failover proposed (${category}). Action: ${action}.`));
-      process.exit(2);
+      process.exit(EXIT_CODES.ALL_EXHAUSTED);
     }
     console.log(chalk.red(`Failed (${category}). Action: ${action}`));
-    process.exit(1);
+    process.exit(EXIT_CODES.TASK_FAILURE);
   }
 
   console.log(chalk.red(`Hop cap reached (${maxHops}).`));
-  process.exit(2);
+  process.exit(EXIT_CODES.ALL_EXHAUSTED);
 }
 
 program
