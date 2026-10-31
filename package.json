@@ -24,7 +24,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "tsx bin/air.ts"

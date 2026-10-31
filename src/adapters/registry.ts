@@ -8,6 +8,10 @@ import { execSync } from 'node:child_process';
 import type { AgentAdapter } from './adapter';
 import { AiderAdapter } from './aider';
 import { GooseAdapter } from './goose';
+import { OpenCodeAdapter } from './opencode';
+import { KilocodeAdapter } from './kilocode';
+import { CodexAdapter } from './codex';
+import { GitHubCopilotAdapter } from './github-copilot';
 
 export interface AdapterInfo {
   adapter: AgentAdapter;
@@ -39,6 +43,10 @@ export function listAdapters(): AdapterInfo[] {
   const candidates: { adapter: AgentAdapter; exe: string }[] = [
     { adapter: new AiderAdapter(), exe: 'aider' },
     { adapter: new GooseAdapter(), exe: 'goose' },
+    { adapter: new OpenCodeAdapter(), exe: 'opencode' },
+    { adapter: new KilocodeAdapter(), exe: 'kilocode' },
+    { adapter: new CodexAdapter(), exe: 'codex' },
+    { adapter: new GitHubCopilotAdapter(), exe: 'gh' },
   ];
 
   return candidates.map(({ adapter, exe }) => {

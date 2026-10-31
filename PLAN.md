@@ -367,8 +367,24 @@ applied. Conflicts were resolved as follows:
 
 ## Current state (2026-10-31)
 
-- 21 test files, 115 tests passing.
+- 25 test files, 144 tests passing.
 - `npm run typecheck`, `npm run typecheck:test`, `npm test` all green.
-- CLI verified: `air run`, `route-test --explain`, `status --json`, `verify`,
-  `air mcp` (initialize + get_status tool).
+- CLI verified: `air run`, `route-test --explain`, `status --json`, `verify`, `air mcp`, `air models`.
 - Pushed to `radmanmilos/air` on `main`.
+
+## Adapters
+
+| Adapter | Executable | Headless | Verified |
+|---|---|---|---|
+| aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
+| goose | `goose` | `goose run --text` | 1.57.0 |
+| opencode | `opencode` | `run --prompt --yes` | UNVERIFIED |
+| kilocode | `kilocode` | `run --prompt --yes` | UNVERIFIED |
+| codex | `codex` | `exec --skip-git-repo-check` | UNVERIFIED |
+| github-copilot | `gh` | `copilot --allow` | UNVERIFIED |
+| mock (test-only) | `node tests/fixtures/mock-tool.js` | env-controlled | n/a |
+
+All adapters are discovered from PATH at runtime. The mock adapter is test-only
+and is never registered by production code. opencode, kilocode, codex, and
+github-copilot are UNVERIFIED spikes — see their docs in `docs/adapters/` and
+confirm flags against the installed binaries before relying on them.
