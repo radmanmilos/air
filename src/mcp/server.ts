@@ -2,7 +2,8 @@
 //
 // Exposes run_task, get_task_status, get_task_output, approve_failover,
 // cancel_task, get_status over stdio. No prompting on stdin; approval is a
-// task-state transition (R2-10).
+// task-state transition (R2-10). Jobs run in the background so the MCP
+// client is not blocked waiting on long tasks.
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -10,22 +11,101 @@ import { z } from 'zod';
 import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
 import { selectCandidate, formatRouteDecision } from '../router/router';
-import { GooseAdapter } from '../adapters/goose';
-import { MockAdapter } from '../../tests/mock-adapter';
+import { availableAdapters, adapterStatus } from '../adapters/registry';
 import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../types/errors';
 import { defaultStateForTask, type ResultState } from '../types/result';
 import { snapshotGit, formatDirtyReport } from '../context/checkpoint';
+import { buildHandoffPack } from '../context/handoff';
 import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state';
 import { trace } from '../observability/trace';
 import { redact } from '../security/redact';
-import { defaultAllowList } from '../security/allowlist';
+import { defaultAllowList, checkHandoffAllowlist } from '../security/allowlist';
+import { EXIT_CODES } from '../types/exit-codes';
 
-const tasks = new Map<string, { state: any; controller: AbortController }>();
+interface Job {
+  state: any;
+  controller: AbortController;
+  promise: Promise<void>;
+  adapter?: any;
+  taskInput?: any;
+  cwd: string;
+  isWriteTask: boolean;
+}
+
+const jobs = new Map<string, Job>();
 
 function listAdapters(): any[] {
-  return [new MockAdapter(), new GooseAdapter()];
+  return availableAdapters();
+}
+
+async function runJob(job: Job): Promise<void> {
+  const { state, controller, adapter, taskInput, cwd, isWriteTask } = job;
+  const { config } = await loadConfig({ cwd });
+  const tracker = createHealthTracker();
+  await tracker.load();
+
+  const { outcome } = await runProcess(adapter.buildCommand(taskInput), {
+    timeoutMs: config.timeouts.defaultMs,
+    maxBufferBytes: config.buffers.maxBytes,
+    signal: controller.signal,
+  });
+
+  const fact = classifyOutcome(outcome);
+  let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr, {
+    timedOut: outcome.timedOut,
+    cancelled: outcome.cancelled,
+    spawnError: outcome.spawnError,
+  });
+
+  // Update health before the next routing decision.
+  if (outcome.cancelled) tracker.recordFailure(adapter.provider, adapter.model, 'USER_CANCELLED');
+  else if (outcome.timedOut) {
+    tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
+    tracker.setCooldown(adapter.provider, adapter.model, Date.now() + 60_000, 'TIMEOUT');
+  } else if (outcome.spawnError) tracker.recordFailure(adapter.provider, adapter.model, 'TOOL_NOT_INSTALLED');
+  else if (outcome.exitCode === 0) tracker.recordSuccess(adapter.provider, adapter.model);
+  else {
+    tracker.recordFailure(adapter.provider, adapter.model, category);
+    if (category === 'RATE_LIMIT' || category === 'QUOTA_EXCEEDED') {
+      tracker.setCooldown(adapter.provider, adapter.model, Date.now() + 60_000, category);
+    }
+  }
+  await tracker.flush();
+
+  const afterSnap = snapshotGit(cwd);
+  const changed = afterSnap.staged.length > 0 || afterSnap.unstaged.length > 0 || afterSnap.untracked.length > 0;
+  let result: ResultState;
+  if (outcome.cancelled) result = 'CANCELLED';
+  else if (outcome.timedOut || outcome.spawnError) result = 'FAILED';
+  else if (outcome.exitCode === 0) {
+    if (isWriteTask) result = changed ? 'SUCCEEDED_WITH_CHANGES' : 'NO_CHANGES';
+    else result = changed ? 'NEEDS_USER_REVIEW' : 'SUCCEEDED_READ_ONLY';
+  } else result = 'FAILED';
+
+  const finalState: any = {
+    ...state,
+    state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
+    result,
+    endedAt: new Date().toISOString(),
+    error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
+      ? { category, message: outcome.stderr.slice(0, 500) }
+      : undefined,
+  };
+  job.state = finalState;
+  await writeTaskState(finalState);
+  trace({ runId: job.state.runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, changed });
+
+  if (outcome.cancelled || outcome.timedOut || outcome.spawnError || outcome.exitCode !== 0) {
+    const action = getErrorAction(category);
+    if (triggersFailover(category)) {
+      finalState.state = 'AWAITING_APPROVAL';
+      finalState.proposedSwitch = { adapter: 'goose', provider: 'openai', model: 'gpt-4o', reason: category };
+      job.state = finalState;
+      await writeTaskState(finalState);
+    }
+  }
 }
 
 export async function startMcp(): Promise<void> {
@@ -46,12 +126,10 @@ export async function startMcp(): Promise<void> {
     async (args: any) => {
       const runId = makeRunId();
       const controller = new AbortController();
-      tasks.set(runId, { state: { runId, state: 'QUEUED' }, controller });
-      await appendTaskIndex(runId);
-
       const cwd = args.cwd ?? process.cwd();
       const snap = snapshotGit(cwd);
       const isWriteTask = !args.readOnly;
+
       if (isWriteTask && snap.dirty) {
         const st: any = {
           runId,
@@ -63,11 +141,11 @@ export async function startMcp(): Promise<void> {
           state: 'FAILED',
           startedAt: new Date().toISOString(),
           hops: 0,
-          maxHops: 0,
+          maxHops: 1,
           error: { category: 'PERMISSION_DENIED', message: formatDirtyReport(snap) },
         };
-        tasks.set(runId, { state: st, controller });
         await writeTaskState(st);
+        await appendTaskIndex(runId);
         return { content: [{ type: 'text', text: formatDirtyReport(snap) }] };
       }
 
@@ -99,72 +177,48 @@ export async function startMcp(): Promise<void> {
           maxHops: config.failover.maxHops,
           error: { category: 'MODEL_UNAVAILABLE', message: formatRouteDecision(decision) },
         };
-        tasks.set(runId, { state: st, controller });
         await writeTaskState(st);
+        await appendTaskIndex(runId);
         return { content: [{ type: 'text', text: `No eligible candidate.\n${formatRouteDecision(decision)}` }] };
       }
 
       const chosen = decision.chosen;
       const adapter = adapters.find((a) => a.id === chosen.id)!;
-      const spec = adapter.buildCommand(taskInput);
-      const running = {
+      const running: any = {
         runId,
         task: args.task,
         cwd,
         adapter: chosen.id,
         provider: chosen.provider,
         model: chosen.model,
-        state: 'RUNNING' as const,
+        state: 'RUNNING',
         startedAt: new Date().toISOString(),
         hops: 1,
         maxHops: config.failover.maxHops,
       };
-      tasks.set(runId, { state: running, controller });
       await writeTaskState(running);
+      await appendTaskIndex(runId);
       trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips });
 
-      const { outcome } = await runProcess(spec, {
-        timeoutMs: config.timeouts.defaultMs,
-        maxBufferBytes: config.buffers.maxBytes,
-        signal: controller.signal,
-      });
-
-      const fact = classifyOutcome(outcome);
-      let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr);
-      let result: ResultState;
-      if (outcome.cancelled) result = 'CANCELLED';
-      else if (outcome.timedOut || outcome.spawnError) result = 'FAILED';
-      else if (outcome.exitCode === 0) result = defaultStateForTask(!!args.readOnly, outcome.stdout.length > 0);
-      else result = 'FAILED';
-
-      const finalState: any = {
-        ...running,
-        state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' ? 'COMPLETED' : 'FAILED',
-        result,
-        endedAt: new Date().toISOString(),
-        error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY'
-          ? { category, message: outcome.stderr.slice(0, 500) }
-          : undefined,
+      const job: Job = {
+        state: running,
+        controller,
+        promise: Promise.resolve(),
+        adapter,
+        taskInput,
+        cwd,
+        isWriteTask,
       };
-      tasks.set(runId, { state: finalState, controller });
-      await writeTaskState(finalState);
-      trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs });
+      job.promise = runJob(job).catch((err) => {
+        job.state.error = { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) };
+        job.state.state = 'FAILED';
+        writeTaskState(job.state);
+      });
+      jobs.set(runId, job);
 
-      if (outcome.cancelled) return { content: [{ type: 'text', text: 'Cancelled.' }] };
-      if (outcome.timedOut) return { content: [{ type: 'text', text: `Timed out (${category}).` }] };
-      if (outcome.spawnError) return { content: [{ type: 'text', text: `Tool not available: ${outcome.spawnError.message}` }] };
-      if (outcome.exitCode !== 0) {
-        const action = getErrorAction(category);
-        if (triggersFailover(category)) {
-          finalState.state = 'AWAITING_APPROVAL';
-          finalState.proposedSwitch = { adapter: 'goose', provider: 'openai', model: 'gpt-4o', reason: category };
-          tasks.set(runId, { state: finalState, controller });
-          await writeTaskState(finalState);
-          return { content: [{ type: 'text', text: `Failover proposed (${category}). Action: ${action}. Call approve_failover(runId="${runId}") to proceed.` }] };
-        }
-        return { content: [{ type: 'text', text: `Failed (${category}). Action: ${action}` }] };
-      }
-return { content: [{ type: 'text', text: `Succeeded (${result}).` }] };
+      return {
+        content: [{ type: 'text', text: `Started task ${runId}. Poll get_task_status(runId="${runId}").` }],
+      };
     },
   );
 
@@ -176,9 +230,9 @@ return { content: [{ type: 'text', text: `Succeeded (${result}).` }] };
       inputSchema: { runId: z.string().describe('Task run id') },
     },
     async (args: any) => {
-      const t = tasks.get(args.runId) ?? (await readTaskState(args.runId));
-      if (!t) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
-      const state = t.state ?? t;
+      const job = jobs.get(args.runId);
+      const state = job?.state ?? (await readTaskState(args.runId));
+      if (!state) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
       return { content: [{ type: 'text', text: JSON.stringify(state) }] };
     },
   );
@@ -191,9 +245,10 @@ return { content: [{ type: 'text', text: `Succeeded (${result}).` }] };
       inputSchema: { runId: z.string().describe('Task run id') },
     },
     async (args: any) => {
-      const t = tasks.get(args.runId) ?? (await readTaskState(args.runId));
-      if (!t) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
-      return { content: [{ type: 'text', text: redact(JSON.stringify(t.state?.output ?? '')) }] };
+      const job = jobs.get(args.runId);
+      const state = job?.state ?? (await readTaskState(args.runId));
+      if (!state) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
+      return { content: [{ type: 'text', text: redact(JSON.stringify(state.output ?? '')) }] };
     },
   );
 
@@ -205,14 +260,14 @@ return { content: [{ type: 'text', text: `Succeeded (${result}).` }] };
       inputSchema: { runId: z.string().describe('Task run id') },
     },
     async (args: any) => {
-      const t = tasks.get(args.runId);
-      if (!t) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
-      if (t.state.state !== 'AWAITING_APPROVAL') {
-        return { content: [{ type: 'text', text: `Task not awaiting approval (state=${t.state.state})` }] };
+      const job = jobs.get(args.runId);
+      if (!job) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
+      if (job.state.state !== 'AWAITING_APPROVAL') {
+        return { content: [{ type: 'text', text: `Task not awaiting approval (state=${job.state.state})` }] };
       }
-      t.state.state = 'SWITCHING';
-      await writeTaskState(t.state);
-      return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Next candidate: ${t.state.proposedSwitch?.adapter ?? 'unknown'}.` }] };
+      job.state.state = 'SWITCHING';
+      await writeTaskState(job.state);
+      return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Next candidate: ${job.state.proposedSwitch?.adapter ?? 'unknown'}.` }] };
     },
   );
 
@@ -224,11 +279,11 @@ return { content: [{ type: 'text', text: `Succeeded (${result}).` }] };
       inputSchema: { runId: z.string().describe('Task run id') },
     },
     async (args: any) => {
-      const t = tasks.get(args.runId);
-      if (!t) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
-      t.controller.abort();
-      t.state.state = 'CANCELLED';
-      await writeTaskState(t.state);
+      const job = jobs.get(args.runId);
+      if (!job) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
+      job.controller.abort();
+      job.state.state = 'CANCELLED';
+      await writeTaskState(job.state);
       return { content: [{ type: 'text', text: `Cancelled ${args.runId}.` }] };
     },
   );
@@ -244,7 +299,7 @@ return { content: [{ type: 'text', text: `Succeeded (${result}).` }] };
       const tracker = createHealthTracker();
       await tracker.load();
       const data = {
-        tools: listAdapters().map((a) => ({ id: a.id, provider: a.provider, model: a.model, available: true })),
+        tools: adapterStatus(),
         cooldowns: tracker.getCooldowns().map((c) => ({ provider: c.provider, model: c.model, until: c.until, reason: c.reason })),
       };
       return { content: [{ type: 'text', text: JSON.stringify(data) }] };
@@ -255,10 +310,7 @@ return { content: [{ type: 'text', text: `Succeeded (${result}).` }] };
   await server.connect(transport);
 }
 
-import { fileURLToPath } from 'node:url';
-
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
-if (isMain) {
+if (typeof require !== 'undefined' && require.main === module) {
   startMcp().catch((err) => {
     console.error('MCP server failed:', err);
     process.exit(1);
