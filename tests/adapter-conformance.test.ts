@@ -1,6 +1,6 @@
-import { MockAdapter, runMock } from './mock-adapter';
-import { classifyError } from '@/adapters/conformance';
-import type { AgentAdapter } from '@/adapters/adapter';
+import { MockAdapter, runMockThroughRunner, classifyOutcomeMock } from './mock-adapter';
+import { classifyError } from '../src/adapters/conformance';
+import type { AgentAdapter } from '../src/adapters/adapter';
 import { describe, it, expect } from 'vitest';
 
 describe('AgentAdapter conformance (G-03)', () => {
@@ -17,31 +17,41 @@ describe('AgentAdapter conformance (G-03)', () => {
   });
 
   it('classifies rate_limit from stderr + non-zero exit', async () => {
-    const r = await runMock('rate_limit');
-    expect(adapter.classifyError(r.code, r.stderr)).toBe('RATE_LIMIT');
+    const outcome = await runMockThroughRunner('rate_limit');
+    expect(classifyOutcomeMock(outcome)).toBe('RATE_LIMIT');
   });
 
   it('classifies auth from stderr + non-zero exit', async () => {
-    const r = await runMock('auth');
-    expect(adapter.classifyError(r.code, r.stderr)).toBe('AUTH_ERROR');
+    const outcome = await runMockThroughRunner('auth');
+    expect(classifyOutcomeMock(outcome)).toBe('AUTH_ERROR');
   });
 
   it('never classifies stdout prose as RATE_LIMIT (false_positive exits 0)', async () => {
-    const r = await runMock('false_positive');
-    expect(r.code).toBe(0);
-    expect(adapter.classifyError(r.code, r.stderr)).not.toBe('RATE_LIMIT');
+    const outcome = await runMockThroughRunner('false_positive');
+    expect(outcome.exitCode).toBe(0);
+    expect(classifyOutcomeMock(outcome)).not.toBe('RATE_LIMIT');
   });
 
   it('does not label success exits as failure categories', async () => {
-    const r = await runMock('succeed');
-    expect(r.code).toBe(0);
-    expect(adapter.classifyError(r.code, r.stderr)).not.toBe('TASK_FAILURE');
-    expect(adapter.classifyError(r.code, r.stderr)).not.toBe('RATE_LIMIT');
+    const outcome = await runMockThroughRunner('succeed');
+    expect(outcome.exitCode).toBe(0);
+    expect(classifyOutcomeMock(outcome)).not.toBe('TASK_FAILURE');
+    expect(classifyOutcomeMock(outcome)).not.toBe('RATE_LIMIT');
   });
 
-  it('classifies crash', async () => {
-    const r = await runMock('crash');
-    expect(adapter.classifyError(r.code, r.stderr)).not.toBe('RATE_LIMIT');
+  it('timeout maps to TIMEOUT via process facts', async () => {
+    const outcome = await runMockThroughRunner('hang', { timeoutMs: 300 });
+    expect(outcome.timedOut).toBe(true);
+    expect(classifyOutcomeMock(outcome)).toBe('TIMEOUT');
+  });
+
+  it('cancellation maps to USER_CANCELLED via process facts', async () => {
+    const controller = new AbortController();
+    const promise = runMockThroughRunner('hang', { signal: controller.signal, timeoutMs: 30_000 });
+    setTimeout(() => controller.abort(), 200);
+    const outcome = await promise;
+    expect(outcome.cancelled).toBe(true);
+    expect(classifyOutcomeMock(outcome)).toBe('USER_CANCELLED');
   });
 
   it('classifyError helper rejects wrong categories', () => {

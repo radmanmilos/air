@@ -3,7 +3,6 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "rootDir": "./",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -16,6 +15,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["tests/**/*.ts", "vitest.config.ts"],
+  "include": ["tests/**/*.ts", "src/**/*.ts", "*.d.ts", "vitest.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
