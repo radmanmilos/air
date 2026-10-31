@@ -15,10 +15,15 @@ import { execSync } from 'node:child_process';
 import { redact } from '../security/redact';
 import type { CommandSpec, ProcessOutcome } from '../types';
 
-// cross-spawn has no published @types package, so we import it via a typed
-// require. It returns the same ChildProcess shape as node:child_process.spawn.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const spawn: (command: string, args?: readonly string[], options?: any) => any = require('cross-spawn').spawn;
+// cross-spawn has no published @types package and ships as ESM-only.
+// We import it lazily so the module graph stays compatible with both
+// CommonJS and ESM consumers.
+async function getSpawn(): Promise<(command: string, args?: readonly string[], options?: any) => any> {
+  const mod = (await import('cross-spawn')) as any;
+  const fn = typeof mod === 'function' ? mod : mod.spawn;
+  if (!fn) throw new Error('cross-spawn did not export a spawn function');
+  return fn;
+}
 
 export interface RunOptions {
   timeoutMs?: number;
@@ -33,6 +38,7 @@ export interface RunResult {
 }
 
 export async function runProcess(spec: CommandSpec, options: RunOptions = {}): Promise<RunResult> {
+  const spawnFn = await getSpawn();
   const maxBuffer = options.maxBufferBytes ?? 1_000_000;
 
   return new Promise((resolve) => {
@@ -42,7 +48,7 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     let stdoutTruncated = false;
     let stderrTruncated = false;
 
-    const child = spawn(spec.executable, spec.args, {
+    const child = spawnFn(spec.executable, spec.args, {
       cwd: spec.cwd,
       env: spec.env ? { ...process.env, ...spec.env } : process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
