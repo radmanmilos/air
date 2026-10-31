@@ -317,3 +317,58 @@ Every adapter implements `AgentAdapter` (src/adapters/adapter.ts):
 
 - `docs/behavior-spec.md` is the authoritative spec in Given/When/Then format.
 - A test validates `air --help` output against the commands documented there.
+
+## Reviews applied (round 3, 2026-10-31)
+
+Four independent reviews (ChatGPT, Claude v2, DeepSeek, Grok v3) were read and
+applied. Conflicts were resolved as follows:
+
+- **Adapter registration (G3-01):** Aider is now registered in CLI and MCP
+  adapter lists. Adapters are discovered from PATH at runtime; missing binaries
+  produce a precise `TOOL_NOT_INSTALLED` skip reason. The mock adapter is
+  test-only and is never reachable from production code.
+- **Production→test isolation (G3-08):** `MockAdapter` moved from
+  `tests/mock-adapter.ts` to `src/adapters/mock.ts`. Test files re-export it.
+  `grep -r "tests/" src bin` returns no results.
+- **Git-based result detection (G3-03):** Success/NO_CHANGES is computed from
+  the actual workspace delta (`git status --porcelain` + `git diff HEAD`),
+  not stdout length. Exit 0 with no file changes on a write task is
+  `NO_CHANGES`; read-only tasks with empty diff are `SUCCEEDED_READ_ONLY`.
+- **Process facts precedence (R4-03):** Timeout, cancellation, and spawn
+  errors take precedence over stderr matching in every adapter's
+  `classifyError`. Process facts are passed as the `structured` argument.
+- **Mechanical handoff (G3-04):** `src/context/handoff.ts` builds a handoff
+  pack from branch, HEAD, `git status --porcelain`, size-capped `git diff`,
+  changed file list, error category, and the last N KB of redacted output.
+  Never includes model-generated prose as evidence.
+- **Process-group spawn (G3-05):** The runner now spawns with
+  `detached: true` on Unix so `process.kill(-pid, ...)` reliably kills the
+  full process tree. Windows uses `taskkill /T /F`.
+- **Streaming redaction (R4-08):** `src/security/streaming-redact.ts` retains
+  a 128-byte overlap between chunks so token patterns spanning OS output
+  boundaries are detected before the chunk is emitted.
+- **Failover hardening (G3-06):** Visited set prevents A→B→A ping-pong.
+  Health updates (cooldown writes) happen before the next routing decision.
+  Handoff text is injected into the next run's task prompt. Hop cap and
+  allow-list blocks exit with `ALL_EXHAUSTED` (2) and list skip reasons.
+- **Exit code table (G3-13):** `src/types/exit-codes.ts` is the single source
+  of truth. 0=success, 1=task failure, 2=all exhausted, 3=cancel, 4=config/
+  dirty, 5=no changes, 6=timeout.
+- **Redaction choke point (G3-14):** `containsSecret` uses non-global
+  detection copies so it has no `lastIndex` state across calls. `--api-key`
+  and `--api-key=value` forms are both handled.
+- **MCP async (G3-12):** `run_task` starts a background job and returns the
+  runId immediately. Poll via `get_task_status` / `get_task_output`.
+- **Verify trust gate (G3-11):** `checkVerifyTrust` refuses repo-config
+  `verify.command` unless the repo path is in the global trusted-repos list.
+  CLI-supplied commands are always trusted.
+- **README honesty (G3-15):** README lists only implemented adapters (aider,
+  goose, mock-for-tests) and documents known limitations.
+
+## Current state (2026-10-31)
+
+- 21 test files, 115 tests passing.
+- `npm run typecheck`, `npm run typecheck:test`, `npm test` all green.
+- CLI verified: `air run`, `route-test --explain`, `status --json`, `verify`,
+  `air mcp` (initialize + get_status tool).
+- Pushed to `radmanmilos/air` on `main`.

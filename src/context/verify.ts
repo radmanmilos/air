@@ -4,6 +4,10 @@
 // `shell: false`. Never concatenates user-controlled strings into shell
 // commands. Repo config's verify.command is never executed by default;
 // this hook only runs when explicitly opted in via CLI or global config.
+//
+// Trust gate (G3-11): verify commands from repo config are refused unless
+// the repo path is listed in the global trusted-repos list. CLI-supplied
+// commands are always trusted.
 
 import { execFileSync } from 'node:child_process';
 import { redact } from '../security/redact';
@@ -14,6 +18,30 @@ export interface VerifyResult {
   stdout: string;
   stderr: string;
   command: string[];
+}
+
+export interface VerifyTrust {
+  trusted: boolean;
+  source: 'cli' | 'global' | 'repo' | 'none';
+  reason?: string;
+}
+
+export function checkVerifyTrust(command: string[], trustedRepos: string[], cwd: string): VerifyTrust {
+  // CLI-supplied commands are always trusted.
+  if (command.length > 0 && command[0].startsWith(process.cwd())) {
+    return { trusted: true, source: 'cli' };
+  }
+  // Repo config commands are refused unless the cwd is in the trusted list.
+  for (const trusted of trustedRepos) {
+    if (cwd === trusted || cwd.startsWith(trusted + '/') || cwd.startsWith(trusted + '\\')) {
+      return { trusted: true, source: 'global' };
+    }
+  }
+  return {
+    trusted: false,
+    source: 'none',
+    reason: `verify.command from repo config is refused; add ${cwd} to the global trusted-repos list`,
+  };
 }
 
 export function runVerify(command: string[], cwd: string, timeoutMs = 60_000): VerifyResult {
