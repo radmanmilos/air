@@ -3,7 +3,12 @@
 // this module. No feature may hard-code ~/.config or ~/.cache.
 
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
+
+/** Normalize path separators to forward slashes for cross-platform consistency. */
+function normalize(p: string): string {
+  return p.split(sep).join('/');
+}
 
 export type Platform = 'win32' | 'darwin' | 'linux' | 'other';
 
@@ -71,13 +76,13 @@ export function resolvePaths(
   }
 
   return {
-    configDir,
-    cacheDir,
-    globalConfigFile: join(configDir, 'config.yaml'),
-    healthFile: join(cacheDir, 'health.json'),
-    tasksDir: join(cacheDir, 'tasks'),
-    tracesDir: join(cacheDir, 'traces'),
-    logFile: join(cacheDir, 'air.log'),
+    configDir: normalize(configDir),
+    cacheDir: normalize(cacheDir),
+    globalConfigFile: normalize(join(configDir, 'config.yaml')),
+    healthFile: normalize(join(cacheDir, 'health.json')),
+    tasksDir: normalize(join(cacheDir, 'tasks')),
+    tracesDir: normalize(join(cacheDir, 'traces')),
+    logFile: normalize(join(cacheDir, 'air.log')),
   };
 }
 

@@ -1,5 +1,5 @@
-import { runProcess } from '../../src/execution/runner';
-import { redact, containsSecret } from '../../src/security/redact';
+import { runProcess } from '../src/execution/runner';
+import { redact, containsSecret } from '../src/security/redact';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, it, expect } from 'vitest';

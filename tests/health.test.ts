@@ -1,5 +1,5 @@
-import { createHealthTracker, shouldSetCooldown, shouldStopAndAsk, shouldAbort } from '../../src/health/tracker';
-import { ERROR_POLICY } from '../../src/types/errors';
+import { createHealthTracker, shouldSetCooldown, shouldStopAndAsk, shouldAbort } from '../src/health/tracker';
+import { ERROR_POLICY } from '../src/types/errors';
 import { describe, it, expect } from 'vitest';
 
 describe('health tracker (G2-02)', () => {

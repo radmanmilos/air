@@ -1,4 +1,4 @@
-import { resolvePaths } from '../../src/config/paths';
+import { resolvePaths } from '../src/config/paths';
 import { describe, it, expect } from 'vitest';
 
 describe('path resolver (G2-07, R2-08)', () => {
@@ -40,8 +40,8 @@ describe('path resolver (G2-07, R2-08)', () => {
       env: { APPDATA: 'C:\\AppData', LOCALAPPDATA: 'C:\\LocalAppData' },
       home: 'C:\\Users\\u',
     });
-    expect(p.configDir).toBe('C:\\AppData\\air');
-    expect(p.cacheDir).toBe('C:\\LocalAppData\\air');
+    expect(p.configDir).toBe('C:/AppData/air');
+    expect(p.cacheDir).toBe('C:/LocalAppData/air');
   });
 
   it('uses all the same central paths', () => {

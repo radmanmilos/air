@@ -1,4 +1,4 @@
-import { atomicWriteJson, readJsonFile } from '../../src/utils/atomic';
+import { atomicWriteJson, readJsonFile } from '../src/utils/atomic';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

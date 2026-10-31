@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { loadConfig, validateConfigFile, migrateConfig } from '../../src/config/loader';
-import { CONFIG_VERSION } from '../../src/config/schema';
+import { loadConfig, validateConfigFile, migrateConfig } from '../src/config/loader';
+import { CONFIG_VERSION } from '../src/config/schema';
 import { describe, it, expect } from 'vitest';
 
 describe('config loader (G2-03)', () => {
@@ -38,7 +38,7 @@ describe('config loader (G2-03)', () => {
     await writeFile(join(repo, '.airrc.yaml'), 'version: 1\nfailover:\n  mode: auto\n');
     const { config } = await loadConfig({
       cwd: repo,
-      cliOverrides: { failover: { mode: 'ask' } },
+      cliOverrides: { failover: { mode: 'ask', maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false } },
     });
     expect(config.failover.mode).toBe('ask');
   });
