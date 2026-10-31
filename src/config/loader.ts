@@ -29,7 +29,7 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
     concurrency: { maxConcurrentAgents: 1 },
     timeouts: { defaultMs: 300_000, perTool: {} },
     buffers: { maxBytes: 1_000_000 },
-    logging: { level: 'info', redact: true },
+    logging: { level: 'info', redact: true, rotation: { maxBytes: 10 * 1024 * 1024, maxBackups: 5 } },
   };
 
   // 2. Global config

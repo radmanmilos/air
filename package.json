@@ -24,6 +24,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint . --ext .ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev": "tsx bin/air.ts"
@@ -41,6 +42,9 @@
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
     "typescript": "^5.4.5",
     "tsx": "^4.7.2",
     "vitest": "^1.6.0"

@@ -10,7 +10,7 @@
 
 ## Reviews applied
 
-This plan was updated after external reviews (see `project_reviews/`). Conflicts were resolved as follows:
+This plan was updated after external reviews (see `docs/reviews/`). Conflicts were resolved as follows:
 
 - **Phase order:** Adopt the vertical-slice-first order from the Claude review (spikes + mock adapter before abstractions). ChatGPT's foundation-first order was rejected.
 - **TUI vs headless:** Adopt Claude's position: air is headless-only. Interactive TUI use is out of scope. Remove or reword the TUI principle.

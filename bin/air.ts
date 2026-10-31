@@ -18,6 +18,7 @@ import { redact } from '../src/security/redact';
 import { runVerify, formatVerifyReport } from '../src/context/verify';
 import { startMcp } from '../src/mcp/server';
 import { buildHandoffPack } from '../src/context/handoff';
+import { checkModels, formatModelCheck } from '../src/router/check-models';
 import { EXIT_CODES, type ExitCode } from '../src/types/exit-codes';
 import { defaultAllowList, checkHandoffAllowlist } from '../src/security/allowlist';
 
@@ -362,6 +363,15 @@ program
     const result = runVerify(cmd, options.cwd ?? process.cwd());
     console.log(formatVerifyReport(result));
     process.exit(result.ok ? 0 : 1);
+  });
+
+program
+  .command('models')
+  .description('List registered adapters and check provider/model allow-list')
+  .action(() => {
+    const result = checkModels();
+    console.log(formatModelCheck(result));
+    process.exit(result.allOk ? 0 : 1);
   });
 
 program.parse();

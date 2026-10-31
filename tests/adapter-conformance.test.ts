@@ -1,7 +1,8 @@
 import { MockAdapter } from '../src/adapters/mock';
 import { runProcess } from '../src/execution/runner';
 import { classifyError } from '../src/adapters/conformance';
-import type { AgentAdapter, ProcessOutcome, TaskInput } from '../src/types';
+import type { AgentAdapter } from '../src/adapters/adapter';
+import type { ProcessOutcome, TaskInput } from '../src/types';
 import { describe, it, expect } from 'vitest';
 
 async function runMockThroughRunner(mode: string, options: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<ProcessOutcome> {

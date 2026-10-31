@@ -65,6 +65,13 @@ CLI but not documented here, the conformance test in
 - Options:
   - `--cwd <dir>` — working directory.
 
+### `air models`
+- Given a request for the registered adapters,
+- When `air models` is run,
+- Then it lists every registered adapter with its provider and model, checks
+  each against the global allow-list, and exits non-zero if any are blocked.
+- Never executes a tool — read-only.
+
 ### `air mcp`
 - Given a request for the MCP server,
 - When `air mcp` is run,

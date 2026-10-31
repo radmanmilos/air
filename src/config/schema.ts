@@ -58,6 +58,12 @@ export const ConfigSchema = z.object({
     .object({
       level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
       redact: z.boolean().default(true),
+      rotation: z
+        .object({
+          maxBytes: z.number().int().min(1024).default(10 * 1024 * 1024),
+          maxBackups: z.number().int().min(0).default(5),
+        })
+        .default({}),
     })
     .default({}),
 });

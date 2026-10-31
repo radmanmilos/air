@@ -16,7 +16,7 @@ const NOT_FOUND_RE = /not found|not installed|enoent/i;
 export class AiderAdapter implements AgentAdapter {
   id = 'aider';
   provider = 'openrouter';
-  model = 'openrouter/gemma-4-31b-it:free';
+  model = 'gemma-4-31b-it:free';
 
   capabilities = {
     headlessExecution: true,

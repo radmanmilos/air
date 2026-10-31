@@ -11,7 +11,7 @@
 // - returns a ProcessOutcome; process facts (timedOut, cancelled, spawnError)
 //   take precedence over adapter stderr matching
 
-import { execSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { StreamingRedactor } from '../security/streaming-redact';
 import type { CommandSpec, ProcessOutcome } from '../types';
 
@@ -75,11 +75,14 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
 
     const killTree = () => {
       if (process.platform === 'win32') {
-        try {
-          execSync(`taskkill /PID ${child.pid} /T /F`, { stdio: 'ignore' });
-        } catch {
-          try { child.kill('SIGKILL'); } catch { /* noop */ }
+        // Use execFile (async, non-blocking) instead of execSync so the
+        // event loop is never stalled by taskkill.
+        if (typeof child.pid === 'number') {
+          execFile('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+            timeout: 5000,
+          }, () => { /* best-effort; child.kill is the fallback */ });
         }
+        try { child.kill('SIGKILL'); } catch { /* noop */ }
       } else {
         const pid = child.pid;
         if (typeof pid === 'number') {
