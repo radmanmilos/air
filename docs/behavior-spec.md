@@ -61,6 +61,8 @@ CLI but not documented here, the conformance test in
 - When `air mcp` is run,
 - Then it starts the MCP server over stdio using async jobs. No prompting on
   stdin; approval is a task-state transition.
+- MCP tools: `run_task`, `get_task_status`, `get_task_output`,
+  `approve_failover`, `cancel_task`, `get_status`.
 
 ## Exit codes
 

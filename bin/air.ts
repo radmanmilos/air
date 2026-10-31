@@ -16,7 +16,8 @@ import { snapshotGit, formatDirtyReport } from '../src/context/checkpoint';
 import { makeRunId, writeTaskState, appendTaskIndex } from '../src/execution/task-state';
 import { trace } from '../src/observability/trace';
 import { redact } from '../src/security/redact';
-import { checkHandoffAllowlist, buildHandoff, defaultAllowList, type AllowList } from '../src/security/allowlist';
+import { startMcp } from '../src/mcp/server';
+import { defaultAllowList, checkHandoffAllowlist, buildHandoff } from '../src/security/allowlist';
 
 const program = new Command();
 
@@ -309,9 +310,10 @@ configCmd
 program
   .command('mcp')
   .description('Start MCP server (stdio)')
-  .action(() => {
-    console.log(chalk.cyan('air mcp'));
-    console.log(chalk.yellow('Not implemented yet'));
+  .action(async () => {
+    // MCP speaks JSON-RPC on stdout; diagnostics go to stderr only.
+    process.stderr.write('air mcp: starting MCP server on stdio\n');
+    await startMcp();
   });
 
 program.parse();
