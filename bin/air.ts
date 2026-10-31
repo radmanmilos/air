@@ -5,6 +5,7 @@ import { loadConfig, migrateConfig } from '../src/config/loader';
 import { createHealthTracker } from '../src/health/tracker';
 import { selectCandidate, formatRouteDecision } from '../src/router/router';
 import { AiderAdapter } from '../src/adapters/aider';
+import { GooseAdapter } from '../src/adapters/goose';
 import { MockAdapter } from '../tests/mock-adapter';
 import { runProcess } from '../src/execution/runner';
 import { classifyOutcome } from '../src/types/outcome';
@@ -15,7 +16,7 @@ import { snapshotGit, formatDirtyReport } from '../src/context/checkpoint';
 import { makeRunId, writeTaskState, appendTaskIndex } from '../src/execution/task-state';
 import { trace } from '../src/observability/trace';
 import { redact } from '../src/security/redact';
-import { classifyError } from '../src/adapters/conformance';
+import { checkHandoffAllowlist, buildHandoff, defaultAllowList, type AllowList } from '../src/security/allowlist';
 
 const program = new Command();
 
@@ -25,8 +26,9 @@ program
   .version('0.1.0');
 
 function listAdapters(): any[] {
-  // MVP: only the mock adapter is registered for tests.
-  return [new MockAdapter()];
+  // MVP: mock + goose adapters are registered. Aider requires the real
+  // binary on PATH; it is included when available.
+  return [new MockAdapter(), new GooseAdapter()];
 }
 
 async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean }) {
@@ -50,7 +52,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
   const runId = makeRunId();
   await appendTaskIndex(runId);
 
-const taskInput: TaskInput = {
+  const taskInput: TaskInput = {
     id: runId,
     prompt: task,
     cwd,
@@ -59,92 +61,138 @@ const taskInput: TaskInput = {
     readOnly: !!options.readOnly,
   };
 
-  const decision = selectCandidate(taskInput, adapters, tracker);
-  if (!decision.chosen) {
-    console.log(chalk.red('No eligible candidate.'));
-    console.log(chalk.gray(formatRouteDecision(decision)));
-    process.exit(2);
-  }
+  const allow = defaultAllowList(adapters);
+  const visited = new Set<string>();
+  let hops = 0;
+  const maxHops = config.failover.maxHops;
 
-  const chosen = decision.chosen;
-  const adapter = adapters.find((a) => a.id === chosen.id)!;
-  const spec = adapter.buildCommand(taskInput);
-
-  const state = {
-    runId,
-    task,
-    cwd,
-    adapter: chosen.id,
-    provider: chosen.provider,
-    model: chosen.model,
-    state: 'RUNNING' as const,
-    startedAt: new Date().toISOString(),
-    hops: 1,
-    maxHops: config.failover.maxHops,
-  };
-  await writeTaskState(state);
-  trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips });
-
-  const { outcome } = await runProcess(spec, {
-    timeoutMs: config.timeouts.defaultMs,
-    maxBufferBytes: config.buffers.maxBytes,
-    onStdout: (c: string) => process.stdout.write(c),
-    onStderr: (c: string) => process.stderr.write(c),
-  });
-
-  const fact = classifyOutcome(outcome);
-  let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr);
-
-  let result: ResultState;
-  if (outcome.cancelled) {
-    result = 'CANCELLED';
-  } else if (outcome.timedOut) {
-    result = 'FAILED';
-  } else if (outcome.spawnError) {
-    result = 'FAILED';
-  } else if (outcome.exitCode === 0) {
-    // Exit 0 alone is not proof of success; MVP treats exit 0 with output as success.
-    result = defaultStateForTask(!!options.readOnly, outcome.stdout.length > 0);
-  } else {
-    result = 'FAILED';
-  }
-
-  const endedAt = new Date().toISOString();
-  await writeTaskState({
-    ...state,
-    state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' ? 'COMPLETED' : 'FAILED',
-    result,
-    endedAt,
-    error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY'
-      ? { category, message: outcome.stderr.slice(0, 500) }
-      : undefined,
-  });
-
-  trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs });
-
-  if (outcome.cancelled) {
-    console.log(chalk.yellow('Cancelled by user.'));
-    process.exit(3);
-  }
-  if (outcome.timedOut) {
-    console.log(chalk.red('Timed out.'));
-    process.exit(1);
-  }
-  if (outcome.spawnError) {
-    console.log(chalk.red(`Tool not available: ${outcome.spawnError.message}`));
-    process.exit(1);
-  }
-  if (outcome.exitCode !== 0) {
-    const action = getErrorAction(category);
-    if (triggersFailover(category) && options.auto) {
-      console.log(chalk.yellow(`Failover proposed (${category}). Action: ${action}. Auto-switch not wired yet in Phase 2.`));
-    } else {
-      console.log(chalk.red(`Failed (${category}). Action: ${action}`));
+  // Failover loop: try candidates until success, abort, or hop cap.
+  while (hops < maxHops) {
+    const decision = selectCandidate(taskInput, adapters, tracker);
+    if (!decision.chosen) {
+      console.log(chalk.red('No eligible candidate.'));
+      console.log(chalk.gray(formatRouteDecision(decision)));
+      process.exit(2);
     }
+
+    const chosen = decision.chosen;
+    const adapter = adapters.find((a) => a.id === chosen.id)!;
+    const key = `${adapter.provider}/${adapter.model}`;
+    if (visited.has(key)) {
+      console.log(chalk.red(`Candidate ${chosen.id} already visited; refusing to loop.`));
+      process.exit(2);
+    }
+    visited.add(key);
+    hops++;
+
+    const spec = adapter.buildCommand(taskInput);
+    const state = {
+      runId,
+      task,
+      cwd,
+      adapter: chosen.id,
+      provider: chosen.provider,
+      model: chosen.model,
+      state: 'RUNNING' as const,
+      startedAt: new Date().toISOString(),
+      hops,
+      maxHops,
+    };
+    await writeTaskState(state);
+    trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips, hops });
+
+    const { outcome } = await runProcess(spec, {
+      timeoutMs: config.timeouts.defaultMs,
+      maxBufferBytes: config.buffers.maxBytes,
+      onStdout: (c: string) => process.stdout.write(c),
+      onStderr: (c: string) => process.stderr.write(c),
+    });
+
+    const fact = classifyOutcome(outcome);
+    let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr);
+
+    let result: ResultState;
+    if (outcome.cancelled) {
+      result = 'CANCELLED';
+    } else if (outcome.timedOut) {
+      result = 'FAILED';
+    } else if (outcome.spawnError) {
+      result = 'FAILED';
+    } else if (outcome.exitCode === 0) {
+      result = defaultStateForTask(!!options.readOnly, outcome.stdout.length > 0);
+    } else {
+      result = 'FAILED';
+    }
+
+    const endedAt = new Date().toISOString();
+    await writeTaskState({
+      ...state,
+      state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' ? 'COMPLETED' : 'FAILED',
+      result,
+      endedAt,
+      error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY'
+        ? { category, message: outcome.stderr.slice(0, 500) }
+        : undefined,
+    });
+
+    trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops });
+
+    if (outcome.cancelled) {
+      console.log(chalk.yellow('Cancelled by user.'));
+      process.exit(3);
+    }
+    if (outcome.timedOut) {
+      console.log(chalk.red('Timed out.'));
+      process.exit(1);
+    }
+    if (outcome.spawnError) {
+      console.log(chalk.red(`Tool not available: ${outcome.spawnError.message}`));
+      process.exit(1);
+    }
+    if (outcome.exitCode === 0) {
+      console.log(chalk.green(`Succeeded (${result}).`));
+      process.exit(0);
+    }
+
+    // Non-zero exit: decide failover.
+    const action = getErrorAction(category);
+    if (triggersFailover(category)) {
+      if (options.auto && hops < maxHops) {
+        // Find the next candidate and check the allow-list.
+        const nextDecision = selectCandidate(
+          { ...taskInput, preferredTool: undefined },
+          adapters.filter((a) => a.id !== adapter.id),
+          tracker,
+        );
+        const next = nextDecision.chosen;
+        if (!next) {
+          console.log(chalk.red(`No alternative candidate (${category}). Action: ${action}`));
+          process.exit(2);
+        }
+        const nextAdapter = adapters.find((a) => a.id === next.id)!;
+        const handoff = buildHandoff(taskInput, adapter, nextAdapter);
+        const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
+        if (!allowCheck.ok) {
+          console.log(chalk.yellow(`Handoff blocked: ${allowCheck.reason}. Action: ${action}`));
+          process.exit(2);
+        }
+        if (allowCheck.ok && options.auto) {
+          console.log(chalk.yellow(`Auto-switching to ${next.id} (${category}).`));
+          console.log(chalk.gray(handoff));
+          continue;
+        }
+        console.log(chalk.yellow(`Failover proposed (${category}). Action: ${action}. Next: ${next.id}`));
+        process.exit(2);
+      }
+      console.log(chalk.red(`Failed (${category}). Action: ${action}`));
+      process.exit(1);
+    }
+    console.log(chalk.red(`Failed (${category}). Action: ${action}`));
     process.exit(1);
   }
-  console.log(chalk.green(`Succeeded (${result}).`));
-  process.exit(0);
+
+  console.log(chalk.red(`Hop cap reached (${maxHops}).`));
+  process.exit(2);
 }
 
 program
