@@ -32,17 +32,24 @@ interface Job {
   taskInput?: any;
   cwd: string;
   isWriteTask: boolean;
+  visited: Set<string>;
+  hops: number;
+  maxHops: number;
+  allow: any;
+  config: any;
 }
 
-const jobs = new Map<string, Job>();
+export const jobs = new Map<string, Job>();
 
 function listAdapters(): any[] {
   return availableAdapters();
 }
 
-async function runJob(job: Job): Promise<void> {
-  const { state, controller, adapter, taskInput, cwd, isWriteTask } = job;
-  const { config } = await loadConfig({ cwd });
+/** Run a single attempt for an existing job. Updates state, health, and
+ * transitions to AWAITING_APPROVAL when a failover-triggering category is
+ * observed. Respects hop cap and revisit prevention. */
+export async function runAttempt(job: Job, adapter: any, taskInput: any): Promise<void> {
+  const { controller, cwd, isWriteTask, state, visited, allow, config } = job;
   const tracker = createHealthTracker();
   await tracker.load();
 
@@ -86,6 +93,9 @@ async function runJob(job: Job): Promise<void> {
 
   const finalState: any = {
     ...state,
+    adapter: adapter.id,
+    provider: adapter.provider,
+    model: adapter.model,
     state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
     result,
     endedAt: new Date().toISOString(),
@@ -95,17 +105,50 @@ async function runJob(job: Job): Promise<void> {
   };
   job.state = finalState;
   await writeTaskState(finalState);
-  trace({ runId: job.state.runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, changed });
+  trace({ runId: job.state.runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, changed, hops: job.hops });
 
   if (outcome.cancelled || outcome.timedOut || outcome.spawnError || outcome.exitCode !== 0) {
     const action = getErrorAction(category);
-    if (triggersFailover(category)) {
+    if (triggersFailover(category) && job.hops < job.maxHops) {
       finalState.state = 'AWAITING_APPROVAL';
       finalState.proposedSwitch = { adapter: 'goose', provider: 'openai', model: 'gpt-4o', reason: category };
       job.state = finalState;
       await writeTaskState(finalState);
     }
   }
+}
+
+/** Resolve the next eligible candidate for a job, respecting the allow-list
+ * and revisit prevention. Returns null when no candidate is available. */
+export async function resolveNextCandidate(job: Job): Promise<{ adapter: any; taskInput: any } | null> {
+  const tracker = createHealthTracker();
+  await tracker.load();
+  const adapters = listAdapters();
+  const decision = selectCandidate(job.taskInput, adapters, tracker);
+  if (!decision.chosen) return null;
+  const nextAdapter = adapters.find((a) => a.id === decision.chosen!.id);
+  if (!nextAdapter) return null;
+  const key = `${nextAdapter.provider}/${nextAdapter.model}`;
+  if (job.visited.has(key)) return null;
+  const allowCheck = checkHandoffAllowlist(job.adapter, nextAdapter, job.allow);
+  if (!allowCheck.ok) return null;
+  // Inject handoff into the next run's task prompt.
+  const handoff = buildHandoffPack({
+    cwd: job.cwd,
+    prompt: job.state.task,
+    from: { id: job.adapter.id, provider: job.adapter.provider, model: job.adapter.model },
+    to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
+    mode: job.taskInput.mode,
+    files: job.taskInput.files,
+    category: job.state.error?.category,
+    summary: job.state.error?.message?.slice(0, 200),
+  });
+  const nextTaskInput = { ...job.taskInput, prompt: `${job.state.task}\n\n--- handoff ---\n${handoff}` };
+  return { adapter: nextAdapter, taskInput: nextTaskInput };
+}
+
+async function runJob(job: Job): Promise<void> {
+  await runAttempt(job, job.adapter!, job.taskInput!);
 }
 
 export async function startMcp(): Promise<void> {
@@ -208,6 +251,11 @@ export async function startMcp(): Promise<void> {
         taskInput,
         cwd,
         isWriteTask,
+        visited: new Set([`${adapter.provider}/${adapter.model}`]),
+        hops: 1,
+        maxHops: config.failover.maxHops,
+        allow,
+        config,
       };
       job.promise = runJob(job).catch((err) => {
         job.state.error = { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) };
@@ -256,7 +304,7 @@ export async function startMcp(): Promise<void> {
     'approve_failover',
     {
       title: 'Approve failover',
-      description: 'Approve a proposed failover for a task.',
+      description: 'Approve a proposed failover for a task and continue execution with the next candidate.',
       inputSchema: { runId: z.string().describe('Task run id') },
     },
     async (args: any) => {
@@ -267,7 +315,37 @@ export async function startMcp(): Promise<void> {
       }
       job.state.state = 'SWITCHING';
       await writeTaskState(job.state);
-      return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Next candidate: ${job.state.proposedSwitch?.adapter ?? 'unknown'}.` }] };
+
+      // Resolve the next candidate, respecting allow-list and revisit rules.
+      const next = await resolveNextCandidate(job);
+      if (!next) {
+        job.state.state = 'FAILED';
+        job.state.error = { category: 'MODEL_UNAVAILABLE', message: 'No eligible alternative candidate after approval.' };
+        await writeTaskState(job.state);
+        return { content: [{ type: 'text', text: 'No eligible alternative candidate after approval.' }] };
+      }
+
+      const key = `${next.adapter.provider}/${next.adapter.model}`;
+      job.visited.add(key);
+      job.hops++;
+      job.adapter = next.adapter;
+      job.taskInput = next.taskInput;
+      job.state.adapter = next.adapter.id;
+      job.state.provider = next.adapter.provider;
+      job.state.model = next.adapter.model;
+      job.state.hops = job.hops;
+      job.state.state = 'RUNNING';
+      job.state.startedAt = new Date().toISOString();
+      await writeTaskState(job.state);
+      trace({ runId: args.runId, event: 'failover_approved', to: next.adapter.id, hops: job.hops });
+
+      job.promise = runAttempt(job, next.adapter, next.taskInput).catch((err) => {
+        job.state.error = { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) };
+        job.state.state = 'FAILED';
+        writeTaskState(job.state);
+      });
+
+      return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Switching to ${next.adapter.id}.` }] };
     },
   );
 
