@@ -3,11 +3,13 @@
 // this module. No feature may hard-code ~/.config or ~/.cache.
 
 import { homedir } from 'node:os';
-import { join, sep } from 'node:path';
+import { join } from 'node:path';
 
 /** Normalize path separators to forward slashes for cross-platform consistency. */
 function normalize(p: string): string {
-  return p.split(sep).join('/');
+  // Replace both possible separators regardless of host OS so the result is
+  // identical whether the host is Linux, macOS, or Windows.
+  return p.replace(/\\/g, '/').replace(/\/+/g, '/');
 }
 
 export type Platform = 'win32' | 'darwin' | 'linux' | 'other';

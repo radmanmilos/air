@@ -40,3 +40,12 @@ export interface AgentAdapter {
    */
   classifyError(exitCode: number | null, stderr: string, structured?: unknown): ErrorCategory;
 }
+
+/** Verification metadata carried by the registry, not the adapter contract. */
+export interface AdapterMeta {
+  verified: boolean;
+  enabled: boolean;
+  headlessSupported: boolean;
+  verificationDate?: string;
+  verificationVersion?: string;
+}
