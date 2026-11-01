@@ -1,5 +1,5 @@
 import { createHealthTracker } from '../src/health/tracker';
-import { selectCandidate, formatRouteDecision } from '../src/router/router';
+import { selectCandidate, selectCandidateFrom, isBlockedByAllowlist, formatRouteDecision } from '../src/router/router';
 import { MockAdapter } from './mock-adapter';
 import { describe, it, expect } from 'vitest';
 
@@ -54,5 +54,41 @@ describe('router (G2-05)', () => {
     );
     expect(decision.chosen).toBeNull();
     expect(decision.skips[0].reason).toBe('cannot_handle');
+  });
+
+  it('selectCandidateFrom skips visited candidates (R5-05)', () => {
+    const tracker = createHealthTracker();
+    const visited = new Set(['mock|openrouter|mock-model']);
+    const decision = selectCandidateFrom(
+      { id: 't1', prompt: 'do thing', cwd: '/tmp', mode: 'ask' },
+      [adapter],
+      tracker,
+      visited,
+      null,
+    );
+    expect(decision.chosen).toBeNull();
+    expect(decision.skips[0].reason).toBe('already_visited');
+  });
+
+  it('selectCandidateFrom skips allow-list blocked candidates (R5-04)', () => {
+    const tracker = createHealthTracker();
+    const allow = { providers: ['other'], models: ['other-model'] };
+    const decision = selectCandidateFrom(
+      { id: 't1', prompt: 'do thing', cwd: '/tmp', mode: 'ask' },
+      [adapter],
+      tracker,
+      new Set(),
+      allow,
+    );
+    expect(decision.chosen).toBeNull();
+    expect(decision.skips[0].reason).toBe('allow_list_blocked');
+  });
+
+  it('isBlockedByAllowlist returns null when allowed', () => {
+    expect(isBlockedByAllowlist(adapter, { providers: ['openrouter'], models: ['mock-model'] })).toBeNull();
+  });
+
+  it('isBlockedByAllowlist blocks a different provider', () => {
+    expect(isBlockedByAllowlist(adapter, { providers: ['other'], models: ['mock-model'] })).toContain('openrouter');
   });
 });

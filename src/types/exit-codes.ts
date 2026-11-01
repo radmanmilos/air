@@ -11,6 +11,7 @@ export const EXIT_CODES = {
   CONFIG_OR_DIRTY: 4, // config invalid, dirty-tree refused, verify failed
   NO_CHANGES: 5, // write task exited 0 with empty diff
   TIMEOUT: 6, // timed out
+  FAILOVER_PROPOSED: 7, // failover proposed but not approved (R5-04)
 } as const;
 
 export type ExitCode = (typeof EXIT_CODES)[keyof typeof EXIT_CODES];

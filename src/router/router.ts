@@ -7,10 +7,11 @@
 import type { AgentAdapter } from '../adapters/adapter';
 import type { ExecutionCandidate, TaskInput } from '../types';
 import type { HealthTracker } from '../health/tracker';
+import type { AllowList } from '../security/allowlist';
 
 export interface SkipRecord {
   candidate: string;
-  reason: 'cooldown_active' | 'capability_mismatch' | 'tool_not_registered' | 'cannot_handle';
+  reason: 'cooldown_active' | 'capability_mismatch' | 'tool_not_registered' | 'cannot_handle' | 'already_visited' | 'allow_list_blocked';
   detail?: string;
 }
 
@@ -33,6 +34,22 @@ export function selectCandidate(
   task: TaskInput,
   adapters: AgentAdapter[],
   tracker: HealthTracker,
+  now: number = Date.now(),
+): RouteDecision {
+  return selectCandidateFrom(task, adapters, tracker, new Set(), null, now);
+}
+
+/**
+ * Select the best candidate, excluding already-visited ones and respecting
+ * the provider-destination allow-list (R5-04/R5-05). Returns the first
+ * eligible candidate, or null when none remain.
+ */
+export function selectCandidateFrom(
+  task: TaskInput,
+  adapters: AgentAdapter[],
+  tracker: HealthTracker,
+  visited: Set<string>,
+  allow: AllowList | null,
   now: number = Date.now(),
 ): RouteDecision {
   const skips: SkipRecord[] = [];
@@ -76,10 +93,41 @@ export function selectCandidate(
       continue;
     }
 
+    // Revisit prevention: skip candidates already visited this run.
+    const revisitKey = `${candidate.id}|${candidate.provider}|${candidate.model}`;
+    if (visited.has(revisitKey)) {
+      skips.push({ candidate: candidate.id, reason: 'already_visited', detail: revisitKey });
+      continue;
+    }
+
+    // Provider-destination policy (R5-04): a change of provider or model
+    // requires an allow-list entry. This is checked here so a blocked
+    // candidate does not prevent considering later eligible candidates.
+    if (allow) {
+      const blocked = isBlockedByAllowlist(adapter, allow);
+      if (blocked) {
+        skips.push({ candidate: candidate.id, reason: 'allow_list_blocked', detail: blocked });
+        continue;
+      }
+    }
+
     return { task, chosen: candidate, skips, considered: candidates.length };
   }
 
   return { task, chosen: null, skips, considered: candidates.length };
+}
+
+/** Shared helper: is this adapter blocked by the provider-destination
+ *  allow-list? Returns a reason string when blocked, null when allowed. */
+export function isBlockedByAllowlist(adapter: AgentAdapter, allow: AllowList | null): string | null {
+  if (!allow) return null;
+  if (allow.providers.length > 0 && !allow.providers.includes(adapter.provider)) {
+    return `provider ${adapter.provider} not in allow-list`;
+  }
+  if (allow.models.length > 0 && !allow.models.includes(adapter.model)) {
+    return `model ${adapter.model} not in allow-list`;
+  }
+  return null;
 }
 
 /** Format a RouteDecision for --explain / JSON output. */

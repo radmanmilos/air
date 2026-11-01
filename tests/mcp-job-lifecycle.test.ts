@@ -69,14 +69,17 @@ describe('mcp job lifecycle (G3-02, G3-12)', () => {
     expect(job.state.result).toBe('SUCCEEDED_READ_ONLY');
   });
 
-  it('run_attempt with rate_limit transitions to AWAITING_APPROVAL', async () => {
+  it('run_attempt with rate_limit and no alternative transitions to FAILED', async () => {
     process.env.MOCK_MODE = 'rate_limit';
     const adapter = new MockAdapter();
     const job = makeJob(adapter, 'fix the bug', 'ask');
+    // The only candidate is already visited, so resolveNextCandidate finds
+    // nothing. The job must fail rather than propose a placeholder (R5-04).
+    job.visited.add(`${adapter.id}|${adapter.provider}/${adapter.model}`);
     await runAttempt(job, adapter, job.taskInput);
-    expect(job.state.state).toBe('AWAITING_APPROVAL');
+    expect(job.state.state).toBe('FAILED');
     expect(job.state.error?.category).toBe('RATE_LIMIT');
-    expect(job.state.proposedSwitch).toBeTruthy();
+    expect(job.state.proposedSwitch).toBeFalsy();
   });
 
   it('resolve_next_candidate returns null when no alternative exists', async () => {
@@ -84,7 +87,7 @@ describe('mcp job lifecycle (G3-02, G3-12)', () => {
     const adapter = new MockAdapter();
     const job = makeJob(adapter, 'fix', 'ask');
     // Mark the only candidate as visited so resolveNextCandidate finds nothing.
-    job.visited.add(`${adapter.provider}/${adapter.model}`);
+    job.visited.add(`${adapter.id}|${adapter.provider}|${adapter.model}`);
     const next = await resolveNextCandidate(job);
     expect(next).toBeNull();
   });

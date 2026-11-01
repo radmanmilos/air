@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { loadConfig, migrateConfig } from '../src/config/loader';
 import { createHealthTracker } from '../src/health/tracker';
-import { selectCandidate, formatRouteDecision } from '../src/router/router';
+import { selectCandidate, selectCandidateFrom, isBlockedByAllowlist, formatRouteDecision } from '../src/router/router';
 import { AiderAdapter } from '../src/adapters/aider';
 import { availableAdapters, adapterStatus } from '../src/adapters/registry';
 import { runProcess } from '../src/execution/runner';
@@ -73,7 +73,13 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
   // Failover loop: try candidates until success, abort, or hop cap.
   while (hops < maxHops) {
-    const decision = selectCandidate(taskInput, adapters, tracker);
+    const decision = selectCandidateFrom(
+      taskInput,
+      adapters,
+      tracker,
+      visited,
+      allow,
+    );
     if (!decision.chosen) {
       console.log(chalk.red('No eligible candidate.'));
       console.log(chalk.gray(formatRouteDecision(decision)));
@@ -82,13 +88,20 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
     const chosen = decision.chosen;
     const adapter = adapters.find((a) => a.id === chosen.id)!;
-    const key = `${adapter.provider}/${adapter.model}`;
-    if (visited.has(key)) {
+    const revisitKey = `${chosen.id}|${chosen.provider}|${chosen.model}`;
+    if (visited.has(revisitKey)) {
       console.log(chalk.red(`Candidate ${chosen.id} already visited; refusing to loop.`));
       process.exit(EXIT_CODES.ALL_EXHAUSTED);
     }
-    visited.add(key);
+    visited.add(revisitKey);
     hops++;
+
+    // Build the task's provider-destination policy from the actual first
+    // selected candidate, not adapters[0] (R5-04).
+    if (hops === 1) {
+      allow.providers = [chosen.provider];
+      allow.models = [chosen.model];
+    }
 
     const spec = adapter.buildCommand(taskInput);
     const beforeSnap = snapshotGit(cwd);
@@ -190,26 +203,36 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
     // Non-zero exit: decide failover.
     const action = getErrorAction(category);
-    if (triggersFailover(category)) {
-      if (options.auto && hops < maxHops) {
-        const nextDecision = selectCandidate(
-          { ...taskInput, preferredTool: undefined },
-          adapters.filter((a) => a.id !== adapter.id),
-          tracker,
-        );
-        const next = nextDecision.chosen;
-        if (!next) {
-          console.log(chalk.red(`No alternative candidate (${category}). Action: ${action}`));
-          process.exit(EXIT_CODES.ALL_EXHAUSTED);
-        }
-        const nextAdapter = adapters.find((a) => a.id === next.id)!;
-        const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
-        if (!allowCheck.ok) {
-          console.log(chalk.yellow(`Handoff blocked: ${allowCheck.reason}. Action: ${action}`));
-          process.exit(EXIT_CODES.ALL_EXHAUSTED);
-        }
-        // Inject mechanical git-state handoff into the next run's task prompt.
-        const handoff = buildHandoffPack({
+    if (triggersFailover(category) && hops < maxHops) {
+      // Resolve the next eligible candidate using the shared policy:
+      // executable availability, verification/enabled state, cooldown,
+      // allow-list, capabilities and revisit prevention (R5-04/R5-05).
+      const nextDecision = selectCandidateFrom(
+        { ...taskInput, preferredTool: undefined },
+        adapters,
+        tracker,
+        visited,
+        allow,
+      );
+      const next = nextDecision.chosen;
+      if (!next) {
+        console.log(chalk.red(`No alternative candidate (${category}). Action: ${action}`));
+        process.exit(EXIT_CODES.ALL_EXHAUSTED);
+      }
+      const nextAdapter = adapters.find((a) => a.id === next.id)!;
+
+      // Provider-destination policy (R5-04): a change of provider or model
+      // requires an allow-list entry or explicit one-task consent. `--auto`
+      // must never bypass provider restrictions.
+      const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
+      const proposal = {
+        runId,
+        from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
+        to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
+        category,
+        action,
+        task: taskInput.prompt,
+        handoff: buildHandoffPack({
           cwd,
           prompt: task,
           from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
@@ -219,14 +242,36 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
           category,
           summary: outcome.stderr.slice(0, 200),
           outputTail: outcome.stderr.slice(-2048),
-        });
-        taskInput.prompt = `${task}\n\n--- handoff ---\n${handoff}`;
+        }),
+      };
+
+      if (!allowCheck.ok) {
+        console.log(chalk.yellow(`Handoff blocked: ${allowCheck.reason}. Action: ${action}`));
+        console.log(chalk.gray(`Proposed switch to ${nextAdapter.id} (${nextAdapter.provider}/${nextAdapter.model}) was blocked by the provider-destination policy.`));
+        process.exit(EXIT_CODES.ALL_EXHAUSTED);
+      }
+
+      if (options.auto) {
+        // `--auto` switches within the same provider/model allow-list only.
+        // It must never bypass provider restrictions (R5-04).
+        taskInput.prompt = `${task}\n\n--- handoff ---\n${proposal.handoff}`;
         console.log(chalk.yellow(`Auto-switching to ${next.id} (${category}).`));
-        console.log(chalk.gray(handoff));
+        console.log(chalk.gray(proposal.handoff));
         continue;
       }
-      console.log(chalk.yellow(`Failover proposed (${category}). Action: ${action}.`));
-      process.exit(EXIT_CODES.ALL_EXHAUSTED);
+
+      // `ask` (default): propose the failover and continue in the same process
+      // when the user approves. Never label a proposal-only exit as
+      // ALL_EXHAUSTED (R5-04).
+      const approved = await promptApproveFailover(proposal);
+      if (!approved) {
+        console.log(chalk.yellow(`Failover declined for ${runId}.`));
+        process.exit(EXIT_CODES.ALL_EXHAUSTED);
+      }
+      taskInput.prompt = `${task}\n\n--- handoff ---\n${proposal.handoff}`;
+      console.log(chalk.yellow(`Approved failover; switching to ${next.id} (${category}).`));
+      console.log(chalk.gray(proposal.handoff));
+      continue;
     }
     console.log(chalk.red(`Failed (${category}). Action: ${action}`));
     process.exit(EXIT_CODES.TASK_FAILURE);
@@ -234,6 +279,44 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
   console.log(chalk.red(`Hop cap reached (${maxHops}).`));
   process.exit(EXIT_CODES.ALL_EXHAUSTED);
+}
+
+/** Interactive approval prompt for a failover proposal (R5-04). Reads from
+ *  stdin so the same process can approve and continue the run. Falls back to
+ *  declining when stdin is not a TTY. */
+async function promptApproveFailover(proposal: {
+  runId: string;
+  from: { id: string; provider: string; model: string };
+  to: { id: string; provider: string; model: string };
+  category: string;
+  action: string;
+  handoff: string;
+}): Promise<boolean> {
+  if (!process.stdin.isTTY) {
+    // Non-interactive: decline by default so `ask` never auto-switches.
+    return false;
+  }
+  process.stdout.write(chalk.cyan('\nair: failover proposed\n'));
+  process.stdout.write(chalk.gray(`  run:      ${proposal.runId}\n`));
+  process.stdout.write(chalk.gray(`  from:     ${proposal.from.id} (${proposal.from.provider}/${proposal.from.model})\n`));
+  process.stdout.write(chalk.gray(`  to:       ${proposal.to.id} (${proposal.to.provider}/${proposal.to.model})\n`));
+  process.stdout.write(chalk.gray(`  reason:   ${proposal.category}\n`));
+  process.stdout.write(chalk.gray(`  action:   ${proposal.action}\n`));
+  process.stdout.write(chalk.gray(`  handoff:  ${proposal.handoff.split('\n')[0]}\n`));
+  process.stdout.write(chalk.cyan('Approve failover? [y/N] '));
+
+  return new Promise<boolean>((resolve) => {
+    const onAnswer = (data: Buffer) => {
+      const raw = data.toString().trim().toLowerCase();
+      process.stdin.removeListener('data', onAnswer);
+      process.stdin.resume();
+      resolve(raw === 'y' || raw === 'yes');
+    };
+    process.stdin.setEncoding('utf8');
+    process.stdin.removeListener('data', onAnswer);
+    process.stdin.on('data', onAnswer);
+    process.stdin.resume();
+  });
 }
 
 program

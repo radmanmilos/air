@@ -10,7 +10,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
-import { selectCandidate, formatRouteDecision } from '../router/router';
+import { selectCandidate, selectCandidateFrom, isBlockedByAllowlist, formatRouteDecision } from '../router/router';
 import { availableAdapters, adapterStatus } from '../adapters/registry';
 import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
@@ -110,28 +110,87 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   if (outcome.cancelled || outcome.timedOut || outcome.spawnError || outcome.exitCode !== 0) {
     const action = getErrorAction(category);
     if (triggersFailover(category) && job.hops < job.maxHops) {
-      finalState.state = 'AWAITING_APPROVAL';
-      finalState.proposedSwitch = { adapter: 'goose', provider: 'openai', model: 'gpt-4o', reason: category };
-      job.state = finalState;
-      await writeTaskState(finalState);
+      // Resolve the actual next eligible candidate and store it in the
+      // proposal (R5-04/R5-05). Never hard-code a placeholder destination.
+      const next = await resolveNextCandidate(job);
+      if (next) {
+        // `auto` mode switches within the same provider/model allow-list only.
+        // It must never bypass provider restrictions (R5-04).
+        if (job.taskInput.auto) {
+          const blocked = isBlockedByAllowlist(next.adapter, job.allow);
+          if (blocked) {
+            finalState.state = 'FAILED';
+            finalState.error = { category: 'PERMISSION_DENIED', message: `Auto-switch blocked: ${blocked}` };
+            job.state = finalState;
+            await writeTaskState(finalState);
+            return;
+          }
+          // Auto-approve within the allow-list and continue the same run.
+          const key = `${next.adapter.id}|${next.adapter.provider}|${next.adapter.model}`;
+          job.visited.add(key);
+          job.hops++;
+          job.adapter = next.adapter;
+          job.taskInput = next.taskInput;
+          finalState.adapter = next.adapter.id;
+          finalState.provider = next.adapter.provider;
+          finalState.model = next.adapter.model;
+          finalState.hops = job.hops;
+          finalState.state = 'RUNNING';
+          finalState.startedAt = new Date().toISOString();
+          job.state = finalState;
+          await writeTaskState(finalState);
+          trace({ runId: job.state.runId, event: 'failover_auto', to: next.adapter.id, hops: job.hops });
+          await runAttempt(job, next.adapter, next.taskInput);
+          return;
+        }
+        finalState.state = 'AWAITING_APPROVAL';
+        finalState.proposedSwitch = {
+          adapter: next.adapter.id,
+          provider: next.adapter.provider,
+          model: next.adapter.model,
+          reason: category,
+          action,
+          task: next.taskInput.prompt,
+        };
+        job.state = finalState;
+        await writeTaskState(finalState);
+      }
     }
   }
 }
 
 /** Resolve the next eligible candidate for a job, respecting the allow-list
- * and revisit prevention. Returns null when no candidate is available. */
+ * and revisit prevention. Searches later candidates when the first selection
+ * is blocked or already visited (R5-04/R5-05). Returns null when no
+ * candidate is available. */
 export async function resolveNextCandidate(job: Job): Promise<{ adapter: any; taskInput: any } | null> {
   const tracker = createHealthTracker();
   await tracker.load();
   const adapters = listAdapters();
-  const decision = selectCandidate(job.taskInput, adapters, tracker);
+  const decision = selectCandidateFrom(
+    job.taskInput,
+    adapters,
+    tracker,
+    job.visited,
+    job.allow,
+  );
   if (!decision.chosen) return null;
   const nextAdapter = adapters.find((a) => a.id === decision.chosen!.id);
   if (!nextAdapter) return null;
-  const key = `${nextAdapter.provider}/${nextAdapter.model}`;
-  if (job.visited.has(key)) return null;
-  const allowCheck = checkHandoffAllowlist(job.adapter, nextAdapter, job.allow);
-  if (!allowCheck.ok) return null;
+
+  // Recompute the proposal before approval and reject stale approvals if the
+  // candidate changed since the proposal was stored (R5-05).
+  if (job.state.proposedSwitch) {
+    const stored = job.state.proposedSwitch;
+    if (
+      stored.adapter !== nextAdapter.id ||
+      stored.provider !== nextAdapter.provider ||
+      stored.model !== nextAdapter.model
+    ) {
+      return null;
+    }
+  }
+
   // Inject handoff into the next run's task prompt.
   const handoff = buildHandoffPack({
     cwd: job.cwd,
@@ -196,7 +255,8 @@ export async function startMcp(): Promise<void> {
       const tracker = createHealthTracker();
       await tracker.load();
       const adapters = listAdapters();
-      const allow = defaultAllowList(adapters);
+      const visited = new Set<string>();
+      const allow: any = { providers: [], models: [] };
       const taskInput: any = {
         id: runId,
         prompt: args.task,
@@ -205,7 +265,7 @@ export async function startMcp(): Promise<void> {
         readOnly: !!args.readOnly,
       };
 
-      const decision = selectCandidate(taskInput, adapters, tracker);
+      const decision = selectCandidateFrom(taskInput, adapters, tracker, visited, allow);
       if (!decision.chosen) {
         const st: any = {
           runId,
@@ -227,6 +287,11 @@ export async function startMcp(): Promise<void> {
 
       const chosen = decision.chosen;
       const adapter = adapters.find((a) => a.id === chosen.id)!;
+      // Build the task's provider-destination policy from the actual first
+      // selected candidate, not adapters[0] (R5-04).
+      allow.providers = [chosen.provider];
+      allow.models = [chosen.model];
+      visited.add(`${chosen.id}|${chosen.provider}|${chosen.model}`);
       const running: any = {
         runId,
         task: args.task,
@@ -251,7 +316,7 @@ export async function startMcp(): Promise<void> {
         taskInput,
         cwd,
         isWriteTask,
-        visited: new Set([`${adapter.provider}/${adapter.model}`]),
+        visited,
         hops: 1,
         maxHops: config.failover.maxHops,
         allow,
@@ -304,14 +369,30 @@ export async function startMcp(): Promise<void> {
     'approve_failover',
     {
       title: 'Approve failover',
-      description: 'Approve a proposed failover for a task and continue execution with the next candidate.',
-      inputSchema: { runId: z.string().describe('Task run id') },
+      description: 'Approve a proposed failover for a task and continue execution with the next candidate. The provider/model in the consent payload must match the pending proposal exactly (R5-04).',
+      inputSchema: {
+        runId: z.string().describe('Task run id'),
+        provider: z.string().optional().describe('Consent for this exact provider (must match the proposal)'),
+        model: z.string().optional().describe('Consent for this exact model (must match the proposal)'),
+      },
     },
     async (args: any) => {
       const job = jobs.get(args.runId);
       if (!job) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
       if (job.state.state !== 'AWAITING_APPROVAL') {
         return { content: [{ type: 'text', text: `Task not awaiting approval (state=${job.state.state})` }] };
+      }
+      const proposal = job.state.proposedSwitch;
+      if (!proposal) {
+        return { content: [{ type: 'text', text: 'No pending failover proposal for this task.' }] };
+      }
+      // Bind the approval to the exact pending proposal (R5-04). A stale or
+      // mismatched consent payload is refused.
+      if (args.provider !== undefined && args.provider !== proposal.provider) {
+        return { content: [{ type: 'text', text: `Consent provider ${args.provider} does not match proposal provider ${proposal.provider}.` }] };
+      }
+      if (args.model !== undefined && args.model !== proposal.model) {
+        return { content: [{ type: 'text', text: `Consent model ${args.model} does not match proposal model ${proposal.model}.` }] };
       }
       job.state.state = 'SWITCHING';
       await writeTaskState(job.state);
@@ -325,7 +406,7 @@ export async function startMcp(): Promise<void> {
         return { content: [{ type: 'text', text: 'No eligible alternative candidate after approval.' }] };
       }
 
-      const key = `${next.adapter.provider}/${next.adapter.model}`;
+      const key = `${next.adapter.id}|${next.adapter.provider}|${next.adapter.model}`;
       job.visited.add(key);
       job.hops++;
       job.adapter = next.adapter;
@@ -345,7 +426,7 @@ export async function startMcp(): Promise<void> {
         writeTaskState(job.state);
       });
 
-      return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Switching to ${next.adapter.id}.` }] };
+      return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Switching to ${next.adapter.id} (${next.adapter.provider}/${next.adapter.model}).` }] };
     },
   );
 

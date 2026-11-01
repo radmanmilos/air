@@ -12,12 +12,15 @@ export interface AllowList {
   models: string[];
 }
 
-export function defaultAllowList(adapters: AgentAdapter[]): AllowList {
-  // Default policy: only the first-attempt provider is allowed (R-07).
-  // A proposed replacement that changes provider must be disclosed and
-  // requires explicit user consent. `auto` failover must never bypass
-  // provider restrictions.
-  const first = adapters[0];
+/** Build the task's provider-destination policy from the actual first
+ *  selected candidate (R5-04). Never use adapters[0] directly: the first
+ *  adapter in the list may be cooling down or blocked, in which case the
+ *  policy must describe the candidate actually chosen for the task. */
+export function defaultAllowList(
+  adapters: AgentAdapter[],
+  chosen?: { provider: string; model: string } | null,
+): AllowList {
+  const first = chosen ?? adapters[0];
   return {
     providers: first ? [first.provider] : [],
     models: first ? [first.model] : [],
