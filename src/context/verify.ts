@@ -26,12 +26,23 @@ export interface VerifyTrust {
   reason?: string;
 }
 
-export function checkVerifyTrust(command: string[], trustedRepos: string[], cwd: string): VerifyTrust {
-  // CLI-supplied commands are always trusted.
-  if (command.length > 0 && command[0].startsWith(process.cwd())) {
+/**
+ * Trust gate for verify commands (G3-11).
+ *
+ * - CLI-supplied commands are always trusted (the user typed them).
+ * - Repo-config commands are refused unless the cwd is in the global
+ *   trusted-repos list. The caller passes the source explicitly so the
+ *   decision is deterministic and testable.
+ */
+export function checkVerifyTrust(
+  command: string[],
+  trustedRepos: string[],
+  cwd: string,
+  source: 'cli' | 'repo' = 'cli',
+): VerifyTrust {
+  if (source === 'cli') {
     return { trusted: true, source: 'cli' };
   }
-  // Repo config commands are refused unless the cwd is in the trusted list.
   for (const trusted of trustedRepos) {
     if (cwd === trusted || cwd.startsWith(trusted + '/') || cwd.startsWith(trusted + '\\')) {
       return { trusted: true, source: 'global' };

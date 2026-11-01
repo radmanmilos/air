@@ -15,7 +15,7 @@ import { snapshotGit, snapshotDelta, formatDirtyReport, formatDeltaReport } from
 import { makeRunId, writeTaskState, appendTaskIndex } from '../src/execution/task-state';
 import { trace } from '../src/observability/trace';
 import { redact } from '../src/security/redact';
-import { runVerify, formatVerifyReport } from '../src/context/verify';
+import { checkVerifyTrust, runVerify, formatVerifyReport } from '../src/context/verify';
 import { startMcp } from '../src/mcp/server';
 import { buildHandoffPack } from '../src/context/handoff';
 import { checkModels, formatModelCheck } from '../src/router/check-models';
@@ -457,7 +457,37 @@ program
   .argument('<cmd...>', 'Command and arguments')
   .option('--cwd <dir>', 'Working directory')
   .action((cmd: string[], options: { cwd?: string }) => {
+    // CLI-supplied commands are always trusted (G3-11).
+    const trust = checkVerifyTrust(cmd, [], options.cwd ?? process.cwd(), 'cli');
+    if (!trust.trusted) {
+      console.log(chalk.red(`Verify refused: ${trust.reason}`));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
     const result = runVerify(cmd, options.cwd ?? process.cwd());
+    console.log(formatVerifyReport(result));
+    process.exit(result.ok ? 0 : 1);
+  });
+
+program
+  .command('verify-repo')
+  .description('Run the repo-configured verify command through the trust gate')
+  .option('--cwd <dir>', 'Working directory')
+  .action(async (options: { cwd?: string }) => {
+    const cwd = options.cwd ?? process.cwd();
+    const { config } = await loadConfig({ cwd });
+    if (!config.verify.enabled || !config.verify.command) {
+      console.log(chalk.yellow('No verify command configured for this repo.'));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
+    // Repo-config commands are refused unless the cwd is in the global
+    // trusted-repos list (G3-11). CLI-supplied commands are always trusted.
+    const trust = checkVerifyTrust([config.verify.command], config.trustedRepos ?? [], cwd, 'repo');
+    if (!trust.trusted) {
+      console.log(chalk.red(`Verify refused: ${trust.reason}`));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
+    const cmd = config.verify.command.split(/\s+/).filter(Boolean);
+    const result = runVerify(cmd, cwd);
     console.log(formatVerifyReport(result));
     process.exit(result.ok ? 0 : 1);
   });

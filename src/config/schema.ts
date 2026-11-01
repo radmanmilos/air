@@ -28,6 +28,8 @@ const VerifySchema = z.object({
   command: z.string().optional(),
 });
 
+const TrustedReposSchema = z.array(z.string()).default([]);
+
 const RedactionSchema = z.object({
   enabled: z.boolean().default(true),
 });
@@ -43,6 +45,7 @@ export const ConfigSchema = z.object({
   verify: VerifySchema.default({}),
   redaction: RedactionSchema.default({}),
   concurrency: ConcurrencySchema.default({}),
+  trustedRepos: TrustedReposSchema.default([]),
   timeouts: z
     .object({
       defaultMs: z.number().int().min(1000).default(300_000),
