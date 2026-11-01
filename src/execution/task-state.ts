@@ -22,9 +22,22 @@ export interface TaskState {
   endedAt?: string;
   hops: number;
   maxHops: number;
-  proposedSwitch?: { adapter: string; provider: string; model: string; reason: string };
+  proposedSwitch?: {
+    adapter: string;
+    provider: string;
+    model: string;
+    reason: string;
+    action?: string;
+    task?: string;
+  };
   outputTail?: string;
   error?: { category: string; message: string };
+  delta?: {
+    staged: string[];
+    unstaged: string[];
+    untracked: string[];
+    deleted: string[];
+  };
 }
 
 function stateFile(runId: string): string {

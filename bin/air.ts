@@ -11,7 +11,7 @@ import { classifyOutcome } from '../src/types/outcome';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../src/types/errors';
 import { defaultStateForTask, type ResultState } from '../src/types/result';
 import type { TaskInput } from '../src/types';
-import { snapshotGit, formatDirtyReport } from '../src/context/checkpoint';
+import { snapshotGit, snapshotDelta, formatDirtyReport, formatDeltaReport } from '../src/context/checkpoint';
 import { makeRunId, writeTaskState, appendTaskIndex } from '../src/execution/task-state';
 import { trace } from '../src/observability/trace';
 import { redact } from '../src/security/redact';
@@ -149,9 +149,14 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     }
     await tracker.flush();
 
-    // Determine result from actual workspace delta, not stdout length (G3-03).
+    // Determine result from the agent-produced delta relative to the initial
+    // snapshot, not from whether the tree is dirty at all (R5-07). Pre-
+    // existing staged/unstaged/untracked files are NOT counted as agent
+    // changes, so read-only tasks with unrelated initial dirt are not marked
+    // as modified by AIR.
     const afterSnap = snapshotGit(cwd);
-    const changed = afterSnap.staged.length > 0 || afterSnap.unstaged.length > 0 || afterSnap.untracked.length > 0;
+    const delta = snapshotDelta(beforeSnap, afterSnap);
+    const changed = delta.dirty;
     let result: ResultState;
     if (outcome.cancelled) {
       result = 'CANCELLED';
@@ -161,6 +166,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       if (isWriteTask) {
         result = changed ? 'SUCCEEDED_WITH_CHANGES' : 'NO_CHANGES';
       } else {
+        // Read-only: pre-existing dirt is not agent work.
         result = changed ? 'NEEDS_USER_REVIEW' : 'SUCCEEDED_READ_ONLY';
       }
     } else {
@@ -173,12 +179,18 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
       result,
       endedAt,
+      delta: {
+        staged: delta.staged,
+        unstaged: delta.unstaged,
+        untracked: delta.untracked,
+        deleted: delta.deleted,
+      },
       error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
         ? { category, message: outcome.stderr.slice(0, 500) }
         : undefined,
     });
 
-    trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed });
+    trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed, delta: formatDeltaReport(delta) });
 
     if (outcome.cancelled) {
       console.log(chalk.yellow('Cancelled by user.'));
@@ -242,6 +254,8 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
           category,
           summary: outcome.stderr.slice(0, 200),
           outputTail: outcome.stderr.slice(-2048),
+          before: beforeSnap,
+          after: afterSnap,
         }),
       };
 

@@ -14,42 +14,116 @@ export interface GitSnapshot {
   unstaged: string[];
   untracked: string[];
   dirty: boolean;
+  /** True when the directory is not a Git repository or Git failed. */
+  isGitRepo: boolean;
+  /** Error message when isGitRepo is false. */
+  gitError?: string;
 }
 
-function git(cwd: string, args: string[]): string {
+function git(cwd: string, args: string[]): { ok: boolean; out: string } {
   try {
-    return execFileSync('git', ['--no-pager', ...args], {
+    const out = execFileSync('git', ['--no-pager', ...args], {
       cwd,
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
     }).trim();
-  } catch {
-    return '';
+    return { ok: true, out };
+  } catch (err: any) {
+    return { ok: false, out: String(err?.message || err || '').slice(0, 200) };
   }
 }
 
 export function snapshotGit(cwd: string): GitSnapshot {
-  const branch = git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
+  const branchCheck = git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (!branchCheck.ok) {
+    return {
+      branch: null,
+      head: null,
+      staged: [],
+      unstaged: [],
+      untracked: [],
+      dirty: false,
+      isGitRepo: false,
+      gitError: branchCheck.out,
+    };
+  }
+
   const head = git(cwd, ['rev-parse', 'HEAD']);
-  const staged = git(cwd, ['diff', '--cached', '--name-only']).split('\n').filter(Boolean);
-  const unstaged = git(cwd, ['diff', '--name-only']).split('\n').filter(Boolean);
-  const untracked = git(cwd, ['ls-files', '--others', '--exclude-standard']).split('\n').filter(Boolean);
+  const staged = git(cwd, ['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
+  const unstaged = git(cwd, ['diff', '--name-only']).out.split('\n').filter(Boolean);
+  const untracked = git(cwd, ['ls-files', '--others', '--exclude-standard']).out.split('\n').filter(Boolean);
   return {
-    branch: branch || null,
-    head: head || null,
+    branch: branchCheck.out || null,
+    head: head.out || null,
     staged,
     unstaged,
     untracked,
     dirty: staged.length > 0 || unstaged.length > 0 || untracked.length > 0,
+    isGitRepo: true,
   };
 }
 
+/**
+ * Compute the agent-produced delta between an initial snapshot and a final
+ * snapshot (R5-07). Pre-existing staged/unstaged/untracked files that were
+ * present before the run are NOT counted as agent changes.
+ */
+export function snapshotDelta(
+  before: GitSnapshot,
+  after: GitSnapshot,
+): {
+  staged: string[];
+  unstaged: string[];
+  untracked: string[];
+  deleted: string[];
+  dirty: boolean;
+  preexisting: boolean;
+} {
+  if (!before.isGitRepo || !after.isGitRepo) {
+    return { staged: [], unstaged: [], untracked: [], deleted: [], dirty: after.dirty, preexisting: false };
+  }
+
+  const set = (arr: string[]) => new Set(arr);
+  const beforeStaged = set(before.staged);
+  const beforeUnstaged = set(before.unstaged);
+  const beforeUntracked = set(before.untracked);
+
+  const staged = after.staged.filter((f) => !beforeStaged.has(f));
+  const unstaged = after.unstaged.filter((f) => !beforeUnstaged.has(f));
+  const untracked = after.untracked.filter((f) => !beforeUntracked.has(f));
+
+  // Deleted: present before but absent after.
+  const deleted: string[] = [];
+  for (const f of beforeStaged) if (!set(after.staged).has(f) && !set(after.unstaged).has(f)) deleted.push(f);
+  for (const f of beforeUnstaged) if (!set(after.staged).has(f) && !set(after.unstaged).has(f)) deleted.push(f);
+
+  const dirty = staged.length > 0 || unstaged.length > 0 || untracked.length > 0 || deleted.length > 0;
+  const preexisting = before.dirty && !dirty;
+  return { staged, unstaged, untracked, deleted, dirty, preexisting };
+}
+
 export function formatDirtyReport(snap: GitSnapshot): string {
+  if (!snap.isGitRepo) {
+    return `Not a Git repository${snap.gitError ? ` (${snap.gitError})` : ''}. Refuse to start a write-capable task. Pass --allow-dirty to proceed (non-destructive).`;
+  }
   const lines: string[] = [];
   lines.push('Working tree is dirty:');
   if (snap.staged.length) lines.push(`  staged:   ${snap.staged.join(', ')}`);
   if (snap.unstaged.length) lines.push(`  modified: ${snap.unstaged.join(', ')}`);
   if (snap.untracked.length) lines.push(`  untracked: ${snap.untracked.join(', ')}`);
   lines.push('Refuse to start a write-capable task. Pass --allow-dirty to proceed (non-destructive).');
+  return lines.join('\n');
+}
+
+/** Format a delta report for --explain / handoff output. */
+export function formatDeltaReport(delta: ReturnType<typeof snapshotDelta>): string {
+  const lines: string[] = [];
+  lines.push('Agent-produced changes (relative to initial snapshot):');
+  if (delta.staged.length) lines.push(`  staged:   ${delta.staged.join(', ')}`);
+  if (delta.unstaged.length) lines.push(`  modified: ${delta.unstaged.join(', ')}`);
+  if (delta.untracked.length) lines.push(`  untracked: ${delta.untracked.join(', ')}`);
+  if (delta.deleted.length) lines.push(`  deleted:  ${delta.deleted.join(', ')}`);
+  if (!delta.dirty) lines.push('  (none)');
+  if (delta.preexisting) lines.push('  pre-existing dirt: unchanged by AIR');
   return lines.join('\n');
 }

@@ -72,4 +72,39 @@ describe('handoff packer (G3-04)', () => {
     expect(pack).toContain('[diff truncated]');
     expect(pack.length).toBeLessThan(2000);
   });
+
+  it('includes agent-produced untracked file content when safe and size-capped (R5-07)', () => {
+    writeFileSync(join(dir, 'new.txt'), 'agent output');
+    const before = { isGitRepo: true, branch: 'main', head: 'h', staged: [], unstaged: [], untracked: [], dirty: false };
+    const after = { isGitRepo: true, branch: 'main', head: 'h', staged: [], unstaged: [], untracked: ['new.txt'], dirty: true };
+    const pack = buildHandoffPack({
+      cwd: dir,
+      prompt: 'fix',
+      from: { id: 'aider', provider: 'openrouter', model: 'm1' },
+      to: { id: 'goose', provider: 'openai', model: 'gpt-4o' },
+      mode: 'ask',
+      before,
+      after,
+    });
+    expect(pack).toContain('agent output');
+    expect(pack).toContain('new.txt');
+  });
+
+  it('does not include pre-existing untracked file content (R5-07)', () => {
+    writeFileSync(join(dir, 'pre.txt'), 'pre-existing');
+    writeFileSync(join(dir, 'new.txt'), 'agent output');
+    const before = { isGitRepo: true, branch: 'main', head: 'h', staged: [], unstaged: [], untracked: ['pre.txt'], dirty: true };
+    const after = { isGitRepo: true, branch: 'main', head: 'h', staged: [], unstaged: [], untracked: ['pre.txt', 'new.txt'], dirty: true };
+    const pack = buildHandoffPack({
+      cwd: dir,
+      prompt: 'fix',
+      from: { id: 'aider', provider: 'openrouter', model: 'm1' },
+      to: { id: 'goose', provider: 'openai', model: 'gpt-4o' },
+      mode: 'ask',
+      before,
+      after,
+    });
+    expect(pack).toContain('agent output');
+    expect(pack).not.toContain('pre-existing');
+  });
 });

@@ -16,7 +16,7 @@ import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../types/errors';
 import { defaultStateForTask, type ResultState } from '../types/result';
-import { snapshotGit, formatDirtyReport } from '../context/checkpoint';
+import { snapshotGit, snapshotDelta, formatDirtyReport } from '../context/checkpoint';
 import { buildHandoffPack } from '../context/handoff';
 import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state';
 import { trace } from '../observability/trace';
@@ -37,6 +37,7 @@ interface Job {
   maxHops: number;
   allow: any;
   config: any;
+  beforeSnap: any;
 }
 
 export const jobs = new Map<string, Job>();
@@ -49,7 +50,7 @@ function listAdapters(): any[] {
  * transitions to AWAITING_APPROVAL when a failover-triggering category is
  * observed. Respects hop cap and revisit prevention. */
 export async function runAttempt(job: Job, adapter: any, taskInput: any): Promise<void> {
-  const { controller, cwd, isWriteTask, state, visited, allow, config } = job;
+  const { controller, cwd, isWriteTask, state, visited, allow, config, beforeSnap } = job;
   const tracker = createHealthTracker();
   await tracker.load();
 
@@ -81,8 +82,11 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   }
   await tracker.flush();
 
+  // Determine result from the agent-produced delta relative to the initial
+  // snapshot (R5-07). Pre-existing dirt is NOT counted as agent work.
   const afterSnap = snapshotGit(cwd);
-  const changed = afterSnap.staged.length > 0 || afterSnap.unstaged.length > 0 || afterSnap.untracked.length > 0;
+  const delta = snapshotDelta(beforeSnap ?? snapshotGit(cwd), afterSnap);
+  const changed = delta.dirty;
   let result: ResultState;
   if (outcome.cancelled) result = 'CANCELLED';
   else if (outcome.timedOut || outcome.spawnError) result = 'FAILED';
@@ -99,6 +103,12 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
     state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
     result,
     endedAt: new Date().toISOString(),
+    delta: {
+      staged: delta.staged,
+      unstaged: delta.unstaged,
+      untracked: delta.untracked,
+      deleted: delta.deleted,
+    },
     error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
       ? { category, message: outcome.stderr.slice(0, 500) }
       : undefined,
@@ -201,6 +211,8 @@ export async function resolveNextCandidate(job: Job): Promise<{ adapter: any; ta
     files: job.taskInput.files,
     category: job.state.error?.category,
     summary: job.state.error?.message?.slice(0, 200),
+    before: job.beforeSnap,
+    after: snapshotGit(job.cwd),
   });
   const nextTaskInput = { ...job.taskInput, prompt: `${job.state.task}\n\n--- handoff ---\n${handoff}` };
   return { adapter: nextAdapter, taskInput: nextTaskInput };
@@ -321,6 +333,7 @@ export async function startMcp(): Promise<void> {
         maxHops: config.failover.maxHops,
         allow,
         config,
+        beforeSnap: snap,
       };
       job.promise = runJob(job).catch((err) => {
         job.state.error = { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) };

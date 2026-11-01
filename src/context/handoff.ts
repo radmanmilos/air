@@ -7,9 +7,11 @@
 
 import { execFileSync } from 'node:child_process';
 import { redact } from '../security/redact';
+import type { GitSnapshot } from '../context/checkpoint';
 
 const DIFF_CAP = 4096; // bytes
 const TAIL_CAP = 2048; // bytes
+const UNTRACKED_CONTENT_CAP = 2048; // bytes per untracked file
 
 export interface HandoffOptions {
   cwd: string;
@@ -23,6 +25,9 @@ export interface HandoffOptions {
   outputTail?: string;
   maxDiffBytes?: number;
   maxTailBytes?: number;
+  before?: GitSnapshot;
+  after?: GitSnapshot;
+  untrackedContentCap?: number;
 }
 
 function git(cwd: string, args: string[]): string {
@@ -37,9 +42,21 @@ function git(cwd: string, args: string[]): string {
   }
 }
 
+function readFileContent(cwd: string, path: string, cap: number): string | null {
+  // Untracked files are not in the index; read them directly from disk.
+  try {
+    const { readFileSync } = require('node:fs');
+    const out = readFileSync(`${cwd}/${path}`, 'utf8');
+    return out.length > cap ? out.slice(0, cap) + '\n[content truncated]\n' : out;
+  } catch {
+    return null;
+  }
+}
+
 export function buildHandoffPack(opts: HandoffOptions): string {
   const diffCap = opts.maxDiffBytes ?? DIFF_CAP;
   const tailCap = opts.maxTailBytes ?? TAIL_CAP;
+  const untrackedCap = opts.untrackedContentCap ?? UNTRACKED_CONTENT_CAP;
 
   const branch = git(opts.cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
   const head = git(opts.cwd, ['rev-parse', 'HEAD']);
@@ -87,6 +104,26 @@ export function buildHandoffPack(opts: HandoffOptions): string {
     lines.push(truncatedTail);
     lines.push('```');
   }
+
+  // Untracked file contents are included only when safe and size-capped.
+  // Otherwise the handoff explicitly states that content was omitted and
+  // needs inspection (R5-07).
+  if (opts.after && opts.after.untracked.length > 0) {
+    const beforeUntracked = new Set(opts.before?.untracked ?? []);
+    for (const f of opts.after.untracked) {
+      if (beforeUntracked.has(f)) continue; // pre-existing, not agent-produced
+      const content = readFileContent(opts.cwd, f, untrackedCap);
+      if (content === null) {
+        lines.push(`- untracked ${f}: content omitted (unreadable)`);
+      } else {
+        lines.push(`- untracked ${f}:`);
+        lines.push('```');
+        lines.push(content);
+        lines.push('```');
+      }
+    }
+  }
+
   lines.push(`- continue from the current working tree; do not reset or revert.`);
   return lines.join('\n');
 }
