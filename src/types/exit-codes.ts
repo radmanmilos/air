@@ -20,8 +20,9 @@ export function exitCodeFor(resultState: string, reason?: string): ExitCode {
   switch (resultState) {
     case 'SUCCEEDED_WITH_CHANGES':
     case 'SUCCEEDED_READ_ONLY':
-    case 'NO_CHANGES':
       return EXIT_CODES.SUCCESS;
+    case 'NO_CHANGES':
+      return EXIT_CODES.NO_CHANGES;
     case 'CANCELLED':
       return EXIT_CODES.USER_CANCELLED;
     case 'FAILED':

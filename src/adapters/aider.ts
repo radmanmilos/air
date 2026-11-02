@@ -25,6 +25,8 @@ export class AiderAdapter implements AgentAdapter {
     shellAccess: false,
     imageInput: false,
     supportsCancellation: true,
+    supportsStreaming: true,
+    contextWindow: 128_000,
   };
 
   canHandle(_task: TaskInput): boolean {

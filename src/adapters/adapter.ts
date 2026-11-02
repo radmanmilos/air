@@ -23,6 +23,8 @@ export interface AgentAdapter {
     shellAccess: boolean;
     imageInput: boolean;
     supportsCancellation: boolean;
+    supportsStreaming: boolean;
+    contextWindow?: number;
   };
 
   /** True if the adapter can handle this task (capability + availability check). */
