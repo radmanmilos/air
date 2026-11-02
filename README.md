@@ -1,6 +1,6 @@
 # air
 
-**Status:** Phases 0-5 implemented. 94 tests passing. CLI + MCP server functional.
+**Status:** Phases 0-5 implemented. 189 tests passing. CLI + MCP server functional.
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
@@ -15,12 +15,15 @@ Unified AI tool orchestrator with smart routing and failover. One CLI + MCP serv
 - **Success detection** - Uses actual workspace delta (git status/diff), not stdout length
 - **Process facts** - Timeout, cancellation, and spawn errors take precedence over stderr matching
 - **Streaming redaction** - Secrets redacted per-chunk with overlap to catch split tokens
+- **Model catalog** - Lists every adapter's provider/model, capabilities, cost tier, and context window; `air models --best <task>` recommends the cheapest eligible model
+- **Multi-session parallel** - Runs multiple tasks concurrently, each on its own model, with independent job state and concurrency seats
+- **Inter-process coordination** - Lock files with stale-lock recovery; health flush and task-index append are concurrency-safe
 
 ## Known limitations
 
 - MCP `approve_failover` flips state to SWITCHING but does not yet continue execution (pending G3-02)
 - MCP `run_task` awaits the full process inside the tool handler (pending G3-12)
-- opencode and kilocode are not implemented; README reflects only aider + goose
+- opencode, kilocode, codex, and github-copilot are unverified spikes; README reflects only aider + goose
 - `npm run lint` is not configured (eslint not installed)
 
 ## Quick Start
