@@ -94,7 +94,18 @@ function key(provider: string, model: string): string {
   return `${provider}/${model}`;
 }
 
-export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTracker {
+function freshState(): HealthState {
+  // Each tracker gets its own state object so mutations in one tracker
+  // cannot leak into another (R5-12).
+  return {
+    cooldowns: [],
+    successes: {},
+    failures: {},
+    cancellations: {},
+  };
+}
+
+export function createHealthTracker(state: HealthState = freshState()): HealthTracker {
   return {
     setCooldown(provider, model, untilMs, reason) {
       state.cooldowns = state.cooldowns
@@ -137,7 +148,7 @@ export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTr
         'health',
         paths.healthFile,
         async (current) => {
-          const base: HealthState = current ?? { ...EMPTY };
+          const base: HealthState = current ?? freshState();
           const merged: HealthState = {
             cooldowns: [
               ...base.cooldowns.filter(
