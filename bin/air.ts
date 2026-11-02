@@ -39,11 +39,11 @@ async function listAdapters(config?: any): Promise<any[]> {
   return availableAdapters(config);
 }
 
-async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean }) {
+async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string }) {
   console.log(chalk.cyan('air run'));
   console.log(chalk.gray('Task:'), task);
 
-  const cwd = process.cwd();
+  const cwd = options.cwd ?? process.cwd();
   const snap = snapshotGit(cwd);
   const isWriteTask = !options.readOnly;
 
@@ -350,6 +350,7 @@ program
   .option('--auto', 'Auto-switch on failover')
   .option('--allow-dirty', 'Allow running on a dirty working tree (non-destructive)')
   .option('--read-only', 'Treat the task as read-only; empty diff is a valid outcome')
+  .option('--cwd <dir>', 'Working directory (default: current directory)')
   .action(runAction);
 function showStatus(options: { json?: boolean }) {
   const tracker = createHealthTracker();
