@@ -18,7 +18,7 @@ import { redact } from '../src/security/redact';
 import { checkVerifyTrust, runVerify, formatVerifyReport } from '../src/context/verify';
 import { startMcp } from '../src/mcp/server';
 import { buildHandoffPack } from '../src/context/handoff';
-import { checkModels, formatModelCheck } from '../src/router/check-models';
+import { buildModelCatalog, formatModelCatalog, formatBestModel } from '../src/router/catalog';
 import { EXIT_CODES, type ExitCode } from '../src/types/exit-codes';
 import { defaultAllowList, checkHandoffAllowlist } from '../src/security/allowlist';
 
@@ -513,11 +513,16 @@ program
 
 program
   .command('models')
-  .description('List registered adapters and check provider/model allow-list')
-  .action(() => {
-    const result = checkModels();
-    console.log(formatModelCheck(result));
-    process.exit(result.allOk ? 0 : 1);
+  .description('List registered adapters with provider/model and capabilities')
+  .option('--best <task>', 'Recommend the best model for a task')
+  .action((options: { best?: string }) => {
+    const adapters = availableAdapters();
+    const catalog = buildModelCatalog(adapters);
+    if (options.best) {
+      console.log(formatBestModel(catalog, { mode: 'ask', readOnly: false }));
+      return;
+    }
+    console.log(formatModelCatalog(catalog));
   });
 
 program.parse();

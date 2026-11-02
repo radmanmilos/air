@@ -19,13 +19,14 @@ export class KilocodeAdapter implements AgentAdapter {
   provider = 'openrouter';
   model = 'gemma-4-31b-it:free';
 
-  capabilities = {
-    headlessExecution: true,
+capabilities = {
+    headlessExecution: false,
     structuredOutput: false,
-    fileEditing: true,
-    shellAccess: true,
+    fileEditing: false,
+    shellAccess: false,
     imageInput: false,
-    supportsCancellation: true,
+    supportsCancellation: false,
+    supportsStreaming: false,
   };
 
   canHandle(_task: TaskInput): boolean {

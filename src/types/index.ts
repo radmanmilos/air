@@ -9,6 +9,8 @@ export interface ToolCapabilities {
   shellAccess: boolean;
   imageInput: boolean;
   supportsCancellation: boolean;
+  supportsStreaming: boolean;
+  contextWindow?: number;
 }
 
 export interface CommandSpec {

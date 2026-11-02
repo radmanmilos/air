@@ -19,13 +19,14 @@ export class CodexAdapter implements AgentAdapter {
   provider = 'openai';
   model = 'gpt-4o';
 
-  capabilities = {
-    headlessExecution: true,
+capabilities = {
+    headlessExecution: false,
     structuredOutput: false,
-    fileEditing: true,
-    shellAccess: true,
+    fileEditing: false,
+    shellAccess: false,
     imageInput: false,
-    supportsCancellation: true,
+    supportsCancellation: false,
+    supportsStreaming: false,
   };
 
   canHandle(_task: TaskInput): boolean {
