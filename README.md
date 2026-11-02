@@ -1,6 +1,6 @@
 # air
 
-**Status:** Phases 0-5 implemented. 189 tests passing. CLI + MCP server functional.
+**Status:** Phases 0-5 implemented. 191 tests passing. CLI + MCP server functional.
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
