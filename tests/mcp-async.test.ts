@@ -1,5 +1,5 @@
 import { startMcp } from '../src/mcp/server';
-import { createHealthTracker } from '../src/health/tracker';
+import { resetHealth } from '../src/health/tracker';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -33,17 +33,20 @@ describe('mcp stdio round-trip (R5-16)', () => {
     originalMockMode = process.env.MOCK_MODE;
     // The mock adapter shares (openrouter, mock-model) with every other test
     // in this worker, and a previous run's RATE_LIMIT/TIMEOUT cooldown is
-    // persisted to the shared health file. Clear it so routing is deterministic.
-    const tracker = createHealthTracker();
-    await tracker.load();
-    tracker.clearCooldown('openrouter', 'mock-model');
-    await tracker.flush();
+    // persisted to the shared health file. Reset it deterministically under
+    // the inter-process lock so routing is reproducible (R5-09).
+    await resetHealth();
   });
 
   afterEach(() => {
     if (originalMockMode === undefined) delete process.env.MOCK_MODE;
     else process.env.MOCK_MODE = originalMockMode;
-    rmSync(dir, { recursive: true, force: true });
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // A background mock process may still hold the temp dir open on Windows;
+      // the OS reclaims it at process exit.
+    }
   });
 
   async function startPair() {
@@ -76,8 +79,11 @@ await client.connect(clientTransport);
       });
       const text = toolText(st);
       state = JSON.parse(text);
-      if (state.state === 'COMPLETED' || state.state === 'FAILED') break;
+      if (state.state === 'COMPLETED' || state.state === 'FAILED' || state.state === 'CANCELLED') break;
       await new Promise((r) => setTimeout(r, 50));
+    }
+    if (state.state !== 'COMPLETED') {
+      throw new Error(`expected COMPLETED, got ${JSON.stringify(state)}`);
     }
     expect(state.state).toBe('COMPLETED');
     expect(state.result).toBe('SUCCEEDED_READ_ONLY');

@@ -76,7 +76,7 @@ export function healthSnapshot(state: HealthState, now: number = Date.now()): He
 
 export interface HealthTracker {
   setCooldown(provider: string, model: string, untilMs: number, reason: ErrorCategory): void;
-  /** Remove a cooldown for (provider, model). No-op when none is set. */
+  /** Remove a cooldown for (provider, model). In-memory only; persisted by flush(). */
   clearCooldown(provider: string, model: string): void;
   isCoolingDown(provider: string, model: string, now?: number): boolean;
   getCooldown(provider: string, model: string, now?: number): CooldownEntry | null;
@@ -105,6 +105,18 @@ function freshState(): HealthState {
   };
 }
 
+/** Persist an empty health state under the inter-process lock (R5-09).
+ *  Used by tests to reset the shared health file deterministically, and by
+ *  `air health reset` if that command is ever implemented. */
+export async function resetHealth(): Promise<void> {
+  await lockedReadModifyWrite<HealthState>(
+    'health',
+    paths.healthFile,
+    async () => freshState(),
+    { timeoutMs: 5000 },
+  );
+}
+
 export function createHealthTracker(state: HealthState = freshState()): HealthTracker {
   return {
 setCooldown(provider, model, untilMs, reason) {
@@ -116,9 +128,9 @@ setCooldown(provider, model, untilMs, reason) {
         state.cooldowns = state.cooldowns.filter(
           (c) => !(c.provider === provider && c.model === model),
         );
-        // Persist the removal so a later load() in another process/tracker
-        // does not resurrect the cooldown (R5-16 test seam). The caller is
-        // expected to follow with flush() to persist deterministically.
+        // In-memory only: the removal is persisted by the next flush().
+        // This keeps the seam deterministic for tests and avoids a
+        // read-modify-write racing with a concurrent flush().
       },
     isCoolingDown(provider, model, now = Date.now()) {
       return state.cooldowns.some(
