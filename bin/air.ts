@@ -39,7 +39,7 @@ async function listAdapters(config?: any): Promise<any[]> {
   return availableAdapters(config);
 }
 
-async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string }) {
+async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string; noTty?: boolean; sessions?: string[] }) {
   console.log(chalk.cyan('air run'));
   console.log(chalk.gray('Task:'), task);
 
@@ -59,6 +59,25 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
   const adapters = await listAdapters(config);
   const runId = makeRunId();
   await appendTaskIndex(runId);
+
+  // Multi-session parallel execution: each session runs on its own model.
+  if (options.sessions && options.sessions.length > 0) {
+    const { runSessions } = await import('../src/execution/sessions');
+    const sessionConfigs = options.sessions.map((prompt, i) => ({
+      id: `s${i + 1}`,
+      task: prompt,
+      cwd,
+      adapter: adapters[i % adapters.length],
+      mode: (options.auto ? 'auto' : 'ask') as 'ask' | 'auto',
+      readOnly: !!options.readOnly,
+      files: options.files,
+    }));
+    const handles = await runSessions(sessionConfigs);
+    for (const h of handles) {
+      await h.promise;
+    }
+    process.exit(EXIT_CODES.SUCCESS);
+  }
 
   const taskInput: TaskInput = {
     id: runId,
@@ -351,6 +370,8 @@ program
   .option('--allow-dirty', 'Allow running on a dirty working tree (non-destructive)')
   .option('--read-only', 'Treat the task as read-only; empty diff is a valid outcome')
   .option('--cwd <dir>', 'Working directory (default: current directory)')
+  .option('--no-tty', 'Disable interactive prompts (non-interactive failover)')
+  .option('--sessions <tasks...>', 'Run multiple tasks concurrently, each on its own model')
   .action(runAction);
 function showStatus(options: { json?: boolean }) {
   const tracker = createHealthTracker();
