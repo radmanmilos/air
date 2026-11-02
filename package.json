@@ -22,6 +22,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "postbuild": "node scripts/fix-imports.mjs",
     "prebuild": "node -e \"require('fs').rmSync('dist', {recursive:true, force:true})\"",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",

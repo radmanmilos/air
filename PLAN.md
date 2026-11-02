@@ -344,16 +344,20 @@ applied. Conflicts were resolved as follows:
 - **Process-group spawn (G3-05):** The runner now spawns with
   `detached: true` on Unix so `process.kill(-pid, ...)` reliably kills the
   full process tree. Windows uses `taskkill /T /F`.
-- **Streaming redaction (R4-08):** `src/security/streaming-redact.ts` retains
-  a 128-byte overlap between chunks so token patterns spanning OS output
-  boundaries are detected before the chunk is emitted.
+- **Streaming redaction (R5-06):** `src/security/streaming-redact.ts` retains
+  a bounded overlap between chunks so token patterns spanning OS output
+  boundaries are detected before the chunk is emitted. A suffix that could be
+  the start of a token prefix is withheld until the next chunk arrives, so a
+  secret split at any character boundary never leaks and adjacent chunks are
+  emitted exactly once.
 - **Failover hardening (G3-06):** Visited set prevents A→B→A ping-pong.
   Health updates (cooldown writes) happen before the next routing decision.
   Handoff text is injected into the next run's task prompt. Hop cap and
   allow-list blocks exit with `ALL_EXHAUSTED` (2) and list skip reasons.
 - **Exit code table (G3-13):** `src/types/exit-codes.ts` is the single source
-  of truth. 0=success, 1=task failure, 2=all exhausted, 3=cancel, 4=config/
-  dirty, 5=no changes, 6=timeout.
+  of truth. 0=success, 1=no changes, 2=all exhausted, 3=cancel, 4=config/
+  dirty, 5=timeout, 6=task failure. `exitCodeFor(resultState, reason?)`
+  maps every result state to its code.
 - **Redaction choke point (G3-14):** `containsSecret` uses non-global
   detection copies so it has no `lastIndex` state across calls. `--api-key`
   and `--api-key=value` forms are both handled.
@@ -365,19 +369,28 @@ applied. Conflicts were resolved as follows:
 - **README honesty (G3-15):** README lists only implemented adapters (aider,
   goose, mock-for-tests) and documents known limitations.
 
-## Current state (2026-10-31)
+## Current state (2026-11-02)
 
-- 25 test files, 144 tests passing.
-- `npm run typecheck`, `npm run typecheck:test`, `npm test` all green.
-- CLI verified: `air run`, `route-test --explain`, `status --json`, `verify`, `air mcp`, `air models`.
+- 31 test files, 191 tests passing.
+- `npm run typecheck`, `npm run typecheck:test`, `npm run build`,
+  `npm run lint`, `npm test` and `npm pack --dry-run` all green.
+- CLI verified: `air run`, `route-test --explain`, `status --json`,
+  `verify`, `air mcp`, `air models`.
 - Pushed to `radmanmilos/air` on `main`.
 
 ## Adapters
+
+### Verified
 
 | Adapter | Executable | Headless | Verified |
 |---|---|---|---|
 | aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
 | goose | `goose` | `goose run --text` | 1.57.0 |
+
+### Unverified (visible, never routed)
+
+| Adapter | Executable | Headless | Verified |
+|---|---|---|---|
 | opencode | `opencode` | `run --prompt --yes` | UNVERIFIED |
 | kilocode | `kilocode` | `run --prompt --yes` | UNVERIFIED |
 | codex | `codex` | `exec --skip-git-repo-check` | UNVERIFIED |
@@ -387,4 +400,5 @@ applied. Conflicts were resolved as follows:
 All adapters are discovered from PATH at runtime. The mock adapter is test-only
 and is never registered by production code. opencode, kilocode, codex, and
 github-copilot are UNVERIFIED spikes — see their docs in `docs/adapters/` and
-confirm flags against the installed binaries before relying on them.
+confirm flags against the installed binaries before relying on them. They are
+visible in `air status` but are never selected by normal routing.

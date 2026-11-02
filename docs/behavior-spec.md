@@ -82,10 +82,12 @@ CLI but not documented here, the conformance test in
 
 ## Exit codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Task failure |
-| 2 | All candidates exhausted |
-| 3 | User abort |
-| 4 | Config error |
+| Code | Name | Meaning |
+|---|---|---|
+| 0 | SUCCESS | Succeeded with changes or read-only |
+| 1 | NO_CHANGES | Write task exited 0 with empty diff |
+| 2 | ALL_EXHAUSTED | Hop cap reached, no eligible candidate, or allow-list blocked |
+| 3 | USER_CANCELLED | Cancelled |
+| 4 | CONFIG_OR_DIRTY | Config invalid, dirty-tree refused, or verify failed |
+| 5 | TIMEOUT | Timed out |
+| 6 | TASK_FAILURE | Failed; tool exited non-zero with no failover category |

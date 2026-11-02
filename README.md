@@ -1,6 +1,6 @@
 # air
 
-**Status:** Phases 0-5 implemented. 191 tests passing. CLI + MCP server functional.
+**Status:** Release candidate. 191 tests passing. CLI + MCP server functional. Build, lint and package dry-run green on CI.
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
@@ -10,7 +10,7 @@ Unified AI tool orchestrator with smart routing and failover. One CLI + MCP serv
 - **Failover with control** - Asks before switching by default, optional auto-switch (`--auto`)
 - **Stream + buffer** - Live output while parsing for rate limits; bounded rolling buffer with truncation metadata
 - **Context handoff** - Builds handoff from git state (never model summary); redacts secrets
-- **MCP server** - Expose routing to other agents via stdio JSON-RPC
+- **MCP server** - Expose routing to other agents via stdio JSON-RPC. `run_task` runs jobs in the background; `get_task_status`, `get_task_output`, `approve_failover`, `cancel_task` and `get_status` poll and drive the same run.
 - **Safety** - Dirty-tree refusal by default (`--allow-dirty` opt-in); provider allow-list; hop cap; revisit prevention
 - **Success detection** - Uses actual workspace delta (git status/diff), not stdout length
 - **Process facts** - Timeout, cancellation, and spawn errors take precedence over stderr matching
@@ -21,17 +21,21 @@ Unified AI tool orchestrator with smart routing and failover. One CLI + MCP serv
 
 ## Known limitations
 
-- MCP `approve_failover` flips state to SWITCHING but does not yet continue execution (pending G3-02)
-- MCP `run_task` awaits the full process inside the tool handler (pending G3-12)
-- opencode, kilocode, codex, and github-copilot are unverified spikes; README reflects only aider + goose
-- `npm run lint` is not configured (eslint not installed)
+- `opencode`, `kilocode`, `codex` and `github-copilot` are unverified spikes; they are visible in `air status` but are never selected by normal routing.
+- Verified adapters (aider, goose) require the external CLI to be installed and on PATH; their command syntax and permission flags were smoke-tested locally.
 
 ## Quick Start
 
 ```bash
-npm install
-npm run dev
-air --help
+npm ci
+npm run dev -- --help
+```
+
+For a global CLI on your shell PATH:
+
+```bash
+npm run build
+npm link
 ```
 
 ## Commands
@@ -44,6 +48,18 @@ air --help
 - `air verify -- <cmd...>` - Run an approved verification command (array args, no shell)
 - `air mcp` - Start MCP server (stdio)
 
+## Exit codes
+
+| Code | Name | Meaning |
+|---|---|---|
+| 0 | SUCCESS | Succeeded with changes or read-only |
+| 1 | NO_CHANGES | Write task exited 0 with empty diff |
+| 2 | ALL_EXHAUSTED | Hop cap reached, no eligible candidate, or allow-list blocked |
+| 3 | USER_CANCELLED | Cancelled |
+| 4 | CONFIG_OR_DIRTY | Config invalid, dirty-tree refused, or verify failed |
+| 5 | TIMEOUT | Timed out |
+| 6 | TASK_FAILURE | Failed; tool exited non-zero with no failover category |
+
 ## Configuration
 
 Configuration lives in a platform-appropriate directory, resolved by a single
@@ -53,7 +69,7 @@ central path module:
 |---|---|---|
 | Linux | `$XDG_CONFIG_HOME/air` (fallback `~/.config/air`) | `$XDG_CACHE_HOME/air` (fallback `~/.cache/air`) |
 | macOS | `~/Library/Application Support/air` | `~/Library/Caches/air` |
-| Windows | `%APPDATA%/air` | `%LOCALAPPDATA/air` |
+| Windows | `%APPDATA%/air` | `%LOCALAPPDATA%/air` |
 
 Global config: platform config directory / `config.yaml`  
 Repo config: `.airrc.yaml` (untrusted by default; validation required)  
@@ -68,15 +84,23 @@ npm run typecheck      # app typecheck
 npm run typecheck:test # test typecheck
 npm test               # vitest
 npm run build          # tsc
+npm run lint           # eslint
 npm run dev            # tsx bin/air.ts
 ```
 
 ## Adapters
 
+### Verified
+
 | Adapter | Executable | Headless | Verified |
 |---|---|---|---|
 | aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
 | goose | `goose` | `goose run --text` | 1.57.0 |
+
+### Unverified (visible, never routed)
+
+| Adapter | Executable | Headless | Verified |
+|---|---|---|---|
 | opencode | `opencode` | `run --prompt --yes` | UNVERIFIED |
 | kilocode | `kilocode` | `run --prompt --yes` | UNVERIFIED |
 | codex | `codex` | `exec --skip-git-repo-check` | UNVERIFIED |
