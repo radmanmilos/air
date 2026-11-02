@@ -3,7 +3,7 @@
 // added without changing router logic.
 
 import type { ErrorCategory } from '../types/errors';
-import type { CommandSpec, ParsedEvent, SpawnOptions, TaskInput } from '../types';
+import type { CommandSpec, ParsedEvent, TaskInput } from '../types';
 
 export interface AgentAdapter {
   /** Stable id, e.g. 'aider'. */

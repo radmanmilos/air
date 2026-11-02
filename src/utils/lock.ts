@@ -81,7 +81,6 @@ export async function acquireLock(
 ): Promise<LockHandle | null> {
   const lockDir = options.lockDir ?? `${paths.cacheDir}/locks`;
   const path = `${lockDir}/${name}.lock`;
-  const start = processStartTime();
   const deadline = Date.now() + (options.timeoutMs ?? 5000);
 
   while (true) {

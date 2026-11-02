@@ -3,13 +3,12 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { loadConfig, migrateConfig } from '../src/config/loader';
 import { createHealthTracker } from '../src/health/tracker';
-import { selectCandidate, selectCandidateFrom, isBlockedByAllowlist, formatRouteDecision } from '../src/router/router';
-import { AiderAdapter } from '../src/adapters/aider';
+import { selectCandidate, selectCandidateFrom, formatRouteDecision } from '../src/router/router';
 import { availableAdapters, adapterStatus } from '../src/adapters/registry';
 import { runProcess } from '../src/execution/runner';
 import { classifyOutcome } from '../src/types/outcome';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../src/types/errors';
-import { defaultStateForTask, type ResultState } from '../src/types/result';
+import { type ResultState } from '../src/types/result';
 import type { TaskInput } from '../src/types';
 import { snapshotGit, snapshotDelta, formatDirtyReport, formatDeltaReport } from '../src/context/checkpoint';
 import { makeRunId, writeTaskState, appendTaskIndex } from '../src/execution/task-state';
@@ -19,7 +18,7 @@ import { checkVerifyTrust, runVerify, formatVerifyReport } from '../src/context/
 import { startMcp } from '../src/mcp/server';
 import { buildHandoffPack } from '../src/context/handoff';
 import { buildModelCatalog, formatModelCatalog, formatBestModel } from '../src/router/catalog';
-import { EXIT_CODES, type ExitCode } from '../src/types/exit-codes';
+import { EXIT_CODES } from '../src/types/exit-codes';
 import { defaultAllowList, checkHandoffAllowlist } from '../src/security/allowlist';
 
 const program = new Command();
@@ -92,7 +91,6 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
   const visited = new Set<string>();
   let hops = 0;
   const maxHops = config.failover.maxHops;
-  let lastCategory: ErrorCategory = 'UNKNOWN';
 
   // Failover loop: try candidates until success, abort, or hop cap.
   while (hops < maxHops) {
@@ -154,7 +152,6 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
     const fact = classifyOutcome(outcome);
     let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr);
-    lastCategory = category;
 
     // Update health tracker before the next routing decision (R4-03, R5-12).
     // User cancellation is NOT a provider failure: it must not add a failure

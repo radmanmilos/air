@@ -21,8 +21,8 @@ export interface ProcessOutcome {
   stderrBytes: number;
   stdoutTruncated: boolean;
   stderrTruncated: boolean;
-  stdoutTail?: string; // redacted rolling tail for handoff
-  stderrTail?: string;
+  stdoutTail: string; // redacted rolling tail for handoff
+  stderrTail: string;
   startedAt: string;
   endedAt: string;
   durationMs: number;

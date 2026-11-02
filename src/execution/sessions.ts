@@ -10,7 +10,7 @@
 // time unless --parallel is passed.
 
 import { createHealthTracker } from '../health/tracker';
-import { acquireSeat, withSeat } from '../utils/concurrency';
+import { withSeat } from '../utils/concurrency';
 import { makeRunId, writeTaskState, appendTaskIndex } from '../execution/task-state';
 import { snapshotGit } from '../context/checkpoint';
 import type { AgentAdapter } from '../adapters/adapter';

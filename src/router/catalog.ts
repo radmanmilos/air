@@ -56,7 +56,7 @@ function costTierFor(adapter: AgentAdapter): 0 | 1 | 2 | 3 {
 }
 
 /** Filter the catalog to models that can handle a task. */
-export function bestModelFor(catalog: ModelEntry[], task: { mode: 'ask' | 'auto'; readOnly: boolean }): ModelEntry | null {
+export function bestModelFor(catalog: ModelEntry[], _task: { mode: 'ask' | 'auto'; readOnly: boolean }): ModelEntry | null {
   const eligible = catalog.filter((m) => m.available && m.capabilities.headless);
   if (eligible.length === 0) return null;
   // Prefer the cheapest model that can do the task.

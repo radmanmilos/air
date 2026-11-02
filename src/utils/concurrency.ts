@@ -9,7 +9,6 @@
 // automatically, so a crashed AIR does not leave an unrecoverable lock.
 
 import { promises as fs, constants as fsConstants } from 'node:fs';
-import { join } from 'node:path';
 import { paths } from '../config/paths';
 import { isPidAlive } from './lock';
 

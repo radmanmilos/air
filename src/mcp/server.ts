@@ -10,19 +10,17 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
-import { selectCandidate, selectCandidateFrom, isBlockedByAllowlist, formatRouteDecision } from '../router/router';
+import { selectCandidateFrom, isBlockedByAllowlist, formatRouteDecision } from '../router/router';
 import { availableAdapters, adapterStatus } from '../adapters/registry';
 import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../types/errors';
-import { defaultStateForTask, type ResultState } from '../types/result';
+import type { ResultState } from '../types/result';
 import { snapshotGit, snapshotDelta, formatDirtyReport } from '../context/checkpoint';
 import { buildHandoffPack } from '../context/handoff';
 import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state';
 import { trace } from '../observability/trace';
 import { redact } from '../security/redact';
-import { defaultAllowList, checkHandoffAllowlist } from '../security/allowlist';
-import { EXIT_CODES } from '../types/exit-codes';
 
 interface Job {
   state: any;
@@ -50,7 +48,7 @@ function listAdapters(): any[] {
  * transitions to AWAITING_APPROVAL when a failover-triggering category is
  * observed. Respects hop cap and revisit prevention. */
 export async function runAttempt(job: Job, adapter: any, taskInput: any): Promise<void> {
-  const { controller, cwd, isWriteTask, state, visited, allow, config, beforeSnap } = job;
+  const { controller, cwd, isWriteTask, state, config, beforeSnap } = job;
   const tracker = createHealthTracker();
   await tracker.load();
 

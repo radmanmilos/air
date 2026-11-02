@@ -3,7 +3,7 @@
 // respected because two tools on the same provider share one cooldown.
 
 import { paths } from '../config/paths';
-import { atomicWriteJson, readJsonFile } from '../utils/atomic';
+import { readJsonFile } from '../utils/atomic';
 import { lockedReadModifyWrite } from '../utils/lock';
 import type { ErrorCategory } from '../types/errors';
 import { getErrorAction } from '../types/errors';
@@ -88,8 +88,6 @@ export interface HealthTracker {
   snapshot(now?: number): HealthSnapshot;
 }
 
-const EMPTY: HealthState = { cooldowns: [], successes: {}, failures: {}, cancellations: {} };
-
 function key(provider: string, model: string): string {
   return `${provider}/${model}`;
 }
@@ -130,7 +128,7 @@ export function createHealthTracker(state: HealthState = freshState()): HealthTr
     recordSuccess(provider, model) {
       state.successes[key(provider, model)] = (state.successes[key(provider, model)] ?? 0) + 1;
     },
-    recordFailure(provider, model, category) {
+    recordFailure(provider, model, _category) {
       state.failures[key(provider, model)] = (state.failures[key(provider, model)] ?? 0) + 1;
     },
     recordCancellation(provider, model) {

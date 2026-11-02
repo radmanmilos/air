@@ -6,7 +6,6 @@
 
 import { availableAdapters, adapterStatus } from '../adapters/registry';
 import { defaultAllowList } from '../security/allowlist';
-import type { AgentAdapter } from '../adapters/adapter';
 
 export interface ModelCheckResult {
   adapters: { id: string; provider: string; model: string; available: boolean; reason?: string }[];

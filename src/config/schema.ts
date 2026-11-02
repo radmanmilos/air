@@ -46,26 +46,41 @@ const ConcurrencySchema = z.object({
   maxConcurrentAgents: z.number().int().min(1).default(1),
 });
 
+// zod 4 does not re-run inner defaults when an object field's `.default({})`
+// is an empty object, so each sub-schema default is spelled out explicitly.
+const DEFAULT_FAILOVER = { mode: 'ask' as const, maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false };
+const DEFAULT_PERMISSION = { mode: 'ask' as const, broadApproval: false, autoCommit: false, allowShell: false };
+const DEFAULT_VERIFY = { enabled: false };
+const DEFAULT_REDACTION = { enabled: true };
+const DEFAULT_CONCURRENCY = { maxConcurrentAgents: 1 };
+const DEFAULT_TIMEOUTS = { defaultMs: 300_000, perTool: {} };
+const DEFAULT_BUFFERS = { maxBytes: 1_000_000 };
+const DEFAULT_LOGGING = {
+  level: 'info' as const,
+  redact: true,
+  rotation: { maxBytes: 10 * 1024 * 1024, maxBackups: 5 },
+};
+
 export const ConfigSchema = z.object({
   version: z.number().int().min(1).default(CONFIG_VERSION),
   tools: z.array(ToolConfigSchema).default([]),
-  failover: FailoverSchema.default({}),
-  permission: PermissionSchema.default({}),
-  verify: VerifySchema.default({}),
-  redaction: RedactionSchema.default({}),
-  concurrency: ConcurrencySchema.default({}),
+  failover: FailoverSchema.default(DEFAULT_FAILOVER),
+  permission: PermissionSchema.default(DEFAULT_PERMISSION),
+  verify: VerifySchema.default(DEFAULT_VERIFY),
+  redaction: RedactionSchema.default(DEFAULT_REDACTION),
+  concurrency: ConcurrencySchema.default(DEFAULT_CONCURRENCY),
   trustedRepos: TrustedReposSchema.default([]),
   timeouts: z
     .object({
       defaultMs: z.number().int().min(1000).default(300_000),
       perTool: z.record(z.string(), z.number().int().min(1000)).default({}),
     })
-    .default({}),
+    .default(DEFAULT_TIMEOUTS),
   buffers: z
     .object({
       maxBytes: z.number().int().min(1024).default(1_000_000),
     })
-    .default({}),
+    .default(DEFAULT_BUFFERS),
   logging: z
     .object({
       level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -75,9 +90,9 @@ export const ConfigSchema = z.object({
           maxBytes: z.number().int().min(1024).default(10 * 1024 * 1024),
           maxBackups: z.number().int().min(0).default(5),
         })
-        .default({}),
+        .default(DEFAULT_LOGGING.rotation),
     })
-    .default({}),
+    .default(DEFAULT_LOGGING),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

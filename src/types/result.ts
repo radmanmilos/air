@@ -9,7 +9,7 @@ export type ResultState =
   | 'CANCELLED' // user cancelled
   | 'NEEDS_USER_REVIEW'; // ambiguous state; requires human judgment
 
-export function isTerminal(state: ResultState): boolean {
+export function isTerminal(_state: ResultState): boolean {
   return true; // all result states are terminal
 }
 

@@ -3,7 +3,7 @@ import tsParser from '@typescript-eslint/parser';
 
 export default [
   {
-    files: ['**/*.ts'],
+    files: ['src/**/*.ts', 'bin/**/*.ts', '*.d.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -14,9 +14,15 @@ export default [
     },
     plugins: { '@typescript-eslint': tseslint },
     rules: {
-      'no-console': ['error', { allow: ['error', 'warn'] }],
+      'no-console': ['error', { allow: ['error', 'warn', 'info', 'debug', 'trace'] }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    files: ['bin/air.ts'],
+    rules: {
+      'no-console': 'off',
     },
   },
 ];
