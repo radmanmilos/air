@@ -45,17 +45,20 @@ export function healthSnapshot(state: HealthState, now: number = Date.now()): He
   let totalFailures = 0;
   let totalCancellations = 0;
   const successRate: Record<string, number> = {};
-  for (const [k, s] of Object.entries(state.successes)) {
-    totalSuccesses += s;
+  const allKeys = new Set<string>([
+    ...Object.keys(state.successes),
+    ...Object.keys(state.failures),
+    ...Object.keys(state.cancellations),
+  ]);
+  for (const k of allKeys) {
+    const s = state.successes[k] ?? 0;
     const f = state.failures[k] ?? 0;
-    totalCancellations += state.cancellations[k] ?? 0;
+    const c = state.cancellations[k] ?? 0;
+    totalSuccesses += s;
     totalFailures += f;
+    totalCancellations += c;
     const total = s + f;
     successRate[k] = total > 0 ? s / total : 0;
-  }
-  for (const [k, c] of Object.entries(state.cancellations)) {
-    totalCancellations += c;
-    if (!(k in successRate)) successRate[k] = 0;
   }
   const active = state.cooldowns.filter((c) => c.until > now);
   return {

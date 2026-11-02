@@ -1,5 +1,5 @@
 import { createHealthTracker, shouldSetCooldown, shouldStopAndAsk, shouldAbort } from '../src/health/tracker';
-import { ERROR_POLICY } from '../src/types/errors';
+import { ERROR_POLICY, triggersFailover } from '../src/types/errors';
 import { describe, it, expect } from 'vitest';
 
 describe('health tracker (G2-02)', () => {
@@ -23,6 +23,23 @@ describe('health tracker (G2-02)', () => {
     t.recordFailure('openrouter', 'm1', 'RATE_LIMIT');
     // No throw; state is internal. Just verify no exception.
     expect(typeof t.flush).toBe('function');
+  });
+
+  it('records cancellations separately from failures (R5-12)', () => {
+    const t = createHealthTracker();
+    t.recordCancellation('openrouter', 'm1');
+    const snap = t.snapshot();
+    expect(snap.totalCancellations).toBe(1);
+    expect(snap.totalFailures).toBe(0);
+    // Cancellation must NOT add a cooldown.
+    expect(t.isCoolingDown('openrouter', 'm1')).toBe(false);
+    expect(snap.hasActiveCooldown).toBe(false);
+  });
+
+  it('cancellation does not trigger failover (R5-12)', () => {
+    // USER_CANCELLED maps to 'abort' in ERROR_POLICY, which is in
+    // NO_FAILOVER_ACTIONS, so triggersFailover() must return false.
+    expect(triggersFailover('USER_CANCELLED')).toBe(false);
   });
 
   it('returns only active cooldowns', () => {
