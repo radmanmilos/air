@@ -7,6 +7,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z } from 'zod';
 import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
@@ -40,7 +41,15 @@ interface Job {
 
 export const jobs = new Map<string, Job>();
 
-function listAdapters(): any[] {
+let _mockAdapter: any | null = null;
+async function listAdapters(): Promise<any[]> {
+  if (process.env.AIR_MOCK_ADAPTER) {
+    if (!_mockAdapter) {
+      const { MockAdapter } = await import('../adapters/mock');
+      _mockAdapter = new MockAdapter();
+    }
+    return [_mockAdapter];
+  }
   return availableAdapters();
 }
 
@@ -108,7 +117,7 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
     adapter: adapter.id,
     provider: adapter.provider,
     model: adapter.model,
-    state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
+    state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : result === 'CANCELLED' ? 'CANCELLED' : 'FAILED',
     result,
     endedAt: new Date().toISOString(),
     delta: {
@@ -187,7 +196,7 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
 export async function resolveNextCandidate(job: Job): Promise<{ adapter: any; taskInput: any } | null> {
   const tracker = createHealthTracker();
   await tracker.load();
-  const adapters = listAdapters();
+  const adapters = await listAdapters();
   const decision = selectCandidateFrom(
     job.taskInput,
     adapters,
@@ -233,7 +242,7 @@ async function runJob(job: Job): Promise<void> {
   await runAttempt(job, job.adapter!, job.taskInput!);
 }
 
-export async function startMcp(): Promise<void> {
+export async function startMcp(transport?: Transport): Promise<{ server: McpServer; transport: Transport }> {
   const server = new McpServer({ name: 'air', version: '0.1.0' });
 
   server.registerTool(
@@ -277,7 +286,7 @@ export async function startMcp(): Promise<void> {
       const { config } = await loadConfig({ cwd });
       const tracker = createHealthTracker();
       await tracker.load();
-      const adapters = listAdapters();
+const adapters = await listAdapters();
       const visited = new Set<string>();
       const allow: any = { providers: [], models: [] };
       const taskInput: any = {
@@ -494,8 +503,9 @@ export async function startMcp(): Promise<void> {
     },
   );
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const serverTransport = transport ?? new StdioServerTransport();
+  await server.connect(serverTransport);
+  return { server, transport: serverTransport };
 }
 
 if (typeof require !== 'undefined' && require.main === module) {

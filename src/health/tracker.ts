@@ -76,6 +76,8 @@ export function healthSnapshot(state: HealthState, now: number = Date.now()): He
 
 export interface HealthTracker {
   setCooldown(provider: string, model: string, untilMs: number, reason: ErrorCategory): void;
+  /** Remove a cooldown for (provider, model). No-op when none is set. */
+  clearCooldown(provider: string, model: string): void;
   isCoolingDown(provider: string, model: string, now?: number): boolean;
   getCooldown(provider: string, model: string, now?: number): CooldownEntry | null;
   getCooldowns(now?: number): CooldownEntry[];
@@ -105,11 +107,19 @@ function freshState(): HealthState {
 
 export function createHealthTracker(state: HealthState = freshState()): HealthTracker {
   return {
-    setCooldown(provider, model, untilMs, reason) {
-      state.cooldowns = state.cooldowns
-        .filter((c) => !(c.provider === provider && c.model === model))
-        .concat({ provider, model, until: untilMs, reason });
-    },
+setCooldown(provider, model, untilMs, reason) {
+       state.cooldowns = state.cooldowns
+         .filter((c) => !(c.provider === provider && c.model === model))
+         .concat({ provider, model, until: untilMs, reason });
+      },
+      clearCooldown(provider, model) {
+        state.cooldowns = state.cooldowns.filter(
+          (c) => !(c.provider === provider && c.model === model),
+        );
+        // Persist the removal so a later load() in another process/tracker
+        // does not resurrect the cooldown (R5-16 test seam). The caller is
+        // expected to follow with flush() to persist deterministically.
+      },
     isCoolingDown(provider, model, now = Date.now()) {
       return state.cooldowns.some(
         (c) => c.provider === provider && c.model === model && c.until > now,

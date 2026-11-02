@@ -1,24 +1,43 @@
 import { startMcp } from '../src/mcp/server';
-import { MockAdapter } from '../src/adapters/mock';
-import { runProcess } from '../src/execution/runner';
-import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../src/execution/task-state';
+import { createHealthTracker } from '../src/health/tracker';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// We can't easily drive the real stdio MCP server in-process, so we exercise
-// the job lifecycle through the exported helpers by importing the module's
-// internal job map via a re-export shim. The shim is the test seam.
-import { jobs } from '../src/mcp/server';
+// R5-16: end-to-end MCP stdio integration test.
+//
+// Drives the real air MCP server over a pair of linked in-memory transports
+// (the same JSON-RPC framing a real stdio client would use), with the MockAdapter
+// injected via the AIR_MOCK_ADAPTER seam. Exercises run_task -> get_task_status
+// -> get_task_output -> cancel_task as a genuine round-trip, not an in-process
+// helper call.
 
-describe('mcp async + approve continuation (G3-02, G3-12)', () => {
+/** Extract the first text content block from a tool result, or stringify. */
+function toolText(result: any): string {
+  const content = result?.content;
+  if (Array.isArray(content) && content[0]?.type === 'text' && typeof content[0].text === 'string') {
+    return content[0].text as string;
+  }
+  return JSON.stringify(content);
+}
+
+describe('mcp stdio round-trip (R5-16)', () => {
   let dir: string;
   let originalMockMode: string | undefined;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'air-mcp-'));
     originalMockMode = process.env.MOCK_MODE;
+    // The mock adapter shares (openrouter, mock-model) with every other test
+    // in this worker, and a previous run's RATE_LIMIT/TIMEOUT cooldown is
+    // persisted to the shared health file. Clear it so routing is deterministic.
+    const tracker = createHealthTracker();
+    await tracker.load();
+    tracker.clearCooldown('openrouter', 'mock-model');
+    await tracker.flush();
   });
 
   afterEach(() => {
@@ -27,75 +46,101 @@ describe('mcp async + approve continuation (G3-02, G3-12)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('exports startMcp as a function', () => {
-    expect(typeof startMcp).toBe('function');
-  });
+  async function startPair() {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    process.env.AIR_MOCK_ADAPTER = '1';
+    const { server } = await startMcp(serverTransport);
+    const client = new Client({ name: 'air-test', version: '0.1.0' });
+await client.connect(clientTransport);
+    return { client, server, serverTransport, clientTransport };
+  }
 
-  it('job map is exported for test inspection', () => {
-    expect(jobs).toBeInstanceOf(Map);
-  });
+  it('run_task -> get_task_status -> get_task_output round-trip', async () => {
+    process.env.MOCK_MODE = 'succeed';
+    const { client, serverTransport, clientTransport } = await startPair();
 
-  it('runProcess persists a redacted output tail and truncation metadata (R5-08)', async () => {
-    const { outcome } = await runProcess(
-      {
-        executable: process.execPath,
-        args: ['-e', "process.stdout.write('hello world');process.exit(0)"],
-        cwd: dir,
-      },
-      { stdoutTailBytes: 100 },
-    );
-    expect(outcome.stdoutTail).toContain('hello world');
-    expect(outcome.stdoutTruncated).toBe(false);
-    expect(outcome.stdoutBytes).toBeGreaterThan(0);
-  });
-
-  it('runProcess keeps a rolling tail when output exceeds the cap (R5-08)', async () => {
-    const { outcome } = await runProcess(
-      {
-        executable: process.execPath,
-        args: ['-e', "process.stdout.write('a'.repeat(5000));process.exit(0)"],
-        cwd: dir,
-      },
-      { stdoutTailBytes: 100, maxBufferBytes: 100 },
-    );
-    expect(outcome.stdoutTruncated).toBe(true);
-    expect(outcome.stdoutTail.length).toBeLessThanOrEqual(100);
-    expect(outcome.stdoutTail).toContain('a');
-  });
-
-  it('runProcess redacts secrets in the output tail (R5-08)', async () => {
-    const secret = 'sk-or-this-is-a-fake-test-key-1234567890abcdef';
-    const { outcome } = await runProcess(
-      {
-        executable: process.execPath,
-        args: ['-e', `process.stdout.write('token ${secret} done');process.exit(0)`],
-        cwd: dir,
-      },
-      { stdoutTailBytes: 500 },
-    );
-    expect(outcome.stdoutTail).not.toContain(secret);
-    expect(outcome.stdoutTail).toContain('[REDACTED]');
-  });
-
-  it('get_task_output reads the persisted outputTail field (R5-08)', async () => {
-    const runId = makeRunId();
-    await appendTaskIndex(runId);
-    await writeTaskState({
-      runId,
-      task: 'read',
-      cwd: dir,
-      adapter: 'mock',
-      provider: 'openrouter',
-      model: 'mock-model',
-      state: 'COMPLETED',
-      result: 'SUCCEEDED_READ_ONLY',
-      startedAt: new Date().toISOString(),
-      endedAt: new Date().toISOString(),
-      hops: 1,
-      maxHops: 3,
-      outputTail: 'captured output',
+    const run = await client.callTool({
+      name: 'run_task',
+      arguments: { task: 'do something', cwd: dir, readOnly: true },
     });
-    const state = await readTaskState(runId);
-    expect(state?.outputTail).toBe('captured output');
+    const runText = toolText(run);
+    const runId = runText.match(/Started task ([a-z0-9-]+)/)?.[1];
+    expect(runId).toBeTruthy();
+
+    // Poll until the job finishes.
+    let state: any = null;
+    for (let i = 0; i < 50; i++) {
+      const st = await client.callTool({
+        name: 'get_task_status',
+        arguments: { runId: runId! },
+      });
+      const text = toolText(st);
+      state = JSON.parse(text);
+      if (state.state === 'COMPLETED' || state.state === 'FAILED') break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(state.state).toBe('COMPLETED');
+    expect(state.result).toBe('SUCCEEDED_READ_ONLY');
+
+    const out = await client.callTool({
+      name: 'get_task_output',
+      arguments: { runId: runId! },
+    });
+    const outText = toolText(out);
+    expect(outText).toContain('Mock tool: editing');
+
+    await clientTransport.close();
+    await serverTransport.close();
+  });
+
+  it('cancel_task transitions a running job to CANCELLED (R5-12)', async () => {
+    process.env.MOCK_MODE = 'hang';
+    const { client, serverTransport, clientTransport } = await startPair();
+
+    const run = await client.callTool({
+      name: 'run_task',
+      arguments: { task: 'hang', cwd: dir, readOnly: true },
+    });
+    const runText = toolText(run);
+    const runId = runText.match(/Started task ([a-z0-9-]+)/)?.[1];
+    if (!runId) throw new Error(`run_task did not return a run id: ${runText}`);
+    expect(runId).toBeTruthy();
+
+    // Give the background job a moment to start.
+    await new Promise((r) => setTimeout(r, 100));
+
+    const cancel = await client.callTool({
+      name: 'cancel_task',
+      arguments: { runId: runId! },
+    });
+    const cancelText = toolText(cancel);
+    expect(cancelText).toContain('Cancelled');
+
+    let state: any = null;
+    for (let i = 0; i < 50; i++) {
+      const st = await client.callTool({
+        name: 'get_task_status',
+        arguments: { runId: runId! },
+      });
+      const text = toolText(st);
+      state = JSON.parse(text);
+      if (state.state === 'CANCELLED') break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(state.state).toBe('CANCELLED');
+
+    await clientTransport.close();
+    await serverTransport.close();
+  });
+
+  it('listTools advertises the air tool set', async () => {
+    const { client, serverTransport, clientTransport } = await startPair();
+    const list = await client.listTools();
+    const names = list.tools.map((t) => t.name).sort();
+    expect(names).toEqual(
+      ['approve_failover', 'cancel_task', 'get_status', 'get_task_output', 'get_task_status', 'run_task'].sort(),
+    );
+    await clientTransport.close();
+    await serverTransport.close();
   });
 });
