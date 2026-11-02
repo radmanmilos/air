@@ -33,7 +33,7 @@ async function listAdapters(config?: any): Promise<any[]> {
   // Production registry: real adapters only, discovered from PATH.
   // MockAdapter is test-only and injected explicitly by tests.
   if (process.env.MOCK_MODE) {
-    const { MockAdapter } = await import('./src/adapters/mock');
+    const { MockAdapter } = await import('../src/adapters/mock');
     return [new MockAdapter()];
   }
   return availableAdapters(config);
@@ -355,17 +355,23 @@ program
 function showStatus(options: { json?: boolean }) {
   const tracker = createHealthTracker();
   return tracker.load().then(() => {
+    const snap = tracker.snapshot();
     const data = {
       command: 'status',
       version: '0.1.0',
       tools: adapterStatus(),
-      cooldowns: tracker.getCooldowns().map((c) => ({
+      cooldowns: snap.cooldowns.map((c) => ({
         provider: c.provider,
         model: c.model,
         until: c.until,
         reason: c.reason,
       })),
-      health: [],
+      health: {
+        totalSuccesses: snap.totalSuccesses,
+        totalFailures: snap.totalFailures,
+        successRate: snap.successRate,
+        hasActiveCooldown: snap.hasActiveCooldown,
+      },
     };
     if (options.json) {
       process.stdout.write(JSON.stringify(data) + '\n');
@@ -374,6 +380,9 @@ function showStatus(options: { json?: boolean }) {
     console.log(chalk.cyan('air status'));
     console.log(chalk.gray('Tools:'), data.tools.map((t) => `${t.id}${t.available ? '' : ' (unavailable)'}`).join(', ') || 'none');
     console.log(chalk.gray('Cooldowns:'), data.cooldowns.length);
+    console.log(chalk.gray('Successes:'), snap.totalSuccesses);
+    console.log(chalk.gray('Failures:'), snap.totalFailures);
+    console.log(chalk.gray('Active cooldown:'), snap.hasActiveCooldown ? 'yes' : 'no');
   });
 }
 
@@ -395,12 +404,12 @@ program
   .argument('<task>', 'Task description')
   .option('--explain', 'Print routing reasoning without executing')
   .option('--json', 'Emit machine-readable JSON')
-  .action(async (task: string, options: { explain?: boolean; json?: boolean }) => {
+.action(async (task: string, options: { explain?: boolean; json?: boolean }) => {
     const tracker = createHealthTracker();
     await tracker.load();
     const decision = selectCandidate(
       { id: 'route-test', prompt: task, cwd: process.cwd(), mode: 'ask' },
-      listAdapters(),
+      await listAdapters(),
       tracker,
     );
     const report = formatRouteDecision(decision);

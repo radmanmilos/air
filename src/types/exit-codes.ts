@@ -4,14 +4,14 @@
 // and tests all import from here.
 
 export const EXIT_CODES = {
-  SUCCESS: 0, // SUCCEEDED_WITH_CHANGES, SUCCEEDED_READ_ONLY, NO_CHANGES
-  TASK_FAILURE: 1, // FAILED, tool exited non-zero with no failover category
+  SUCCESS: 0, // SUCCEEDED_WITH_CHANGES, SUCCEEDED_READ_ONLY
+  NO_CHANGES: 1, // write task exited 0 with empty diff
   ALL_EXHAUSTED: 2, // hop cap reached, no eligible candidate, or allow-list blocked
   USER_CANCELLED: 3, // CANCELLED
   CONFIG_OR_DIRTY: 4, // config invalid, dirty-tree refused, verify failed
-  NO_CHANGES: 5, // write task exited 0 with empty diff
-  TIMEOUT: 6, // timed out
-  FAILOVER_PROPOSED: 7, // failover proposed but not approved (R5-04)
+  TIMEOUT: 5, // timed out
+  FAILOVER_PROPOSED: 6, // failover proposed but not approved (R5-04)
+  TASK_FAILURE: 7, // FAILED, tool exited non-zero with no failover category
 } as const;
 
 export type ExitCode = (typeof EXIT_CODES)[keyof typeof EXIT_CODES];

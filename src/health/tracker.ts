@@ -21,6 +21,44 @@ export interface HealthState {
   failures: Record<string, number>;
 }
 
+export interface HealthSnapshot {
+  cooldowns: CooldownEntry[];
+  successes: Record<string, number>;
+  failures: Record<string, number>;
+  /** Total number of recorded successes across all providers/models. */
+  totalSuccesses: number;
+  /** Total number of recorded failures across all providers/models. */
+  totalFailures: number;
+  /** Per-(provider, model) success rate as a number in [0, 1]. */
+  successRate: Record<string, number>;
+  /** True when at least one (provider, model) is currently cooling down. */
+  hasActiveCooldown: boolean;
+}
+
+/** Build a structured health snapshot from a HealthState (R5-18). */
+export function healthSnapshot(state: HealthState, now: number = Date.now()): HealthSnapshot {
+  let totalSuccesses = 0;
+  let totalFailures = 0;
+  const successRate: Record<string, number> = {};
+  for (const [k, s] of Object.entries(state.successes)) {
+    totalSuccesses += s;
+    const f = state.failures[k] ?? 0;
+    totalFailures += f;
+    const total = s + f;
+    successRate[k] = total > 0 ? s / total : 0;
+  }
+  const active = state.cooldowns.filter((c) => c.until > now);
+  return {
+    cooldowns: active,
+    successes: state.successes,
+    failures: state.failures,
+    totalSuccesses,
+    totalFailures,
+    successRate,
+    hasActiveCooldown: active.length > 0,
+  };
+}
+
 export interface HealthTracker {
   setCooldown(provider: string, model: string, untilMs: number, reason: ErrorCategory): void;
   isCoolingDown(provider: string, model: string, now?: number): boolean;
@@ -30,6 +68,7 @@ export interface HealthTracker {
   recordFailure(provider: string, model: string, category: ErrorCategory): void;
   flush(): Promise<void>;
   load(): Promise<void>;
+  snapshot(now?: number): HealthSnapshot;
 }
 
 const EMPTY: HealthState = { cooldowns: [], successes: {}, failures: {} };
@@ -107,6 +146,9 @@ export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTr
         state.successes = loaded.successes ?? {};
         state.failures = loaded.failures ?? {};
       }
+    },
+    snapshot(now?: number) {
+      return healthSnapshot(state, now);
     },
   };
 }
