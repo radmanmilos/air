@@ -4,6 +4,7 @@
 
 import { paths } from '../config/paths';
 import { atomicWriteJson, readJsonFile } from '../utils/atomic';
+import { lockedReadModifyWrite } from '../utils/lock';
 import type { ErrorCategory } from '../types/errors';
 import { getErrorAction } from '../types/errors';
 
@@ -66,7 +67,38 @@ export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTr
       state.failures[key(provider, model)] = (state.failures[key(provider, model)] ?? 0) + 1;
     },
     async flush() {
-      await atomicWriteJson(paths.healthFile, state);
+      // Serialize the read-modify-write cycle across processes (R5-09):
+      // re-read persisted state, merge in our in-memory mutations, and
+      // write atomically under the lock. Two concurrent flushes cannot
+      // overwrite each other.
+      const snapshot = { ...state };
+      await lockedReadModifyWrite<HealthState>(
+        'health',
+        paths.healthFile,
+        async (current) => {
+          const base: HealthState = current ?? { ...EMPTY };
+          const merged: HealthState = {
+            cooldowns: [
+              ...base.cooldowns.filter(
+                (c) => !snapshot.cooldowns.some((s) => s.provider === c.provider && s.model === c.model),
+              ),
+              ...snapshot.cooldowns,
+            ],
+            successes: { ...base.successes, ...snapshot.successes },
+            failures: { ...base.failures, ...snapshot.failures },
+          };
+          return merged;
+        },
+        { timeoutMs: 5000 },
+      );
+      // Refresh in-memory state from the merged result so subsequent
+      // mutations in this process see the latest persisted state.
+      const reloaded = await readJsonFile<HealthState>(paths.healthFile);
+      if (reloaded) {
+        state.cooldowns = reloaded.cooldowns ?? [];
+        state.successes = reloaded.successes ?? {};
+        state.failures = reloaded.failures ?? {};
+      }
     },
     async load() {
       const loaded = await readJsonFile<HealthState>(paths.healthFile);

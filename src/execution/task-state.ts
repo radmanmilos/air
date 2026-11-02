@@ -4,9 +4,14 @@
 // (temp-file-plus-rename) so concurrent CLI + MCP processes cannot observe a
 // half-written file. Multiple tasks never overwrite one another: each run
 // gets a unique id.
+//
+// Task-index updates are guarded by an inter-process lock (R5-09) so two
+// processes reading/modifying/writing the index simultaneously cannot lose
+// task IDs.
 
 import { paths } from '../config/paths';
 import { atomicWriteJson, readJsonFile } from '../utils/atomic';
+import { lockedReadModifyWrite } from '../utils/lock';
 import type { ResultState } from '../types/result';
 
 export interface TaskState {
@@ -66,11 +71,22 @@ export async function listTaskStates(): Promise<TaskState[]> {
   return out;
 }
 
+/**
+ * Append a run id to the task index under an inter-process lock so two
+ * concurrent processes cannot lose task IDs (R5-09).
+ */
 export async function appendTaskIndex(runId: string): Promise<void> {
-  const index = await readJsonFile<{ ids: string[] }>(`${paths.tasksDir}/index.json`);
-  const ids = index?.ids ?? [];
-  if (!ids.includes(runId)) ids.push(runId);
-  await atomicWriteJson(`${paths.tasksDir}/index.json`, { ids });
+  const indexFile = `${paths.tasksDir}/index.json`;
+  await lockedReadModifyWrite<{ ids: string[] }>(
+    'task-index',
+    indexFile,
+    async (current) => {
+      const ids = current?.ids ?? [];
+      if (!ids.includes(runId)) ids.push(runId);
+      return { ids };
+    },
+    { timeoutMs: 5000 },
+  );
 }
 
 export function makeRunId(): string {
