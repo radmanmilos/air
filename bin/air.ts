@@ -123,6 +123,8 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     const { outcome } = await runProcess(spec, {
       timeoutMs: config.timeouts.defaultMs,
       maxBufferBytes: config.buffers.maxBytes,
+      stdoutTailBytes: 2048,
+      stderrTailBytes: 2048,
       onStdout: (c: string) => process.stdout.write(c),
       onStderr: (c: string) => process.stderr.write(c),
     });
@@ -185,6 +187,9 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
         untracked: delta.untracked,
         deleted: delta.deleted,
       },
+      outputTail: redact(outcome.stdoutTail ?? outcome.stdout),
+      stdoutTruncated: outcome.stdoutTruncated,
+      stderrTruncated: outcome.stderrTruncated,
       error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
         ? { category, message: outcome.stderr.slice(0, 500) }
         : undefined,

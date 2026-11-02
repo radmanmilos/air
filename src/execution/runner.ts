@@ -14,6 +14,7 @@
 import { execFile } from 'node:child_process';
 import { StreamingRedactor } from '../security/streaming-redact';
 import type { CommandSpec, ProcessOutcome } from '../types';
+import { utf8Bytes } from '../types/outcome';
 
 // cross-spawn has no published @types package and ships as ESM-only.
 // We import it lazily so the module graph stays compatible with both
@@ -29,6 +30,8 @@ export interface RunOptions {
   timeoutMs?: number;
   signal?: AbortSignal;
   maxBufferBytes?: number;
+  stdoutTailBytes?: number;
+  stderrTailBytes?: number;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
 }
@@ -40,13 +43,18 @@ export interface RunResult {
 export async function runProcess(spec: CommandSpec, options: RunOptions = {}): Promise<RunResult> {
   const spawnFn = await getSpawn();
   const maxBuffer = options.maxBufferBytes ?? 1_000_000;
+  const tailCap = options.stdoutTailBytes ?? 2048;
 
   return new Promise((resolve) => {
     const startedAt = new Date().toISOString();
     let stdout = '';
     let stderr = '';
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
     let stdoutTruncated = false;
     let stderrTruncated = false;
+    let stdoutTail = '';
+    let stderrTail = '';
 
     const child = spawnFn(spec.executable, spec.args, {
       cwd: spec.cwd,
@@ -111,33 +119,60 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
       }
     }
 
-    child.stdout?.on('data', (buf: Buffer) => {
-      const text = stdoutRedactor.feed(buf);
-      if (stdout.length < maxBuffer) {
-        const remaining = maxBuffer - stdout.length;
+    const pushStdout = (text: string) => {
+      // Keep a prefix-capped capture for full output, plus a rolling tail
+      // for handoff/debugging (R5-10).
+      if (stdoutBytes < maxBuffer) {
+        const remaining = maxBuffer - stdoutBytes;
         stdout += text.slice(0, remaining);
-        if (text.length > remaining) stdoutTruncated = true;
+        stdoutBytes += utf8Bytes(text.slice(0, remaining));
+        if (utf8Bytes(text) > remaining) stdoutTruncated = true;
       } else {
         stdoutTruncated = true;
       }
+      // Rolling tail (last N bytes).
+      const nextTail = stdoutTail + text;
+      if (utf8Bytes(nextTail) > tailCap) {
+        let out = nextTail;
+        while (utf8Bytes(out) > tailCap) out = out.slice(1);
+        stdoutTail = out;
+      } else {
+        stdoutTail = nextTail;
+      }
       options.onStdout?.(text);
-    });
+    };
 
-    child.stderr?.on('data', (buf: Buffer) => {
-      const text = stderrRedactor.feed(buf);
-      if (stderr.length < maxBuffer) {
-        const remaining = maxBuffer - stderr.length;
+    const pushStderr = (text: string) => {
+      if (stderrBytes < maxBuffer) {
+        const remaining = maxBuffer - stderrBytes;
         stderr += text.slice(0, remaining);
-        if (text.length > remaining) stderrTruncated = true;
+        stderrBytes += utf8Bytes(text.slice(0, remaining));
+        if (utf8Bytes(text) > remaining) stderrTruncated = true;
       } else {
         stderrTruncated = true;
       }
+      const nextTail = stderrTail + text;
+      if (utf8Bytes(nextTail) > tailCap) {
+        let out = nextTail;
+        while (utf8Bytes(out) > tailCap) out = out.slice(1);
+        stderrTail = out;
+      } else {
+        stderrTail = nextTail;
+      }
       options.onStderr?.(text);
+    };
+
+    child.stdout?.on('data', (buf: Buffer) => {
+      pushStdout(stdoutRedactor.feed(buf));
+    });
+
+    child.stderr?.on('data', (buf: Buffer) => {
+      pushStderr(stderrRedactor.feed(buf));
     });
 
     child.on('error', (err: NodeJS.ErrnoException) => {
-      stdout += stdoutRedactor.flush();
-      stderr += stderrRedactor.flush();
+      pushStdout(stdoutRedactor.flush());
+      pushStderr(stderrRedactor.flush());
       finish({
         exitCode: null,
         signal: null,
@@ -146,6 +181,12 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
         cancelled,
         stdout,
         stderr,
+        stdoutBytes,
+        stderrBytes,
+        stdoutTruncated,
+        stderrTruncated,
+        stdoutTail,
+        stderrTail,
         startedAt,
         endedAt: new Date().toISOString(),
         durationMs: Date.now() - new Date(startedAt).getTime(),
@@ -153,8 +194,8 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     });
 
     child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
-      stdout += stdoutRedactor.flush();
-      stderr += stderrRedactor.flush();
+      pushStdout(stdoutRedactor.flush());
+      pushStderr(stderrRedactor.flush());
       finish({
         exitCode: code,
         signal,
@@ -163,6 +204,12 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
         cancelled,
         stdout,
         stderr,
+        stdoutBytes,
+        stderrBytes,
+        stdoutTruncated,
+        stderrTruncated,
+        stdoutTail,
+        stderrTail,
         startedAt,
         endedAt: new Date().toISOString(),
         durationMs: Date.now() - new Date(startedAt).getTime(),

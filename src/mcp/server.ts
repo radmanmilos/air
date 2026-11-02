@@ -57,7 +57,17 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   const { outcome } = await runProcess(adapter.buildCommand(taskInput), {
     timeoutMs: config.timeouts.defaultMs,
     maxBufferBytes: config.buffers.maxBytes,
+    stdoutTailBytes: 2048,
+    stderrTailBytes: 2048,
     signal: controller.signal,
+    onStdout: (c: string) => {
+      // Stream to the client in real time; the rolling tail is captured
+      // by the runner and persisted in the task state.
+      process.stdout.write(c);
+    },
+    onStderr: (c: string) => {
+      process.stderr.write(c);
+    },
   });
 
   const fact = classifyOutcome(outcome);
@@ -109,6 +119,9 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
       untracked: delta.untracked,
       deleted: delta.deleted,
     },
+    outputTail: redact(outcome.stdoutTail ?? outcome.stdout),
+    stdoutTruncated: outcome.stdoutTruncated,
+    stderrTruncated: outcome.stderrTruncated,
     error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
       ? { category, message: outcome.stderr.slice(0, 500) }
       : undefined,
@@ -374,7 +387,12 @@ export async function startMcp(): Promise<void> {
       const job = jobs.get(args.runId);
       const state = job?.state ?? (await readTaskState(args.runId));
       if (!state) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
-      return { content: [{ type: 'text', text: redact(JSON.stringify(state.output ?? '')) }] };
+      // Retrieval reads the persisted outputTail field (R5-08). The tail is
+      // already redacted and bounded by the runner.
+      const tail = state.outputTail ?? '';
+      const truncated = state.stdoutTruncated || state.stderrTruncated;
+      const meta = truncated ? ' [output truncated]' : '';
+      return { content: [{ type: 'text', text: tail + meta }] };
     },
   );
 

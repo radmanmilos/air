@@ -34,4 +34,68 @@ describe('mcp async + approve continuation (G3-02, G3-12)', () => {
   it('job map is exported for test inspection', () => {
     expect(jobs).toBeInstanceOf(Map);
   });
+
+  it('runProcess persists a redacted output tail and truncation metadata (R5-08)', async () => {
+    const { outcome } = await runProcess(
+      {
+        executable: process.execPath,
+        args: ['-e', "process.stdout.write('hello world');process.exit(0)"],
+        cwd: dir,
+      },
+      { stdoutTailBytes: 100 },
+    );
+    expect(outcome.stdoutTail).toContain('hello world');
+    expect(outcome.stdoutTruncated).toBe(false);
+    expect(outcome.stdoutBytes).toBeGreaterThan(0);
+  });
+
+  it('runProcess keeps a rolling tail when output exceeds the cap (R5-08)', async () => {
+    const { outcome } = await runProcess(
+      {
+        executable: process.execPath,
+        args: ['-e', "process.stdout.write('a'.repeat(5000));process.exit(0)"],
+        cwd: dir,
+      },
+      { stdoutTailBytes: 100, maxBufferBytes: 100 },
+    );
+    expect(outcome.stdoutTruncated).toBe(true);
+    expect(outcome.stdoutTail.length).toBeLessThanOrEqual(100);
+    expect(outcome.stdoutTail).toContain('a');
+  });
+
+  it('runProcess redacts secrets in the output tail (R5-08)', async () => {
+    const secret = 'sk-or-this-is-a-fake-test-key-1234567890abcdef';
+    const { outcome } = await runProcess(
+      {
+        executable: process.execPath,
+        args: ['-e', `process.stdout.write('token ${secret} done');process.exit(0)`],
+        cwd: dir,
+      },
+      { stdoutTailBytes: 500 },
+    );
+    expect(outcome.stdoutTail).not.toContain(secret);
+    expect(outcome.stdoutTail).toContain('[REDACTED]');
+  });
+
+  it('get_task_output reads the persisted outputTail field (R5-08)', async () => {
+    const runId = makeRunId();
+    await appendTaskIndex(runId);
+    await writeTaskState({
+      runId,
+      task: 'read',
+      cwd: dir,
+      adapter: 'mock',
+      provider: 'openrouter',
+      model: 'mock-model',
+      state: 'COMPLETED',
+      result: 'SUCCEEDED_READ_ONLY',
+      startedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      hops: 1,
+      maxHops: 3,
+      outputTail: 'captured output',
+    });
+    const state = await readTaskState(runId);
+    expect(state?.outputTail).toBe('captured output');
+  });
 });

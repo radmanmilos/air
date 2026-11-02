@@ -31,6 +31,8 @@ export interface TaskState {
     task?: string;
   };
   outputTail?: string;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
   error?: { category: string; message: string };
   delta?: {
     staged: string[];
