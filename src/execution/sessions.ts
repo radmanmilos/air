@@ -155,7 +155,7 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
 export async function runSessions(configs: SessionConfig[]): Promise<SessionHandle[]> {
   const handles: SessionHandle[] = [];
   for (const config of configs) {
-    handles.push(runSession(config));
+    handles.push(await runSession(config));
   }
   // Wait for all sessions to settle; a cancelled session does not abort
   // the others.

@@ -20,13 +20,14 @@ export class KilocodeAdapter implements AgentAdapter {
   model = 'gemma-4-31b-it:free';
 
 capabilities = {
-    headlessExecution: false,
+    headlessExecution: true,
     structuredOutput: false,
-    fileEditing: false,
+    fileEditing: true,
     shellAccess: false,
     imageInput: false,
-    supportsCancellation: false,
-    supportsStreaming: false,
+    supportsCancellation: true,
+    supportsStreaming: true,
+    contextWindow: 128_000,
   };
 
   canHandle(_task: TaskInput): boolean {
