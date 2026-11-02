@@ -29,9 +29,13 @@ program
   .description('Unified AI tool orchestrator')
   .version('0.1.0');
 
-function listAdapters(config?: any): any[] {
+async function listAdapters(config?: any): Promise<any[]> {
   // Production registry: real adapters only, discovered from PATH.
   // MockAdapter is test-only and injected explicitly by tests.
+  if (process.env.MOCK_MODE) {
+    const { MockAdapter } = await import('./src/adapters/mock');
+    return [new MockAdapter()];
+  }
   return availableAdapters(config);
 }
 
@@ -52,7 +56,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
   const tracker = createHealthTracker();
   await tracker.load();
 
-  const adapters = listAdapters(config);
+  const adapters = await listAdapters(config);
   const runId = makeRunId();
   await appendTaskIndex(runId);
 
