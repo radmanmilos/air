@@ -78,7 +78,7 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   });
 
   // Update health before the next routing decision.
-  if (outcome.cancelled) tracker.recordFailure(adapter.provider, adapter.model, 'USER_CANCELLED');
+  if (outcome.cancelled) tracker.recordCancellation(adapter.provider, adapter.model);
   else if (outcome.timedOut) {
     tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
     tracker.setCooldown(adapter.provider, adapter.model, Date.now() + 60_000, 'TIMEOUT');

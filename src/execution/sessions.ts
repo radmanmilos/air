@@ -90,7 +90,7 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
         spawnError: outcome.spawnError,
       });
 
-      if (outcome.cancelled) tracker.recordFailure(adapter.provider, adapter.model, 'USER_CANCELLED');
+      if (outcome.cancelled) tracker.recordCancellation(adapter.provider, adapter.model);
       else if (outcome.timedOut) {
         tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
         tracker.setCooldown(adapter.provider, adapter.model, Date.now() + 60_000, 'TIMEOUT');

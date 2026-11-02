@@ -23,6 +23,14 @@ const FailoverSchema = z.object({
   allowProviderSwitch: z.boolean().default(false),
 });
 
+/** Permission mode is separate from failover mode (R5-13). */
+const PermissionSchema = z.object({
+  mode: z.enum(['ask', 'auto', 'deny']).default('ask'),
+  broadApproval: z.boolean().default(false),
+  autoCommit: z.boolean().default(false),
+  allowShell: z.boolean().default(false),
+});
+
 const VerifySchema = z.object({
   enabled: z.boolean().default(false),
   command: z.string().optional(),
@@ -42,6 +50,7 @@ export const ConfigSchema = z.object({
   version: z.number().int().min(1).default(CONFIG_VERSION),
   tools: z.array(ToolConfigSchema).default([]),
   failover: FailoverSchema.default({}),
+  permission: PermissionSchema.default({}),
   verify: VerifySchema.default({}),
   redaction: RedactionSchema.default({}),
   concurrency: ConcurrencySchema.default({}),

@@ -19,16 +19,20 @@ export interface HealthState {
   cooldowns: CooldownEntry[];
   successes: Record<string, number>;
   failures: Record<string, number>;
+  cancellations: Record<string, number>;
 }
 
 export interface HealthSnapshot {
   cooldowns: CooldownEntry[];
   successes: Record<string, number>;
   failures: Record<string, number>;
+  cancellations: Record<string, number>;
   /** Total number of recorded successes across all providers/models. */
   totalSuccesses: number;
   /** Total number of recorded failures across all providers/models. */
   totalFailures: number;
+  /** Total number of recorded cancellations across all providers/models. */
+  totalCancellations: number;
   /** Per-(provider, model) success rate as a number in [0, 1]. */
   successRate: Record<string, number>;
   /** True when at least one (provider, model) is currently cooling down. */
@@ -39,21 +43,29 @@ export interface HealthSnapshot {
 export function healthSnapshot(state: HealthState, now: number = Date.now()): HealthSnapshot {
   let totalSuccesses = 0;
   let totalFailures = 0;
+  let totalCancellations = 0;
   const successRate: Record<string, number> = {};
   for (const [k, s] of Object.entries(state.successes)) {
     totalSuccesses += s;
     const f = state.failures[k] ?? 0;
+    totalCancellations += state.cancellations[k] ?? 0;
     totalFailures += f;
     const total = s + f;
     successRate[k] = total > 0 ? s / total : 0;
+  }
+  for (const [k, c] of Object.entries(state.cancellations)) {
+    totalCancellations += c;
+    if (!(k in successRate)) successRate[k] = 0;
   }
   const active = state.cooldowns.filter((c) => c.until > now);
   return {
     cooldowns: active,
     successes: state.successes,
     failures: state.failures,
+    cancellations: state.cancellations,
     totalSuccesses,
     totalFailures,
+    totalCancellations,
     successRate,
     hasActiveCooldown: active.length > 0,
   };
@@ -66,12 +78,14 @@ export interface HealthTracker {
   getCooldowns(now?: number): CooldownEntry[];
   recordSuccess(provider: string, model: string): void;
   recordFailure(provider: string, model: string, category: ErrorCategory): void;
+  /** Record a user cancellation. NOT a provider failure (R5-12). */
+  recordCancellation(provider: string, model: string): void;
   flush(): Promise<void>;
   load(): Promise<void>;
   snapshot(now?: number): HealthSnapshot;
 }
 
-const EMPTY: HealthState = { cooldowns: [], successes: {}, failures: {} };
+const EMPTY: HealthState = { cooldowns: [], successes: {}, failures: {}, cancellations: {} };
 
 function key(provider: string, model: string): string {
   return `${provider}/${model}`;
@@ -105,6 +119,11 @@ export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTr
     recordFailure(provider, model, category) {
       state.failures[key(provider, model)] = (state.failures[key(provider, model)] ?? 0) + 1;
     },
+    recordCancellation(provider, model) {
+      // User cancellation is NOT a provider failure (R5-12). It must not
+      // add a failure count or cooldown, and it must never trigger failover.
+      state.cancellations[key(provider, model)] = (state.cancellations[key(provider, model)] ?? 0) + 1;
+    },
     async flush() {
       // Serialize the read-modify-write cycle across processes (R5-09):
       // re-read persisted state, merge in our in-memory mutations, and
@@ -125,6 +144,7 @@ export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTr
             ],
             successes: { ...base.successes, ...snapshot.successes },
             failures: { ...base.failures, ...snapshot.failures },
+            cancellations: { ...base.cancellations, ...snapshot.cancellations },
           };
           return merged;
         },
@@ -137,6 +157,7 @@ export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTr
         state.cooldowns = reloaded.cooldowns ?? [];
         state.successes = reloaded.successes ?? {};
         state.failures = reloaded.failures ?? {};
+        state.cancellations = reloaded.cancellations ?? {};
       }
     },
     async load() {
@@ -145,6 +166,7 @@ export function createHealthTracker(state: HealthState = { ...EMPTY }): HealthTr
         state.cooldowns = loaded.cooldowns ?? [];
         state.successes = loaded.successes ?? {};
         state.failures = loaded.failures ?? {};
+        state.cancellations = loaded.cancellations ?? {};
       }
     },
     snapshot(now?: number) {

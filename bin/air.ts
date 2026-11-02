@@ -156,9 +156,11 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr);
     lastCategory = category;
 
-    // Update health tracker before the next routing decision (R4-03).
+    // Update health tracker before the next routing decision (R4-03, R5-12).
+    // User cancellation is NOT a provider failure: it must not add a failure
+    // count or cooldown, and it must never trigger failover.
     if (outcome.cancelled) {
-      tracker.recordFailure(adapter.provider, adapter.model, 'PROCESS_CRASH');
+      tracker.recordCancellation(adapter.provider, adapter.model);
     } else if (outcome.timedOut) {
       tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
       tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, 'TIMEOUT');
