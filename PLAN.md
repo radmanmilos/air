@@ -369,9 +369,9 @@ applied. Conflicts were resolved as follows:
 - **README honesty (G3-15):** README lists only implemented adapters (aider,
   goose, mock-for-tests) and documents known limitations.
 
-## Current state (2026-11-02)
+## Current state (2026-11-03)
 
-- 31 test files, 191 tests passing.
+- 31 test files, 188 tests passing.
 - `npm run typecheck`, `npm run typecheck:test`, `npm run build`,
   `npm run lint`, `npm test` and `npm pack --dry-run` all green.
 - CLI verified: `air run`, `route-test --explain`, `status --json`,
