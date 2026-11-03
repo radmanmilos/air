@@ -67,10 +67,8 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
     stdoutTailBytes: 2048,
     stderrTailBytes: 2048,
     signal: controller.signal,
-    onStdout: (c: string) => {
-      // Stream to the client in real time; the rolling tail is captured
-      // by the runner and persisted in the task state.
-      process.stdout.write(c);
+    onStdout: (_c: string) => {
+      // Do not write child output to stdout in MCP mode (would corrupt JSON-RPC).
     },
     onStderr: (c: string) => {
       process.stderr.write(c);

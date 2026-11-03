@@ -18,8 +18,8 @@ All work in E:\\GitHub\\air. Archive review files when all related tasks are com
 
 ### P0-2 Routing, allow-list, failover
 - [ ] [R6-03][H-06][DS-08][G5-08] Separate discovery from auth; derive allow-list from actual first candidate; real candidate proposals (no hardcoded goose); bind approval to exact proposal hash; --allow-provider/consent; built-CLI e2e.
-- [ ] [DS-02][G5-04] Model catalog: derive available from registry (agree with air status/check-models), reasons when unavailable, exclude unavailable from best.
-- [ ] [DS-03][G5-04] Best-model: respect task.readOnly/mode/capabilities (write/read/headless), filter before ranking, return null with reason if none eligible.
+- [x] [DS-02][G5-04] Model catalog: derive available from registry (agree with air status/check-models), reasons when unavailable, exclude unavailable from best.
+- [x] [DS-03][G5-04] Best-model: respect task.readOnly/mode/capabilities (write/read/headless), filter before ranking, return null with reason if none eligible.
 
 ### P0-3 MCP protocol + output
 - [ ] [R6-05][H-04] MCP stdout only JSON-RPC: remove process.stdout writes from runAttempt in MCP mode; persist redacted output to disk; get_task_output returns it with offsets; real stdio test.
