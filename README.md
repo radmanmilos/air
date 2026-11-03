@@ -136,15 +136,9 @@ npm run dev            # tsx bin/air.ts
 |---|---|---|---|
 | aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
 | goose | `goose` | `goose run --text` | 1.57.0 |
-
-### Unverified (visible, never routed)
-
-| Adapter | Executable | Headless | Verified |
-|---|---|---|---|
-| opencode | `opencode` | `run --prompt --yes` | VERIFIED |
-| kilocode | `kilocode` | `run --prompt --yes` | VERIFIED |
-| codex | `codex` | `exec --skip-git-repo-check` | VERIFIED |
-| github-copilot | `gh` | `copilot --allow` | VERIFIED |
-| mock (test-only) | `node tests/fixtures/mock-tool.js` | env-controlled | n/a |
+| opencode | `opencode` | `opencode run <prompt> --auto` | local |
+| kilocode | `kilocode` | `kilo run <prompt> --auto` | 7.5.16 |
+| codex | `codex` | `codex exec --skip-git-repo-check` | local |
+| github-copilot | `gh` | `gh copilot -- -p <prompt> --allow-all-tools` | local |
 
 Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code.
