@@ -36,7 +36,7 @@ export class GitHubCopilotAdapter implements AgentAdapter {
   }
 
   buildCommand(task: TaskInput): CommandSpec {
-    const args = ['copilot', '--allow', task.prompt];
+    const args = ['copilot', '--', '-p', task.prompt, '--allow-all-tools'];
     if (task.preferredModel) {
       args.push('--model', task.preferredModel);
     }

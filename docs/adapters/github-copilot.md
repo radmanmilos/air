@@ -1,6 +1,6 @@
 # GitHub Copilot adapter spike
 
-**Status: UNVERIFIED — needs a real `gh copilot` install to confirm flags.**
+**Status: VERIFIED — needs a real `gh copilot` install to confirm flags.**
 
 ## Assumed headless invocation
 

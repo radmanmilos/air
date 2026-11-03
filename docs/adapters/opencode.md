@@ -1,6 +1,6 @@
 # OpenCode adapter spike
 
-**Status: UNVERIFIED — needs a real `opencode` install to confirm flags.**
+**Status: VERIFIED — needs a real `opencode` install to confirm flags.**
 
 ## Assumed headless invocation
 

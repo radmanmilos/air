@@ -36,7 +36,12 @@ capabilities = {
   }
 
   buildCommand(task: TaskInput): CommandSpec {
-    const args = ['run', '--prompt', task.prompt, '--yes'];
+    const args = ['run'];
+    if (task.files && task.files.length > 0) {
+      for (const f of task.files) args.push('--file', f);
+    }
+    args.push(task.prompt);
+    args.push('--auto');
     if (task.preferredModel) {
       args.push('--model', task.preferredModel);
     }

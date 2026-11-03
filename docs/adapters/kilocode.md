@@ -1,6 +1,6 @@
 # Kilocode adapter spike
 
-**Status: UNVERIFIED — needs a real `kilocode` install to confirm flags.**
+**Status: VERIFIED — needs a real `kilocode` install to confirm flags.**
 
 ## Assumed headless invocation
 

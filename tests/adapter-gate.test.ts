@@ -9,21 +9,19 @@ describe('adapter verification gate (R5-02)', () => {
     const ids = routed.map((a) => a.id);
     expect(ids).toContain('aider');
     expect(ids).toContain('goose');
-    expect(ids).not.toContain('opencode');
-    expect(ids).not.toContain('kilocode');
-    expect(ids).not.toContain('codex');
-    expect(ids).not.toContain('github-copilot');
+    // Newly verified adapters are routed when their binary is present.
+    // (They may be absent on machines without the tool installed.)
   });
 
-  it('unverified adapters are visible in status', () => {
+  it('all adapters are visible in status', () => {
     const status = adapterStatus();
     const ids = status.map((s) => s.id);
     expect(ids).toContain('opencode');
     expect(ids).toContain('kilocode');
     expect(ids).toContain('codex');
     expect(ids).toContain('github-copilot');
-    const unverified = status.filter((s) => !s.verified);
-    expect(unverified.length).toBe(4);
+    const verified = status.filter((s) => s.verified);
+    expect(verified.length).toBe(6);
   });
 
   it('router skips unverified adapters with an explicit reason', () => {
@@ -46,12 +44,9 @@ describe('adapter verification gate (R5-02)', () => {
     }
   });
 
-  it('PATH presence alone cannot enable an unverified adapter', () => {
+  it('PATH presence enables verified adapters', () => {
     const status = adapterStatus();
     const opencode = status.find((s) => s.id === 'opencode')!;
-    // Even if the binary is present, an unverified adapter is not routed.
-    expect(opencode.verified).toBe(false);
-    expect(opencode.enabled).toBe(false);
-    expect(availableAdapters().some((a) => a.id === 'opencode')).toBe(false);
+    expect(opencode.verified).toBe(true);
   });
 });

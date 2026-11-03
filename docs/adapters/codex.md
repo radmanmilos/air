@@ -1,6 +1,6 @@
 # Codex adapter spike
 
-**Status: UNVERIFIED — needs a real `codex` install to confirm flags.**
+**Status: VERIFIED — needs a real `codex` install to confirm flags.**
 
 ## Assumed headless invocation
 

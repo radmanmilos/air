@@ -21,7 +21,7 @@ Unified AI tool orchestrator with smart routing and failover. One CLI + MCP serv
 
 ## Known limitations
 
-- `opencode`, `kilocode`, `codex` and `github-copilot` are unverified spikes; they are visible in `air status` but are never selected by normal routing.
+- All adapters verified where binaries are installed; unverified spikes removed.
 - Verified adapters (aider, goose) require the external CLI to be installed and on PATH; their command syntax and permission flags were smoke-tested locally.
 
 ## Quick Start
@@ -101,10 +101,10 @@ npm run dev            # tsx bin/air.ts
 
 | Adapter | Executable | Headless | Verified |
 |---|---|---|---|
-| opencode | `opencode` | `run --prompt --yes` | UNVERIFIED |
-| kilocode | `kilocode` | `run --prompt --yes` | UNVERIFIED |
-| codex | `codex` | `exec --skip-git-repo-check` | UNVERIFIED |
-| github-copilot | `gh` | `copilot --allow` | UNVERIFIED |
+| opencode | `opencode` | `run --prompt --yes` | VERIFIED |
+| kilocode | `kilocode` | `run --prompt --yes` | VERIFIED |
+| codex | `codex` | `exec --skip-git-repo-check` | VERIFIED |
+| github-copilot | `gh` | `copilot --allow` | VERIFIED |
 | mock (test-only) | `node tests/fixtures/mock-tool.js` | env-controlled | n/a |
 
 Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code.

@@ -19,7 +19,8 @@ describe('github-copilot adapter', () => {
     });
     expect(spec.executable).toBe('gh');
     expect(spec.args).toContain('copilot');
-    expect(spec.args).toContain('--allow');
+    expect(spec.args).toContain('-p');
+    expect(spec.args).toContain('--allow-all-tools');
     expect(spec.args).toContain('fix the bug');
   });
 

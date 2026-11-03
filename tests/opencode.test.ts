@@ -11,7 +11,7 @@ describe('opencode adapter', () => {
     expect(adapter.capabilities.fileEditing).toBe(true);
   });
 
-  it('builds an opencode run command with --prompt', () => {
+  it('builds an opencode run command', () => {
     const spec = adapter.buildCommand({
       id: 't1',
       prompt: 'fix the bug',
@@ -20,7 +20,7 @@ describe('opencode adapter', () => {
     });
     expect(spec.executable).toBe('opencode');
     expect(spec.args).toContain('run');
-    expect(spec.args).toContain('--prompt');
+    expect(spec.args).toContain('--auto');
     expect(spec.args).toContain('fix the bug');
   });
 

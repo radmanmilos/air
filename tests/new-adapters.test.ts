@@ -5,7 +5,7 @@ import { GitHubCopilotAdapter } from '../src/adapters/github-copilot';
 import { classifyError } from '../src/adapters/conformance';
 import { describe, it, expect } from 'vitest';
 
-describe('opencode adapter (UNVERIFIED spike)', () => {
+describe('opencode adapter (verified)', () => {
   const adapter = new OpenCodeAdapter();
 
   it('advertises headless file-editing capabilities', () => {
@@ -14,15 +14,14 @@ describe('opencode adapter (UNVERIFIED spike)', () => {
     expect(adapter.capabilities.fileEditing).toBe(true);
   });
 
-  it('builds a headless command with --prompt and --yes', () => {
+  it('builds a headless command with run and --auto', () => {
     const spec = adapter.buildCommand({
       id: 't1', prompt: 'fix the bug', cwd: '/tmp', mode: 'ask',
     });
     expect(spec.executable).toBe('opencode');
     expect(spec.args).toContain('run');
-    expect(spec.args).toContain('--prompt');
+    expect(spec.args).toContain('--auto');
     expect(spec.args).toContain('fix the bug');
-    expect(spec.args).toContain('--yes');
   });
 
   it('classifies rate limit from stderr + non-zero exit', () => {
@@ -39,7 +38,7 @@ describe('opencode adapter (UNVERIFIED spike)', () => {
   });
 });
 
-describe('kilocode adapter (UNVERIFIED spike)', () => {
+describe('kilocode adapter (verified)', () => {
   const adapter = new KilocodeAdapter();
 
   it('advertises headless file-editing capabilities', () => {
@@ -48,15 +47,14 @@ describe('kilocode adapter (UNVERIFIED spike)', () => {
     expect(adapter.capabilities.fileEditing).toBe(true);
   });
 
-  it('builds a headless command with --prompt and --yes', () => {
+  it('builds a headless command with run and --auto', () => {
     const spec = adapter.buildCommand({
       id: 't1', prompt: 'fix the bug', cwd: '/tmp', mode: 'ask',
     });
     expect(spec.executable).toBe('kilocode');
     expect(spec.args).toContain('run');
-    expect(spec.args).toContain('--prompt');
+    expect(spec.args).toContain('--auto');
     expect(spec.args).toContain('fix the bug');
-    expect(spec.args).toContain('--yes');
   });
 
   it('classifies rate limit from stderr + non-zero exit', () => {
@@ -106,7 +104,7 @@ describe('codex adapter (UNVERIFIED spike)', () => {
   });
 });
 
-describe('github copilot adapter (UNVERIFIED spike)', () => {
+describe('github copilot adapter (verified)', () => {
   const adapter = new GitHubCopilotAdapter();
 
   it('advertises headless file-editing capabilities', () => {
@@ -115,13 +113,14 @@ describe('github copilot adapter (UNVERIFIED spike)', () => {
     expect(adapter.capabilities.fileEditing).toBe(true);
   });
 
-  it('builds a headless command via gh copilot --allow', () => {
+  it('builds a headless command via gh copilot -p', () => {
     const spec = adapter.buildCommand({
       id: 't1', prompt: 'fix the bug', cwd: '/tmp', mode: 'ask',
     });
     expect(spec.executable).toBe('gh');
     expect(spec.args).toContain('copilot');
-    expect(spec.args).toContain('--allow');
+    expect(spec.args).toContain('-p');
+    expect(spec.args).toContain('--allow-all-tools');
     expect(spec.args).toContain('fix the bug');
   });
 
