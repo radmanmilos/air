@@ -18,6 +18,7 @@ export class KilocodeAdapter implements AgentAdapter {
   id = 'kilocode';
   provider = 'openrouter';
   model = 'gemma-4-31b-it:free';
+  executable = 'kilocode';
 
 capabilities = {
     headlessExecution: true,
@@ -40,7 +41,7 @@ capabilities = {
       args.push('--model', task.preferredModel);
     }
     return {
-      executable: 'kilocode',
+      executable: this.executable ?? 'kilocode',
       args,
       cwd: task.cwd,
     };

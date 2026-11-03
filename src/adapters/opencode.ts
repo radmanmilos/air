@@ -18,6 +18,7 @@ export class OpenCodeAdapter implements AgentAdapter {
   id = 'opencode';
   provider = 'openrouter';
   model = 'gemma-4-31b-it:free';
+  executable = 'opencode';
 
 capabilities = {
     headlessExecution: true,
@@ -40,7 +41,7 @@ capabilities = {
       args.push('--model', task.preferredModel);
     }
     return {
-      executable: 'opencode',
+      executable: this.executable ?? 'opencode',
       args,
       cwd: task.cwd,
     };

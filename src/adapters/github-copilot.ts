@@ -18,6 +18,7 @@ export class GitHubCopilotAdapter implements AgentAdapter {
   id = 'github-copilot';
   provider = 'openai';
   model = 'gpt-4o';
+  executable = 'gh';
 
   capabilities = {
     headlessExecution: true,
@@ -40,7 +41,7 @@ export class GitHubCopilotAdapter implements AgentAdapter {
       args.push('--model', task.preferredModel);
     }
     return {
-      executable: 'gh',
+      executable: this.executable ?? 'gh',
       args,
       cwd: task.cwd,
     };

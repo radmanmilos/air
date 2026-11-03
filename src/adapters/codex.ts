@@ -18,6 +18,7 @@ export class CodexAdapter implements AgentAdapter {
   id = 'codex';
   provider = 'openai';
   model = 'gpt-4o';
+  executable = 'codex';
 
 capabilities = {
     headlessExecution: true,
@@ -40,7 +41,7 @@ capabilities = {
       args.push('--model', task.preferredModel);
     }
     return {
-      executable: 'codex',
+      executable: this.executable ?? 'codex',
       args,
       cwd: task.cwd,
     };
