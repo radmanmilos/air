@@ -7,13 +7,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadCatalog } from '../src/config/catalog';
 import { adapterStatus, listAdapters } from '../src/adapters/registry';
-import { getInstallStatus, recordInstall, clearInstall } from '../src/installer/status';
+import {
+  getInstallStatus,
+  recordInstall,
+  clearInstall,
+  type InstallRecord,
+} from '../src/installer/status';
 import {
   installAdapter,
   upgradeAdapter,
   uninstallAdapter,
   autoInstallMissing,
 } from '../src/installer/installer';
+import type { InstallEntry } from '../src/config/catalog';
+import type { Config } from '../src/config/schema';
 
 vi.mock('../src/installer/installer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/installer/installer')>();
@@ -28,6 +35,37 @@ vi.mock('../src/installer/installer', async (importOriginal) => {
 const mockInstallAdapter = vi.mocked(installAdapter);
 const mockUpgradeAdapter = vi.mocked(upgradeAdapter);
 const mockUninstallAdapter = vi.mocked(uninstallAdapter);
+
+const now = new Date().toISOString();
+
+function mockRecord(installed: boolean, version?: string): InstallRecord {
+  return {
+    installed,
+    version,
+    status: installed ? 'installed' : 'not-installed',
+    installAttempts: 1,
+    updatedAt: now,
+  };
+}
+
+function fullConfig(overrides: Partial<Config> = {}): Config {
+  return {
+    version: 1,
+    tools: [],
+    failover: { mode: 'ask', maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false },
+    permission: { mode: 'ask', broadApproval: false, autoCommit: false, allowShell: false },
+    verify: { enabled: false },
+    redaction: { enabled: true },
+    concurrency: { maxConcurrentAgents: 1 },
+    catalog: { remoteUrl: undefined, autoInstall: false },
+    costOverrides: {},
+    trustedRepos: [],
+    timeouts: { defaultMs: 300_000, perTool: {} },
+    buffers: { maxBytes: 1_000_000 },
+    logging: { level: 'info', redact: true, rotation: { maxBytes: 10 * 1024 * 1024, maxBackups: 5 } },
+    ...overrides,
+  };
+}
 
 describe('adapter catalog integration', () => {
   let originalEnv: NodeJS.ProcessEnv;
@@ -71,12 +109,7 @@ describe('adapter catalog integration', () => {
     const aiderEntry = catalog.tools.find((t) => t.id === 'aider')!;
 
     // Install: mock returns installed status
-    mockInstallAdapter.mockResolvedValueOnce({
-      installed: true,
-      version: '0.86.2',
-      status: 'installed',
-      installAttempts: 1,
-    });
+    mockInstallAdapter.mockResolvedValueOnce(mockRecord(true, '0.86.2'));
 
     const installed = await installAdapter(aiderEntry);
     expect(installed.status).toBe('installed');
@@ -90,12 +123,7 @@ describe('adapter catalog integration', () => {
     expect(status.status).toBe('installed');
 
     // Upgrade: mock returns upgraded status
-    mockUpgradeAdapter.mockResolvedValueOnce({
-      installed: true,
-      version: '0.87.0',
-      status: 'installed',
-      installAttempts: 2,
-    });
+    mockUpgradeAdapter.mockResolvedValueOnce(mockRecord(true, '0.87.0'));
 
     const upgraded = await upgradeAdapter(aiderEntry);
     expect(upgraded.status).toBe('installed');
@@ -114,8 +142,7 @@ describe('adapter catalog integration', () => {
 
   it('adapterStatus includes install status fields', () => {
     const statuses = adapterStatus();
-    const aider = statuses.find((s) => s.id === 'aider');
-    expect(aider).toBeDefined();
+    const aider = statuses.find((s) => s.id === 'aider')!;
     expect(aider.installed).toBeDefined();
     expect(aider.installStatus).toBeDefined();
     expect(typeof aider.verified).toBe('boolean');
@@ -134,14 +161,10 @@ describe('adapter catalog integration', () => {
 
   it('autoInstallMissing does nothing when autoInstall is false (default)', async () => {
     const mockInstallFn = vi.fn();
-    const mockGetInstallStatusFn = vi.fn().mockReturnValue({
-      installed: false,
-      status: 'not-installed',
-      installAttempts: 0,
-    });
+    const mockGetInstallStatusFn = vi.fn().mockReturnValue(mockRecord(false));
 
     await autoInstallMissing(
-      { catalog: { remoteUrl: undefined, autoInstall: false } },
+      fullConfig({ catalog: { remoteUrl: undefined, autoInstall: false } }),
       mockInstallFn,
       mockGetInstallStatusFn,
     );
@@ -151,21 +174,11 @@ describe('adapter catalog integration', () => {
   });
 
   it('autoInstallMissing installs missing adapters when autoInstall is true', async () => {
-    const mockInstallFn = vi.fn().mockResolvedValue({
-      installed: true,
-      version: '0.86.2',
-      status: 'installed',
-      installAttempts: 1,
-    });
-    const mockGetInstallStatusFn = vi.fn().mockReturnValue({
-      installed: false,
-      version: undefined,
-      status: 'not-installed',
-      installAttempts: 0,
-    });
+    const mockInstallFn = vi.fn().mockResolvedValue(mockRecord(true, '0.86.2'));
+    const mockGetInstallStatusFn = vi.fn().mockReturnValue(mockRecord(false));
 
     await autoInstallMissing(
-      { catalog: { remoteUrl: undefined, autoInstall: true } },
+      fullConfig({ catalog: { remoteUrl: undefined, autoInstall: true } }),
       mockInstallFn,
       mockGetInstallStatusFn,
     );
@@ -176,15 +189,10 @@ describe('adapter catalog integration', () => {
 
   it('autoInstallMissing skips already-installed adapters', async () => {
     const mockInstallFn = vi.fn();
-    const mockGetInstallStatusFn = vi.fn().mockReturnValue({
-      installed: true,
-      version: '0.86.2',
-      status: 'installed',
-      installAttempts: 1,
-    });
+    const mockGetInstallStatusFn = vi.fn().mockReturnValue(mockRecord(true, '0.86.2'));
 
     await autoInstallMissing(
-      { catalog: { remoteUrl: undefined, autoInstall: true } },
+      fullConfig({ catalog: { remoteUrl: undefined, autoInstall: true } }),
       mockInstallFn,
       mockGetInstallStatusFn,
     );
