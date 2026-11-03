@@ -85,6 +85,8 @@ npm link
 - `air config migrate` - Upgrade config to the current schema version
 - `air verify -- <cmd...>` - Run an approved verification command (array args, no shell)
 - `air dashboard` - Show orchestrator sessions, decisions, and events (side-panel style)
+- `air export` - Export orchestrator session log for debugging
+- `--dev` - Developer mode with verbose diagnostics
 
 ## Exit codes
 
