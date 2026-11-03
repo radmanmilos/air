@@ -30,6 +30,7 @@ export interface OrchestratorSession {
   startedAt: string;
   endedAt?: string;
   result?: string;
+  parentRunId?: string;
 }
 
 export interface OrchestratorDeps {
@@ -142,6 +143,19 @@ export class Orchestrator {
 
   get(runId: string): OrchestratorSession | undefined {
     return this.sessions.get(runId);
+  }
+
+  async resume(runId: string, taskOverride?: string): Promise<OrchestratorSession> {
+    const prev = this.sessions.get(runId);
+    if (!prev) throw new Error(`Unknown session: ${runId}`);
+    const task = taskOverride ?? prev.task;
+    const handoff = `Continue from previous session ${runId} (${prev.result ?? prev.state}).`;
+    this.log('resume_requested', `${runId} -> ${task}`);
+    const session = await this.start(`${task}\n\n--- handoff ---\n${handoff}`, prev.cwd, { readOnly: prev.readOnly, mode: 'ask' });
+    session.parentRunId = runId;
+    this.sessions.set(session.runId, session);
+    this.persist();
+    return session;
   }
 
   async waitForAll(): Promise<void> {

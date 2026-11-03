@@ -28,6 +28,7 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
     verify: { enabled: false },
     redaction: { enabled: true },
     concurrency: { maxConcurrentAgents: 1 },
+    costOverrides: {},
     trustedRepos: [],
     timeouts: { defaultMs: 300_000, perTool: {} },
     buffers: { maxBytes: 1_000_000 },

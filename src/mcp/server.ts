@@ -538,6 +538,18 @@ const adapters = await listAdapters();
 
   const serverTransport = transport ?? new StdioServerTransport();
   await server.connect(serverTransport);
+
+  // Abort all jobs on process signals (H-08).
+  const abortAll = () => {
+    for (const job of jobs.values()) {
+      try { job.controller.abort(); } catch { /* noop */ }
+      job.state.state = 'CANCELLED';
+      writeTaskState(job.state).catch(() => {});
+    }
+  };
+  process.on('SIGINT', abortAll);
+  process.on('SIGTERM', abortAll);
+
   return { server, transport: serverTransport };
 }
 
