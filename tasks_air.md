@@ -1,4 +1,4 @@
-﻿# AIR - Complete Task List from Reviews 5
+# AIR - Complete Task List from Reviews 5
 Generated: 2026-11-03
 Sources:
 - docs/reviews/chatGPT_plan_review_5.md (R6-01..R6-09)
@@ -11,8 +11,8 @@ All work in E:\\GitHub\\air. Archive review files when all related tasks are com
 ## P0 - Critical (Blockers)
 
 ### P0-1 Cross-process concurrency (locks + seats)
-- [ ] [G5-01][H-02][R6-01][R6-02] Fix lock stale detection: never compare holder.start to PROCESS_START; use PID liveness + ownership token/heartbeat; fixed slot files for global pool. Files: src/utils/lock.ts, src/utils/concurrency.ts
-- [ ] [DS-01][G5-02] Enforce global concurrency cap from config.maxConcurrentAgents; use shared seat namespace (not per-session unique ids); pass cap correctly. Files: src/execution/sessions.ts, src/utils/concurrency.ts, bin/air.ts
+- [x] [G5-01][H-02][R6-01][R6-02] Fix lock stale detection: never compare holder.start to PROCESS_START; use PID liveness + ownership token/heartbeat; fixed slot files for global pool. Files: src/utils/lock.ts, src/utils/concurrency.ts
+- [x] [DS-01][G5-02] Enforce global concurrency cap from config.maxConcurrentAgents; use shared seat namespace (not per-session unique ids); pass cap correctly. Files: src/execution/sessions.ts, src/utils/concurrency.ts, bin/air.ts
 - [ ] [G5-03][H-05] Unsafe same-cwd parallel writes: refuse multi-session writes on same cwd unless readOnly or isolated; plan worktree isolation; tests for refusal. Files: src/execution/sessions.ts, bin/air.ts
 - [ ] [H-02] Multi-process tests: 4 processes x 20 increments = 80; cap enforced across processes; SIGKILL recovery; no ignored seat/lock timeouts.
 
