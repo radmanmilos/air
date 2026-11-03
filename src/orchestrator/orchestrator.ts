@@ -9,8 +9,7 @@ import { join } from 'node:path';
 import { paths } from '../config/paths';
 import { buildModelCatalog, bestModelFor } from '../router/catalog';
 import { availableAdapters } from '../adapters/registry';
-import { runSession, type SessionConfig, type SessionHandle } from '../execution/sessions';
-import type { TaskInput } from '../types';
+import { runSession, type SessionHandle } from '../execution/sessions';
 
 export interface OrchestratorEvent {
   ts: string;
