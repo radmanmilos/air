@@ -14,7 +14,7 @@ All work in E:\\GitHub\\air. Archive review files when all related tasks are com
 - [x] [G5-01][H-02][R6-01][R6-02] Fix lock stale detection: never compare holder.start to PROCESS_START; use PID liveness + ownership token/heartbeat; fixed slot files for global pool. Files: src/utils/lock.ts, src/utils/concurrency.ts
 - [x] [DS-01][G5-02] Enforce global concurrency cap from config.maxConcurrentAgents; use shared seat namespace (not per-session unique ids); pass cap correctly. Files: src/execution/sessions.ts, src/utils/concurrency.ts, bin/air.ts
 - [x] [G5-03][H-05] Unsafe same-cwd parallel writes: refuse multi-session writes on same cwd unless readOnly or isolated; plan worktree isolation; tests for refusal. Files: src/execution/sessions.ts, bin/air.ts
-- [ ] [H-02] Multi-process tests: 4 processes x 20 increments = 80; cap enforced across processes; SIGKILL recovery; no ignored seat/lock timeouts.
+- [x] [H-02] Multi-process tests: 4 processes x 20 increments = 80; cap enforced across processes; SIGKILL recovery; no ignored seat/lock timeouts.
 
 ### P0-2 Routing, allow-list, failover
 - [ ] [R6-03][H-06][DS-08][G5-08] Separate discovery from auth; derive allow-list from actual first candidate; real candidate proposals (no hardcoded goose); bind approval to exact proposal hash; --allow-provider/consent; built-CLI e2e.

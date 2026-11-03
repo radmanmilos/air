@@ -10,7 +10,7 @@
 // time unless --parallel is passed.
 
 import { createHealthTracker } from '../health/tracker';
-import { withSeat } from '../utils/concurrency';
+import { acquireSeat } from '../utils/concurrency';
 import { makeRunId, writeTaskState, appendTaskIndex } from '../execution/task-state';
 import { snapshotGit } from '../context/checkpoint';
 import type { AgentAdapter } from '../adapters/adapter';
@@ -83,7 +83,26 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
 
   const controller = new AbortController();
   const promise = (async () => {
-    await withSeat('agent', maxConcurrentAgents, async () => {
+    const seat = await acquireSeat('agent', maxConcurrentAgents, { timeoutMs: 30_000 });
+    if (!seat) {
+      await writeTaskState({
+        runId,
+        task,
+        cwd,
+        adapter: adapter.id,
+        provider: adapter.provider,
+        model: adapter.model,
+        state: 'FAILED',
+        result: 'FAILED',
+        startedAt: new Date().toISOString(),
+        endedAt: new Date().toISOString(),
+        hops: 0,
+        maxHops,
+        error: { category: 'TIMEOUT', message: 'SEAT_TIMEOUT' },
+      });
+      return;
+    }
+    try {
       const beforeSnap = snapshotGit(cwd);
       const taskInput: TaskInput = {
         id: runId,
@@ -168,7 +187,9 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
           ? { category, message: outcome.stderr.slice(0, 500) }
           : undefined,
       });
-    });
+    } finally {
+      await seat.release();
+    }
   })();
 
   return {

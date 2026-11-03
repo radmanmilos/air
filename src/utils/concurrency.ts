@@ -23,15 +23,6 @@ function processStartTime(): number {
 /** Cached process start time so stale-seat detection is stable across calls. */
 const PROCESS_START = processStartTime();
 
-async function listSeats(dir: string): Promise<string[]> {
-  try {
-    const entries = await fs.readdir(dir);
-    return entries.filter((e) => e.endsWith('.seat'));
-  } catch {
-    return [];
-  }
-}
-
 async function readSeat(path: string): Promise<{ pid: number; start: number } | null> {
   try {
     const raw = await fs.readFile(path, 'utf8');
@@ -39,13 +30,6 @@ async function readSeat(path: string): Promise<{ pid: number; start: number } | 
   } catch {
     return null;
   }
-}
-
-async function isSeatStale(path: string): Promise<boolean> {
-  const data = await readSeat(path);
-  if (!data) return true;
-  if (!(await isPidAlive(data.pid))) return true;
-  return false;
 }
 
 /**
@@ -59,38 +43,49 @@ export async function acquireSeat(
   options: { seatDir?: string; timeoutMs?: number } = {},
 ): Promise<SeatHandle | null> {
   const seatDir = options.seatDir ?? `${paths.cacheDir}/concurrency`;
-  const path = `${seatDir}/${name}.seat`;
-  const start = PROCESS_START;
   const deadline = Date.now() + (options.timeoutMs ?? 30_000);
 
   await fs.mkdir(seatDir, { recursive: true });
 
-  // Reclaim stale seats before counting.
-  const seats = await listSeats(seatDir);
-  for (const s of seats) {
-    if (await isSeatStale(`${seatDir}/${s}`)) {
-      try { await fs.unlink(`${seatDir}/${s}`); } catch { /* noop */ }
+  const slots = Array.from({ length: Math.max(1, maxConcurrent) }, (_, i) => i);
+
+  function slotPath(i: number): string {
+    return `${seatDir}/${name}-${i}.seat`;
+  }
+
+  async function reclaimStale(): Promise<void> {
+    for (const i of slots) {
+      const p = slotPath(i);
+      try {
+        const data = await readSeat(p);
+        if (!data || !(await isPidAlive(data.pid))) {
+          await fs.unlink(p).catch(() => {});
+        }
+      } catch { /* noop */ }
     }
   }
 
-while (true) {
-    const current = (await listSeats(seatDir)).length;
-    if (current < maxConcurrent) {
+  await reclaimStale();
+
+  while (true) {
+    for (const i of slots) {
+      const p = slotPath(i);
       try {
-        // O_CREAT|O_EXCL so the create is atomic: a second process cannot
-        // grab the same seat, and an existing seat is never silently
-        // overwritten (unlike tmp+rename on POSIX).
-        const fd = await fs.open(path, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY, 0o644);
-        await fd.writeFile(JSON.stringify({ pid: process.pid, start }), 'utf8');
+        const fd = await fs.open(p, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY, 0o644);
+        await fd.writeFile(JSON.stringify({ pid: process.pid, start: PROCESS_START }), 'utf8');
         await fd.close();
         return {
           release: async () => {
-            try { await fs.unlink(path); } catch { /* noop */ }
+            try {
+              const cur = await readSeat(p);
+              if (cur && cur.pid === process.pid) await fs.unlink(p);
+            } catch { /* noop */ }
           },
         };
-      } catch { /* retry */ }
+      } catch { /* slot taken or race; try next */ }
     }
     if (Date.now() >= deadline) return null;
+    await reclaimStale();
     await new Promise((r) => setTimeout(r, 50));
   }
 }
