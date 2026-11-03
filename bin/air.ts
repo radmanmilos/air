@@ -2,24 +2,18 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { loadConfig, migrateConfig } from '../src/config/loader';
+import { loadCatalog, catalogTools } from '../src/config/catalog';
 import { createHealthTracker } from '../src/health/tracker';
-import { selectCandidate, selectCandidateFrom, formatRouteDecision } from '../src/router/router';
-import { availableAdapters, adapterStatus } from '../src/adapters/registry';
-import { runProcess } from '../src/execution/runner';
-import { classifyOutcome } from '../src/types/outcome';
-import { getErrorAction, triggersFailover, type ErrorCategory } from '../src/types/errors';
-import { type ResultState } from '../src/types/result';
-import type { TaskInput } from '../src/types';
-import { snapshotGit, snapshotDelta, formatDirtyReport, formatDeltaReport } from '../src/context/checkpoint';
-import { makeRunId, writeTaskState, appendTaskIndex } from '../src/execution/task-state';
-import { trace } from '../src/observability/trace';
-import { redact } from '../src/security/redact';
+import { selectCandidate, formatRouteDecision } from '../src/router/router';
+import { availableAdapters, adapterStatus, refreshAdapterAvailability } from '../src/adapters/registry';
+import { Orchestrator } from '../src/orchestrator/orchestrator';
+import { installAdapter, upgradeAdapter, uninstallAdapter } from '../src/installer/installer';
+import { getInstallStatus } from '../src/installer/status';
 import { checkVerifyTrust, runVerify, formatVerifyReport } from '../src/context/verify';
 import { startMcp } from '../src/mcp/server';
-import { buildHandoffPack } from '../src/context/handoff';
 import { buildModelCatalog, formatModelCatalog, formatBestModel } from '../src/router/catalog';
 import { EXIT_CODES } from '../src/types/exit-codes';
-import { defaultAllowList, checkHandoffAllowlist } from '../src/security/allowlist';
+import { redact } from '../src/security/redact';
 
 const program = new Command();
 
@@ -39,38 +33,36 @@ async function listAdapters(config?: any): Promise<any[]> {
   return availableAdapters(config);
 }
 
+function orchestratorFor(config?: any, cacheDir?: string): Orchestrator {
+  return new Orchestrator({
+    adapters: undefined, // use registry-based discovery
+    config,
+    cacheDir,
+  });
+}
+
 async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string; noTty?: boolean; sessions?: string[]; allowProvider?: string }) {
   if (process.argv.includes('--dev')) process.env.AIR_DEV = '1';
-  console.log(chalk.cyan('╔══════════════════════════════════════╗'));
+  console.log(chalk.cyan('╔═══════════════════════════════════════╗'));
   console.log(chalk.cyan('║') + chalk.bold('   AIR - Adaptive Intelligence Router  ') + chalk.cyan('║'));
-  console.log(chalk.cyan('╚══════════════════════════════════════╝'));
+  console.log(chalk.cyan('║') + chalk.gray('  "AIR is free and so are we"') + chalk.cyan('║'));
+  console.log(chalk.cyan('╚═══════════════════════════════════════╝'));
   console.log(chalk.cyan('air run'));
   console.log(chalk.gray('Task:'), task);
 
   const cwd = options.cwd ?? process.cwd();
-  const snap = snapshotGit(cwd);
-  const isWriteTask = !options.readOnly;
-
-  if (isWriteTask && snap.dirty && !options.allowDirty) {
-    console.log(chalk.red(formatDirtyReport(snap)));
-    process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
-  }
 
   const { config } = await loadConfig({ cwd });
-  const tracker = createHealthTracker();
-  await tracker.load();
-
-  const adapters = await listAdapters(config);
-  const runId = makeRunId();
-  await appendTaskIndex(runId);
+  const orch = orchestratorFor(config, undefined);
 
   // Multi-session parallel execution: each session runs on its own model.
   if (options.sessions && options.sessions.length > 0) {
-    const { runSessions } = await import('../src/execution/sessions');
+    const adapters = await listAdapters(config);
     if (adapters.length === 0) {
       console.log(chalk.red('No adapters available.'));
       process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
+    const { runSessions } = await import('../src/execution/sessions');
     const sessionConfigs = options.sessions.map((prompt, i) => ({
       id: `s${i + 1}`,
       task: prompt,
@@ -99,318 +91,76 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     process.exit(EXIT_CODES.SUCCESS);
   }
 
-  const taskInput: TaskInput = {
-    id: runId,
-    prompt: task,
-    cwd,
-    files: options.files,
-    mode: options.auto ? 'auto' : 'ask',
-    readOnly: !!options.readOnly,
-  };
-
   const controller = new AbortController();
   const onSig = () => controller.abort();
   process.on('SIGINT', onSig);
   process.on('SIGTERM', onSig);
 
-  const allow = defaultAllowList(adapters);
-  const visited = new Set<string>();
-  let hops = 0;
-  const maxHops = config.failover.maxHops;
-
-  // Failover loop: try candidates until success, abort, or hop cap.
-  while (hops < maxHops) {
-    const decision = selectCandidateFrom(
-      taskInput,
-      adapters,
-      tracker,
-      visited,
-      allow,
-    );
-    if (!decision.chosen) {
-      console.log(chalk.red('No eligible candidate.'));
-      console.log(chalk.gray(formatRouteDecision(decision)));
-      process.exit(EXIT_CODES.ALL_EXHAUSTED);
-    }
-
-    const chosen = decision.chosen;
-    const adapter = adapters.find((a) => a.id === chosen.id)!;
-    const revisitKey = `${chosen.id}|${chosen.provider}|${chosen.model}`;
-    if (visited.has(revisitKey)) {
-      console.log(chalk.red(`Candidate ${chosen.id} already visited; refusing to loop.`));
-      process.exit(EXIT_CODES.ALL_EXHAUSTED);
-    }
-    visited.add(revisitKey);
-    hops++;
-
-    // Build the task's provider-destination policy from the actual first
-    // selected candidate, not adapters[0] (R5-04).
-    if (hops === 1) {
-      allow.providers = [chosen.provider];
-      allow.models = [chosen.model];
-    }
-    // Apply --allow-provider / config allowProviderSwitch (R6-03).
-    const extraProviders = (options.allowProvider ?? '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    for (const p of extraProviders) {
-      if (!allow.providers.includes(p)) allow.providers.push(p);
-    }
-    if (config.failover?.allowProviderSwitch) {
-      allow.providers = [];
-    }
-
-    const spec = adapter.buildCommand(taskInput);
-    const beforeSnap = snapshotGit(cwd);
-    const state = {
-      runId,
-      task,
-      cwd,
-      adapter: chosen.id,
-      provider: chosen.provider,
-      model: chosen.model,
-      state: 'RUNNING' as const,
-      startedAt: new Date().toISOString(),
-      hops,
-      maxHops,
-    };
-    await writeTaskState(state);
-    trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips, hops });
-
-    const { outcome } = await runProcess(spec, {
-      timeoutMs: config.timeouts.defaultMs,
-      maxBufferBytes: config.buffers.maxBytes,
-      signal: controller.signal,
-      stdoutTailBytes: 2048,
-      stderrTailBytes: 2048,
-      onStdout: (c: string) => process.stdout.write(c),
-      onStderr: (c: string) => process.stderr.write(c),
+  try {
+    const session = await orch.start(task, cwd, {
+      readOnly: !!options.readOnly,
+      mode: options.auto ? 'auto' : 'ask',
+      files: options.files,
+      maxHops: config.failover.maxHops,
+      allowDirty: !!options.allowDirty,
+    });
+    // Wait for the async result propagation (session_completed event).
+    // The session object is updated when the run completes.
+    await new Promise<void>((resolve) => {
+      const check = () => {
+        const s = orch.get(session.runId);
+        if (s && (s.state === 'COMPLETED' || s.state === 'FAILED' || s.state === 'CANCELLED' || s.state === 'AWAITING_APPROVAL')) {
+          resolve();
+        } else {
+          setTimeout(check, 50);
+        }
+      };
+      check();
     });
 
-    const fact = classifyOutcome(outcome);
-    let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr);
-
-    // Update health tracker before the next routing decision (R4-03, R5-12).
-    // User cancellation is NOT a provider failure: it must not add a failure
-    // count or cooldown, and it must never trigger failover.
-    if (outcome.cancelled) {
-      tracker.recordCancellation(adapter.provider, adapter.model);
-    } else if (outcome.timedOut) {
-      tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
-      tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, 'TIMEOUT');
-    } else if (outcome.spawnError) {
-      tracker.recordFailure(adapter.provider, adapter.model, 'TOOL_NOT_INSTALLED');
-    } else if (outcome.exitCode === 0) {
-      tracker.recordSuccess(adapter.provider, adapter.model);
-    } else {
-      tracker.recordFailure(adapter.provider, adapter.model, category);
-      if (category === 'RATE_LIMIT' || category === 'QUOTA_EXCEEDED') {
-        tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, category);
-      }
-    }
-    await tracker.flush();
-
-    // Determine result from the agent-produced delta relative to the initial
-    // snapshot, not from whether the tree is dirty at all (R5-07). Pre-
-    // existing staged/unstaged/untracked files are NOT counted as agent
-    // changes, so read-only tasks with unrelated initial dirt are not marked
-    // as modified by AIR.
-    const afterSnap = snapshotGit(cwd);
-    const delta = snapshotDelta(beforeSnap, afterSnap);
-    const changed = delta.dirty;
-    let result: ResultState;
-    if (outcome.cancelled) {
-      result = 'CANCELLED';
-    } else if (outcome.timedOut || outcome.spawnError) {
-      result = 'FAILED';
-    } else if (outcome.exitCode === 0) {
-      if (isWriteTask) {
-        result = changed ? 'SUCCEEDED_WITH_CHANGES' : 'NO_CHANGES';
-      } else {
-        // Read-only: pre-existing dirt is not agent work.
-        result = changed ? 'NEEDS_USER_REVIEW' : 'SUCCEEDED_READ_ONLY';
-      }
-    } else {
-      result = 'FAILED';
+    const s = orch.get(session.runId);
+    if (!s) {
+      console.log(chalk.red('No session result.'));
+      process.exit(EXIT_CODES.TASK_FAILURE);
     }
 
-    const endedAt = new Date().toISOString();
-    await writeTaskState({
-      ...state,
-      state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
-      result,
-      endedAt,
-      delta: {
-        staged: delta.staged,
-        unstaged: delta.unstaged,
-        untracked: delta.untracked,
-        deleted: delta.deleted,
-      },
-      outputTail: redact(outcome.stdoutTail ?? outcome.stdout),
-      stdoutTruncated: outcome.stdoutTruncated,
-      stderrTruncated: outcome.stderrTruncated,
-      error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
-        ? { category, message: outcome.stderr.slice(0, 500) }
-        : undefined,
-    });
-
-    trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed, delta: formatDeltaReport(delta) });
-
-    if (outcome.cancelled) {
+    if (s.state === 'CANCELLED') {
       console.log(chalk.yellow('Cancelled by user.'));
       process.exit(EXIT_CODES.USER_CANCELLED);
     }
-    if (outcome.timedOut) {
-      console.log(chalk.red('Timed out.'));
-      process.exit(EXIT_CODES.TIMEOUT);
+    if (s.state === 'AWAITING_APPROVAL') {
+      console.log(chalk.yellow(`Failover proposed for ${session.runId}. Approve to continue.`));
+      process.exit(EXIT_CODES.FAILOVER_PROPOSED);
     }
-    if (outcome.spawnError) {
-      console.log(chalk.red(`Tool not available: ${outcome.spawnError.message}`));
-      process.exit(EXIT_CODES.TASK_FAILURE);
+    if (s.result === 'NO_CHANGES') {
+      console.log(chalk.yellow('Tool exited 0 but no workspace changes detected (NO_CHANGES).'));
+      process.exit(EXIT_CODES.NO_CHANGES);
     }
-    if (outcome.exitCode === 0) {
-      if (result === 'NO_CHANGES') {
-        console.log(chalk.yellow('Tool exited 0 but no workspace changes detected (NO_CHANGES).'));
-        process.exit(EXIT_CODES.NO_CHANGES);
-      }
-      console.log(chalk.green(`Succeeded (${result}).`));
+    if (s.result === 'SUCCEEDED_WITH_CHANGES' || s.result === 'SUCCEEDED_READ_ONLY') {
+      console.log(chalk.green(`Succeeded (${s.result}).`));
       process.exit(EXIT_CODES.SUCCESS);
     }
-
-    // Non-zero exit: decide failover.
-    const action = getErrorAction(category);
-    if (triggersFailover(category) && hops < maxHops) {
-      // Resolve the next eligible candidate using the shared policy:
-      // executable availability, verification/enabled state, cooldown,
-      // allow-list, capabilities and revisit prevention (R5-04/R5-05).
-      const nextDecision = selectCandidateFrom(
-        { ...taskInput, preferredTool: undefined },
-        adapters,
-        tracker,
-        visited,
-        allow,
-      );
-      const next = nextDecision.chosen;
-      if (!next) {
-        console.log(chalk.red(`No alternative candidate (${category}). Action: ${action}`));
-        process.exit(EXIT_CODES.ALL_EXHAUSTED);
-      }
-      const nextAdapter = adapters.find((a) => a.id === next.id)!;
-
-      // Provider-destination policy (R5-04): a change of provider or model
-      // requires an allow-list entry or explicit one-task consent. `--auto`
-      // must never bypass provider restrictions.
-      const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
-      const proposal = {
-        runId,
-        from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
-        to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
-        category,
-        action,
-        task: taskInput.prompt,
-        handoff: buildHandoffPack({
-          cwd,
-          prompt: task,
-          from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
-          to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
-          mode: options.auto ? 'auto' : 'ask',
-          files: options.files,
-          category,
-          summary: outcome.stderr.slice(0, 200),
-          outputTail: outcome.stderr.slice(-2048),
-          before: beforeSnap,
-          after: afterSnap,
-        }),
-      };
-
-      if (!allowCheck.ok) {
-        console.log(chalk.yellow(`Handoff blocked: ${allowCheck.reason}. Action: ${action}`));
-        console.log(chalk.gray(`Proposed switch to ${nextAdapter.id} (${nextAdapter.provider}/${nextAdapter.model}) was blocked by the provider-destination policy.`));
-        process.exit(EXIT_CODES.ALL_EXHAUSTED);
-      }
-
-      if (options.auto) {
-        // `--auto` switches within the same provider/model allow-list only.
-        // It must never bypass provider restrictions (R5-04).
-        taskInput.prompt = `${task}\n\n--- handoff ---\n${proposal.handoff}`;
-        console.log(chalk.yellow(`Auto-switching to ${next.id} (${category}).`));
-        console.log(chalk.gray(proposal.handoff));
-        continue;
-      }
-
-      // `ask` (default): propose the failover and continue in the same process
-      // when the user approves. Never label a proposal-only exit as
-      // ALL_EXHAUSTED (R5-04).
-      const approved = await promptApproveFailover(proposal);
-      if (!approved) {
-        console.log(chalk.yellow(`Failover declined for ${runId}.`));
-        process.exit(EXIT_CODES.ALL_EXHAUSTED);
-      }
-      taskInput.prompt = `${task}\n\n--- handoff ---\n${proposal.handoff}`;
-      console.log(chalk.yellow(`Approved failover; switching to ${next.id} (${category}).`));
-      console.log(chalk.gray(proposal.handoff));
-      continue;
+    // FAILED or unknown
+    console.log(chalk.red(`Failed.`));
+    process.exit(EXIT_CODES.TASK_FAILURE);
+  } catch (err: any) {
+    const msg = String(err?.message || err);
+    // Dirty tree refusal from orchestrator.
+    if (msg.includes('Working tree is dirty') || msg.includes('Not a Git repository')) {
+      console.log(chalk.red(msg));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
-    console.log(chalk.red(`Failed (${category}). Action: ${action}`));
+    // No eligible candidate.
+    if (msg.includes('No eligible candidate') || msg.includes('Hop cap reached')) {
+      console.log(chalk.red(msg));
+      console.log(chalk.gray('No eligible candidate.'));
+      process.exit(EXIT_CODES.ALL_EXHAUSTED);
+    }
+    console.log(chalk.red(msg));
     process.exit(EXIT_CODES.TASK_FAILURE);
   }
-
-  console.log(chalk.red(`Hop cap reached (${maxHops}).`));
-  process.exit(EXIT_CODES.ALL_EXHAUSTED);
 }
 
-/** Interactive approval prompt for a failover proposal (R5-04). Reads from
- *  stdin so the same process can approve and continue the run. Falls back to
- *  declining when stdin is not a TTY. */
-async function promptApproveFailover(proposal: {
-  runId: string;
-  from: { id: string; provider: string; model: string };
-  to: { id: string; provider: string; model: string };
-  category: string;
-  action: string;
-  handoff: string;
-}): Promise<boolean> {
-  if (!process.stdin.isTTY) {
-    // Non-interactive: decline by default so `ask` never auto-switches.
-    return false;
-  }
-  process.stdout.write(chalk.cyan('\nair: failover proposed\n'));
-  process.stdout.write(chalk.gray(`  run:      ${proposal.runId}\n`));
-  process.stdout.write(chalk.gray(`  from:     ${proposal.from.id} (${proposal.from.provider}/${proposal.from.model})\n`));
-  process.stdout.write(chalk.gray(`  to:       ${proposal.to.id} (${proposal.to.provider}/${proposal.to.model})\n`));
-  process.stdout.write(chalk.gray(`  reason:   ${proposal.category}\n`));
-  process.stdout.write(chalk.gray(`  action:   ${proposal.action}\n`));
-  process.stdout.write(chalk.gray(`  handoff:  ${proposal.handoff.split('\n')[0]}\n`));
-  process.stdout.write(chalk.cyan('Approve failover? [y/N] '));
-
-  return new Promise<boolean>((resolve) => {
-    const onAnswer = (data: Buffer) => {
-      const raw = data.toString().trim().toLowerCase();
-      process.stdin.removeListener('data', onAnswer);
-      process.stdin.resume();
-      resolve(raw === 'y' || raw === 'yes');
-    };
-    process.stdin.setEncoding('utf8');
-    process.stdin.removeListener('data', onAnswer);
-    process.stdin.on('data', onAnswer);
-    process.stdin.resume();
-  });
-}
-
-program
-  .command('run')
-  .description('Route and run a task')
-  .argument('<task>', 'Task description')
-  .option('-f, --files <files...>', 'Files to include')
-  .option('--auto', 'Auto-switch on failover')
-  .option('--allow-dirty', 'Allow running on a dirty working tree (non-destructive)')
-  .option('--read-only', 'Treat the task as read-only; empty diff is a valid outcome')
-  .option('--cwd <dir>', 'Working directory (default: current directory)')
-  .option('--no-tty', 'Disable interactive prompts (non-interactive failover)')
-  .option('--allow-provider <providers>', 'Allow failover to these providers (comma-separated)')
-  .option('--sessions <tasks...>', 'Run multiple tasks concurrently, each on its own model')
-  .action(runAction);
 function showStatus(options: { json?: boolean }) {
   const tracker = createHealthTracker();
   return tracker.load().then(() => {
@@ -437,7 +187,10 @@ function showStatus(options: { json?: boolean }) {
       return;
     }
     console.log(chalk.cyan('air status'));
-    console.log(chalk.gray('Tools:'), data.tools.map((t) => `${t.id}${t.available ? '' : ' (unavailable)'}`).join(', ') || 'none');
+    console.log(chalk.gray('Tools:'), data.tools.map((t) => {
+      const inst = t.installed ? `installed${t.version ? ` v${t.version}` : ''}` : 'not-installed';
+      return `${t.id} (${inst})${t.available ? '' : ' (unavailable)'}`;
+    }).join(', ') || 'none');
     console.log(chalk.gray('Cooldowns:'), data.cooldowns.length);
     console.log(chalk.gray('Successes:'), snap.totalSuccesses);
     console.log(chalk.gray('Failures:'), snap.totalFailures);
@@ -463,7 +216,7 @@ program
   .argument('<task>', 'Task description')
   .option('--explain', 'Print routing reasoning without executing')
   .option('--json', 'Emit machine-readable JSON')
-.action(async (task: string, options: { explain?: boolean; json?: boolean }) => {
+  .action(async (task: string, options: { explain?: boolean; json?: boolean }) => {
     const tracker = createHealthTracker();
     await tracker.load();
     const decision = selectCandidate(
@@ -592,6 +345,12 @@ program
     for (const e of (raw.events ?? []).slice(-10)) {
       console.log(`  ${e.ts} ${e.type}: ${e.detail}`);
     }
+    const statuses = adapterStatus();
+    console.log('\n--- Adapters ---');
+    for (const s of statuses) {
+      const inst = s.installed ? `installed${s.version ? ` v${s.version}` : ''}` : 'not-installed';
+      console.log(`- ${s.id} (${s.provider}/${s.model}): ${inst} ${s.installStatus} verified=${s.verified} available=${s.available}`);
+    }
     console.log('--- Help (type /command) ---');
     console.log('  /run /status /dashboard /export /models /verify /mcp');
   });
@@ -642,5 +401,224 @@ program
     }
     console.log(formatModelCatalog(catalog));
   });
+
+const adaptersCmd = program
+  .command('adapters')
+  .description('Manage installable free AI adapters');
+
+adaptersCmd
+  .command('list')
+  .description('List all catalog entries with install status')
+  .option('--json', 'Emit machine-readable JSON')
+  .action(async (options: { json?: boolean }) => {
+    const { config } = await loadConfig({ cwd: process.cwd() });
+    const catalog = await loadCatalog(config);
+    const tools = catalogTools(catalog);
+    const statuses = adapterStatus(config);
+    const statusMap = new Map(statuses.map((s) => [s.id, s]));
+
+    const rows = tools.map((t) => {
+      const s = statusMap.get(t.id);
+      return {
+        id: t.id,
+        name: t.name,
+        adapterId: t.adapterId,
+        provider: t.provider,
+        model: t.model,
+        installed: s?.installed ?? false,
+        version: s?.version,
+        installStatus: s?.installStatus ?? 'not-installed',
+        available: s?.available ?? false,
+        verified: s?.verified ?? false,
+      };
+    });
+
+    if (options.json) {
+      process.stdout.write(JSON.stringify(rows) + '\n');
+      return;
+    }
+    console.log(chalk.cyan('air adapters list'));
+    for (const r of rows) {
+      const inst = r.installed ? `installed${r.version ? ` v${r.version}` : ''}` : 'not-installed';
+      const verified = r.verified ? ' [verified]' : '';
+      console.log(`  ${r.id}${verified}: ${inst} (${r.installStatus})`);
+    }
+  });
+
+adaptersCmd
+  .command('install <id>')
+  .description('Install a free AI adapter')
+  .option('--yes', 'Skip confirmation prompt')
+  .action(async (id: string, options: { yes?: boolean }) => {
+    const { config } = await loadConfig({ cwd: process.cwd() });
+    const catalog = await loadCatalog(config);
+    const entry = catalog.tools.find((t) => t.id === id);
+    if (!entry) {
+      console.log(chalk.red(`Unknown adapter: ${id}`));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
+    const current = getInstallStatus(id, entry.executable);
+    if (current.status === 'installed') {
+      console.log(chalk.yellow(`${id} is already installed (v${current.version})`));
+      return;
+    }
+    if (!options.yes) {
+      console.log(chalk.yellow(`About to install ${id} (${entry.name}). This modifies your system.`));
+      console.log(chalk.cyan('Proceed? [y/N] '));
+      const answer = await new Promise<string>((resolve) => {
+        process.stdin.once('data', (d) => resolve(d.toString().trim().toLowerCase()));
+        process.stdin.resume();
+      });
+      if (answer !== 'y' && answer !== 'yes') {
+        console.log(chalk.yellow('Cancelled.'));
+        return;
+      }
+    }
+    try {
+      const result = await installAdapter(entry);
+      console.log(chalk.green(`${id}: ${result.status}`));
+      if (result.version) console.log(chalk.gray(`  version: ${result.version}`));
+      if (result.error) console.log(chalk.red(`  error: ${result.error}`));
+    } catch (err: any) {
+      console.log(chalk.red(`Install failed: ${err?.message || err}`));
+      process.exit(EXIT_CODES.TASK_FAILURE);
+    }
+  });
+
+adaptersCmd
+  .command('upgrade <id>')
+  .description('Upgrade an adapter to the catalog version')
+  .option('--yes', 'Skip confirmation prompt')
+  .action(async (id: string, options: { yes?: boolean }) => {
+    const { config } = await loadConfig({ cwd: process.cwd() });
+    const catalog = await loadCatalog(config);
+    const entry = catalog.tools.find((t) => t.id === id);
+    if (!entry) {
+      console.log(chalk.red(`Unknown adapter: ${id}`));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
+    const current = getInstallStatus(id, entry.executable);
+    if (current.status === 'installed' && current.version === entry.install.version) {
+      console.log(chalk.yellow(`${id} is already at v${entry.install.version}`));
+      return;
+    }
+    if (!options.yes) {
+      console.log(chalk.yellow(`About to upgrade ${id} to v${entry.install.version}.`));
+      console.log(chalk.cyan('Proceed? [y/N] '));
+      const answer = await new Promise<string>((resolve) => {
+        process.stdin.once('data', (d) => resolve(d.toString().trim().toLowerCase()));
+        process.stdin.resume();
+      });
+      if (answer !== 'y' && answer !== 'yes') {
+        console.log(chalk.yellow('Cancelled.'));
+        return;
+      }
+    }
+    try {
+      const result = await upgradeAdapter(entry);
+      console.log(chalk.green(`${id}: ${result.status}`));
+      if (result.version) console.log(chalk.gray(`  version: ${result.version}`));
+    } catch (err: any) {
+      console.log(chalk.red(`Upgrade failed: ${err?.message || err}`));
+      process.exit(EXIT_CODES.TASK_FAILURE);
+    }
+  });
+
+adaptersCmd
+  .command('uninstall <id>')
+  .description('Uninstall an adapter')
+  .option('--yes', 'Skip confirmation prompt')
+  .action(async (id: string, options: { yes?: boolean }) => {
+    const { config } = await loadConfig({ cwd: process.cwd() });
+    const catalog = await loadCatalog(config);
+    const entry = catalog.tools.find((t) => t.id === id);
+    if (!entry) {
+      console.log(chalk.red(`Unknown adapter: ${id}`));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
+    if (!options.yes) {
+      console.log(chalk.yellow(`About to uninstall ${id}.`));
+      console.log(chalk.cyan('Proceed? [y/N] '));
+      const answer = await new Promise<string>((resolve) => {
+        process.stdin.once('data', (d) => resolve(d.toString().trim().toLowerCase()));
+        process.stdin.resume();
+      });
+      if (answer !== 'y' && answer !== 'yes') {
+        console.log(chalk.yellow('Cancelled.'));
+        return;
+      }
+    }
+    try {
+      await uninstallAdapter(entry);
+      console.log(chalk.green(`${id}: uninstalled`));
+    } catch (err: any) {
+      console.log(chalk.red(`Uninstall failed: ${err?.message || err}`));
+      process.exit(EXIT_CODES.TASK_FAILURE);
+    }
+  });
+
+adaptersCmd
+  .command('status <id>')
+  .description('Show detailed install status for one adapter')
+  .action(async (id: string) => {
+    const { config } = await loadConfig({ cwd: process.cwd() });
+    const catalog = await loadCatalog(config);
+    const entry = catalog.tools.find((t) => t.id === id);
+    if (!entry) {
+      console.log(chalk.red(`Unknown adapter: ${id}`));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
+    const status = getInstallStatus(id, entry.executable);
+    const refreshed = refreshAdapterAvailability(id);
+    console.log(chalk.cyan(`air adapters status ${id}`));
+    console.log(chalk.gray(`  name:          ${entry.name}`));
+    console.log(chalk.gray(`  adapterId:     ${entry.adapterId}`));
+    console.log(chalk.gray(`  provider:      ${entry.provider}`));
+    console.log(chalk.gray(`  model:         ${entry.model}`));
+    console.log(chalk.gray(`  executable:    ${entry.executable}`));
+    console.log(chalk.gray(`  installed:     ${status.installed}`));
+    console.log(chalk.gray(`  version:       ${status.version ?? 'n/a'}`));
+    console.log(chalk.gray(`  status:        ${status.status}`));
+    console.log(chalk.gray(`  available:     ${refreshed?.available ?? false}`));
+    console.log(chalk.gray(`  installAttempts: ${status.installAttempts}`));
+    if (status.error) console.log(chalk.red(`  error:         ${status.error}`));
+  });
+
+program
+  .command('resume')
+  .description('Resume a previous session with optional new task')
+  .argument('<runId>', 'Previous session run id')
+  .argument('[task]', 'New task (defaults to previous task)')
+  .option('--cwd <dir>', 'Working directory (default: current directory)')
+  .action(async (runId: string, task?: string, options?: { cwd?: string }) => {
+    const cwd = options?.cwd ?? process.cwd();
+    const { config } = await loadConfig({ cwd });
+    const orch = orchestratorFor(config, undefined);
+    try {
+      const session = await orch.resume(runId, task);
+      console.log(chalk.green(`Resumed ${session.runId} (parent: ${runId})`));
+      console.log(chalk.gray(`Adapter: ${session.adapterId} (${session.provider}/${session.model})`));
+      console.log(chalk.gray(`State: ${session.state}`));
+      console.log(chalk.gray(`Result: ${session.result ?? 'pending'}`));
+      process.exit(EXIT_CODES.SUCCESS);
+    } catch (err: any) {
+      console.log(chalk.red(String(err?.message || err)));
+      process.exit(EXIT_CODES.TASK_FAILURE);
+    }
+  });
+
+program
+  .command('run')
+  .description('Route and run a task')
+  .argument('<task>', 'Task description')
+  .option('-f, --files <files...>', 'Files to include')
+  .option('--auto', 'Auto-switch on failover')
+  .option('--allow-dirty', 'Allow running on a dirty working tree (non-destructive)')
+  .option('--read-only', 'Treat the task as read-only; empty diff is a valid outcome')
+  .option('--cwd <dir>', 'Working directory (default: current directory)')
+  .option('--no-tty', 'Disable interactive prompts (non-interactive failover)')
+  .option('--allow-provider <providers>', 'Allow failover to these providers (comma-separated)')
+  .option('--sessions <tasks...>', 'Run multiple tasks concurrently, each on its own model')
+  .action(runAction);
 
 program.parse();

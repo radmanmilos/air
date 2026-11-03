@@ -58,19 +58,22 @@ air/
 ├── bin/air.ts
 ├── src/
 │   ├── adapters/         # adapter.ts (contract), conformance.ts
-│   ├── config/           # schema.ts, loader.ts, paths.ts (planned)
+│   ├── config/           # schema.ts, loader.ts, paths.ts, catalog.ts
 │   ├── execution/        # runner.ts (planned)
 │   ├── health/           # tracker.ts (planned)
+│   ├── installer/        # status.ts, installer.ts
 │   ├── mcp/              # server.ts (planned)
+│   ├── orchestrator/     # orchestrator.ts
 │   ├── router/           # router.ts (planned)
 │   ├── security/         # redact.ts
 │   ├── types/            # errors.ts, result.ts, outcome.ts, index.ts
 │   └── utils/
 ├── config/
+│   ├── catalog.json      # bundled free AI adapter catalog
 │   └── models/
 ├── docs/
 │   ├── behavior-spec.md
-│   └── adapters/         # aider.md, goose.md
+│   └── adapters/         # aider.md, goose.md, catalog.md
 ├── tests/
 │   ├── fixtures/         # mock-tool.js
 │   ├── mock-adapter.ts
@@ -185,13 +188,15 @@ air/
 │   ├── context/
 │   ├── execution/
 │   ├── health/
+│   ├── installer/
 │   ├── mcp/
+│   ├── orchestrator/
 │   ├── router/
 │   ├── security/
 │   ├── types/
 │   └── utils/
 ├── config/
-│   ├── default.yaml
+│   ├── catalog.json
 │   └── models/
 ├── docs/adapters/
 ├── tests/unit/ tests/integration/
@@ -207,6 +212,7 @@ air/
 |---|---|---|
 | 0 Spikes | R-09 for aider + one other; mock adapter (R-02); vitest setup | docs/adapters/*.md exist; mock covers success/limit/hang/false-positive/exit0-no-changes |
 | 1 Skeleton | Package fixes, cross-spawn, zod config, paths, logger+redaction, atomic health file, tests | npm test, npm run build, npm run typecheck pass |
+| 1.5 Catalog | Free AI adapter catalog: config/catalog.json, catalog.remoteUrl config, install status persistence, installer (package-manager/direct-download), `air adapters` CLI, MCP list/install/upgrade/uninstall, dashboard adapter section | npm test passes; `air adapters list` works; status shows install status |
 | 2 One-agent execution | aider adapter, air run, stream+buffer, error classification (R-04), checkpoint (R-05), run IDs, result states | Single-agent execution passes with mock; failover *proposed* but not executed |
 | 3 Handoff and safety | Second adapter, task state .air/tasks/, mechanical handoff, redaction (R-06), provider allow-list (R-07) | Redaction and allow-list tests pass; real cross-agent continuation works |
 | 4 MCP | Async jobs, no-prompt in MCP, approval/cancel tools (R-08) | MCP tests pass |
@@ -261,7 +267,7 @@ Respect `XDG_CONFIG_HOME` and `XDG_CACHE_HOME` on Unix-like systems where applic
 
 Shared lifecycle used by CLI and MCP, with states at least: `QUEUED`, `RUNNING`, `FAILURE_DETECTED`, `AWAITING_APPROVAL`, `SWITCHING`, `COMPLETED`, `FAILED`, `CANCELLED`.
 
-MCP tools (typed inputs/outputs): `run_task`, `get_task_status`, `get_task_output`, `approve_failover`, `cancel_task`, `get_status`.
+MCP tools (typed inputs/outputs): `run_task`, `get_task_status`, `get_task_output`, `approve_failover`, `cancel_task`, `get_status`, `list_adapters`, `install_adapter`, `upgrade_adapter`, `uninstall_adapter`.
 
 When a proposed replacement changes provider, the approval response must disclose the new provider/model and what task/context/diff data will be sent. An approval may grant a one-task exception to the provider allow-list only with explicit user consent. `auto` failover must never bypass provider restrictions. MCP must expose approval as a task-state transition and never prompt on stdio. MCP stdout contains protocol messages only; diagnostics use stderr/log files.
 
@@ -371,11 +377,13 @@ applied. Conflicts were resolved as follows:
 
 ## Current state (2026-11-03)
 
-- 31 test files, 188 tests passing.
+- 39 test files, 217 tests passing.
 - `npm run typecheck`, `npm run typecheck:test`, `npm run build`,
   `npm run lint`, `npm test` and `npm pack --dry-run` all green.
 - CLI verified: `air run`, `route-test --explain`, `status --json`,
-  `verify`, `air mcp`, `air models`.
+  `adapters list/install/upgrade/uninstall/status`, `verify`, `air mcp`,
+  `air models`, `air resume`, `air dashboard`.
+- Phase 0 (Orchestrator wiring) and Phase 1 (Free AI Adapter Catalog) complete.
 - Pushed to `radmanmilos/air` on `main`.
 
 ## Adapters

@@ -48,6 +48,13 @@ const ConcurrencySchema = z.object({
 
 const CostOverridesSchema = z.record(z.string(), z.number().int().min(0).max(3)).default({});
 
+// Catalog of installable free AI tools (Phase 1).
+const CatalogSchema = z.object({
+  remoteUrl: z.string().url().optional(),
+  autoInstall: z.boolean().default(false),
+});
+const DEFAULT_CATALOG = { remoteUrl: undefined as string | undefined, autoInstall: false };
+
 // zod 4 does not re-run inner defaults when an object field's `.default({})`
 // is an empty object, so each sub-schema default is spelled out explicitly.
 const DEFAULT_FAILOVER = { mode: 'ask' as const, maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false };
@@ -71,6 +78,7 @@ export const ConfigSchema = z.object({
   verify: VerifySchema.default(DEFAULT_VERIFY),
   redaction: RedactionSchema.default(DEFAULT_REDACTION),
   concurrency: ConcurrencySchema.default(DEFAULT_CONCURRENCY),
+  catalog: CatalogSchema.default(DEFAULT_CATALOG),
   costOverrides: CostOverridesSchema.default({}),
   trustedRepos: TrustedReposSchema.default([]),
   timeouts: z

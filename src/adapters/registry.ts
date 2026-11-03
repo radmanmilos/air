@@ -8,6 +8,7 @@
 import { execSync } from 'node:child_process';
 import type { AgentAdapter, AdapterMeta } from './adapter';
 import type { Config, ToolConfig } from '../config/schema';
+import { getInstallStatus, type InstallStatus } from '../installer/status';
 import { AiderAdapter } from './aider';
 import { GooseAdapter } from './goose';
 import { OpenCodeAdapter } from './opencode';
@@ -19,6 +20,9 @@ export interface AdapterInfo {
   adapter: AgentAdapter;
   meta: AdapterMeta;
   available: boolean;
+  installed: boolean;
+  version?: string;
+  installStatus: InstallStatus;
   reason?: string;
 }
 
@@ -35,14 +39,15 @@ function isOnPath(exe: string): boolean {
 }
 
 // Verification metadata per adapter. Aider and Goose are verified against
-// real installed CLIs; the rest are UNVERIFIED spikes.
+// real installed CLIs; the rest are UNVERIFIED spikes pending CI smoke-test
+// confirmation. Only verified adapters are eligible for routing.
 const META: Record<string, AdapterMeta> = {
   aider: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '0.86.2' },
   goose: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '1.57.0' },
-  opencode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '1.x' },
-  kilocode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
-  codex: { verified: true, enabled: true, headlessSupported: true, verificationVersion: 'latest' },
-  'github-copilot': { verified: true, enabled: true, headlessSupported: true, verificationVersion: 'latest' },
+  opencode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
+  kilocode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
+  codex: { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
+  'github-copilot': { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
 };
 
 const FACTORY: Record<string, () => AgentAdapter> = {
@@ -106,10 +111,14 @@ export function listAdapters(config?: Config): AdapterInfo[] {
     // Configured enablement overrides the default.
     const enabled = metaOverride.enabled ?? meta.enabled;
     const available = isOnPath(EXE[id]);
+    const install = getInstallStatus(id, EXE[id]);
     return {
       adapter,
       meta: { ...meta, enabled },
       available,
+      installed: install.installed,
+      version: install.version,
+      installStatus: install.status,
       reason: available ? undefined : `executable '${EXE[id]}' not found on PATH`,
     };
   });
@@ -128,6 +137,9 @@ export function adapterStatus(config?: Config): {
   provider: string;
   model: string;
   available: boolean;
+  installed: boolean;
+  version?: string;
+  installStatus: InstallStatus;
   verified: boolean;
   enabled: boolean;
   reason?: string;
@@ -137,6 +149,9 @@ export function adapterStatus(config?: Config): {
     provider: a.adapter.provider,
     model: a.adapter.model,
     available: a.available,
+    installed: a.installed,
+    version: a.version,
+    installStatus: a.installStatus,
     verified: a.meta.verified,
     enabled: a.meta.enabled,
     reason: a.reason,
@@ -146,4 +161,10 @@ export function adapterStatus(config?: Config): {
 /** Adapters that are routed by default (verified + enabled + available). */
 export function routedAdapters(config?: Config): AgentAdapter[] {
   return availableAdapters(config);
+}
+
+/** Re-check PATH and install status for a single adapter after install/uninstall. */
+export function refreshAdapterAvailability(id: string): AdapterInfo | undefined {
+  const all = listAdapters();
+  return all.find((a) => a.adapter.id === id);
 }

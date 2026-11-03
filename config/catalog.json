@@ -1,0 +1,164 @@
+{
+  "$schema": "./catalog.schema.json",
+  "version": 1,
+  "description": "Bundled catalog of free, no-login, no-license AI tools installable through AIR.",
+  "tools": [
+    {
+      "id": "aider",
+      "name": "Aider",
+      "adapterId": "aider",
+      "executable": "aider",
+      "provider": "openrouter",
+      "model": "gemma-4-31b-it:free",
+      "capabilities": {
+        "headlessExecution": true,
+        "fileEditing": true,
+        "multipleFiles": true,
+        "gitIntegration": true,
+        "readOnly": true
+      },
+      "description": "AI pair programming in your terminal. Free via OpenRouter.",
+      "tags": ["coding", "free", "openrouter"],
+      "install": {
+        "method": "package-manager",
+        "commands": {
+          "win32": "winget install aider.aider",
+          "darwin": "brew install aider",
+          "linux": "npm install -g aider"
+        },
+        "verify": "aider --version",
+        "version": "0.86.2"
+      }
+    },
+    {
+      "id": "goose",
+      "name": "Goose",
+      "adapterId": "goose",
+      "executable": "goose",
+      "provider": "local",
+      "model": "goose-default",
+      "capabilities": {
+        "headlessExecution": true,
+        "fileEditing": true,
+        "multipleFiles": true,
+        "readOnly": true
+      },
+      "description": "Autonomous AI agent for terminal-based development.",
+      "tags": ["coding", "free", "local"],
+      "install": {
+        "method": "direct-download",
+        "urls": {
+          "win32": { "x64": "https://github.com/block/goose/releases/latest/download/goose-windows-x64.exe" },
+          "darwin": { "x64": "https://github.com/block/goose/releases/latest/download/goose-darwin-x64", "arm64": "https://github.com/block/goose/releases/latest/download/goose-darwin-arm64" },
+          "linux": { "x64": "https://github.com/block/goose/releases/latest/download/goose-linux-x64", "arm64": "https://github.com/block/goose/releases/latest/download/goose-linux-arm64" }
+        },
+        "verify": "goose --version",
+        "version": "1.57.0"
+      }
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "adapterId": "opencode",
+      "executable": "opencode",
+      "provider": "local",
+      "model": "opencode-default",
+      "capabilities": {
+        "headlessExecution": true,
+        "fileEditing": true,
+        "multipleFiles": true,
+        "readOnly": true
+      },
+      "description": "Terminal-based AI coding assistant.",
+      "tags": ["coding", "free", "local"],
+      "install": {
+        "method": "package-manager",
+        "commands": {
+          "win32": "winget install opencode.opencode",
+          "darwin": "brew install opencode",
+          "linux": "npm install -g opencode"
+        },
+        "verify": "opencode --version",
+        "version": "1.x"
+      }
+    },
+    {
+      "id": "kilocode",
+      "name": "KiloCode",
+      "adapterId": "kilocode",
+      "executable": "kilocode",
+      "provider": "local",
+      "model": "kilocode-default",
+      "capabilities": {
+        "headlessExecution": true,
+        "fileEditing": true,
+        "multipleFiles": true,
+        "readOnly": true
+      },
+      "description": "Autonomous coding agent for the terminal.",
+      "tags": ["coding", "free", "local"],
+      "install": {
+        "method": "package-manager",
+        "commands": {
+          "win32": "winget install kilocode.kilocode",
+          "darwin": "brew install kilocode",
+          "linux": "npm install -g kilocode"
+        },
+        "verify": "kilocode --version",
+        "version": "7.5.16"
+      }
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "adapterId": "codex",
+      "executable": "codex",
+      "provider": "openai",
+      "model": "gpt-5-mini",
+      "capabilities": {
+        "headlessExecution": true,
+        "fileEditing": true,
+        "multipleFiles": true,
+        "readOnly": true
+      },
+      "description": "OpenAI's CLI coding agent.",
+      "tags": ["coding", "openai"],
+      "install": {
+        "method": "package-manager",
+        "commands": {
+          "win32": "winget install openai.codex",
+          "darwin": "brew install codex",
+          "linux": "npm install -g @openai/codex"
+        },
+        "verify": "codex --version",
+        "version": "latest"
+      }
+    },
+    {
+      "id": "github-copilot",
+      "name": "GitHub Copilot",
+      "adapterId": "github-copilot",
+      "executable": "gh",
+      "provider": "github",
+      "model": "copilot-default",
+      "capabilities": {
+        "headlessExecution": true,
+        "fileEditing": true,
+        "multipleFiles": true,
+        "readOnly": true
+      },
+      "description": "GitHub CLI with Copilot integration.",
+      "tags": ["coding", "github"],
+      "install": {
+        "method": "package-manager",
+        "commands": {
+          "win32": "winget install github.cli",
+          "darwin": "brew install gh",
+          "linux": "apt-get install -y gh"
+        },
+        "verify": "gh --version",
+        "version": "latest"
+      }
+    }
+  ]
+}

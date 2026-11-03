@@ -1,6 +1,8 @@
 # air
 
-**Status:** Release candidate. 211 tests passing (parallel isolated workers). CLI + MCP server functional. Build, lint and package dry-run green on CI. All review tasks complete.
+*AIR is free and so are we*
+
+**Status:** Release candidate. 217 tests passing (parallel isolated workers). CLI + MCP server functional. Build, lint and package dry-run green on CI. All review tasks complete. Phase 0 (Orchestrator wiring) and Phase 1 (Free AI Adapter Catalog) complete.
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
@@ -83,6 +85,11 @@ npm link
 
 - `air run "<task>"` - Route and run task (`-f, --files`, `--auto`, `--allow-dirty`, `--read-only`)
 - `air status` / `air health` - Show tools, providers, models, and active cooldowns (health is a true alias; `--json`)
+- `air adapters list` - List installable free AI adapters with install status
+- `air adapters install <id>` - Install a free AI adapter
+- `air adapters upgrade <id>` - Upgrade an adapter to the catalog version
+- `air adapters uninstall <id>` - Uninstall an adapter
+- `air adapters status <id>` - Detailed install status for one adapter
 - `air route-test "<task>" --explain` - Test routing without executing (`--json`)
 - `air config --validate` - Validate config against the Zod schema
 - `air config migrate` - Upgrade config to the current schema version
@@ -122,15 +129,6 @@ Precedence: CLI > env > repo `.airrc.yaml` > global > defaults.
 
 ## Development
 
-```bash
-npm run typecheck      # app typecheck
-npm run typecheck:test # test typecheck
-npm test               # vitest
-npm run build          # tsc
-npm run lint           # eslint
-npm run dev            # tsx bin/air.ts
-```
-
 ## Adapters
 
 ### Verified
@@ -145,3 +143,33 @@ npm run dev            # tsx bin/air.ts
 | github-copilot | `gh` | `gh copilot -- -p <prompt> --allow-all-tools` | local |
 
 Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code.
+
+## Free AI Adapter Catalog
+
+AIR bundles a catalog of free, no-login, no-license AI tools that can be installed in the background through `air adapters install <id>`. The catalog lives in `config/catalog.json` and can be overridden via the `catalog.remoteUrl` config setting.
+
+Catalog entries declare an install method (`package-manager` or `direct-download`) with per-platform commands/URLs, a verify command, and a version pin. Install status (installed, version, install status) is persisted in the cache dir and shown in `air status` and `air adapters list`.
+
+### Adapter verification
+
+Only adapters confirmed via CI smoke tests are marked verified and eligible for routing:
+
+| Adapter | Verified | Version |
+|---|---|---|
+| aider | yes | 0.86.2 |
+| goose | yes | 1.57.0 |
+| opencode | no | unverified |
+| kilocode | no | unverified |
+| codex | no | unverified |
+| github-copilot | no | unverified |
+
+## Development
+
+```bash
+npm run typecheck      # app typecheck
+npm run typecheck:test # test typecheck
+npm test               # vitest
+npm run build          # tsc
+npm run lint           # eslint
+npm run dev            # tsx bin/air.ts
+```

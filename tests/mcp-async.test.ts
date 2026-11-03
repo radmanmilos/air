@@ -143,9 +143,9 @@ await client.connect(clientTransport);
     const { client, serverTransport, clientTransport } = await startPair();
     const list = await client.listTools();
     const names = list.tools.map((t) => t.name).sort();
-    expect(names).toEqual(
-      ['approve_failover', 'cancel_task', 'get_status', 'get_task_output', 'get_task_status', 'run_task'].sort(),
-    );
+      expect(names).toEqual(
+        ['approve_failover', 'cancel_task', 'get_status', 'get_task_output', 'get_task_status', 'install_adapter', 'list_adapters', 'resume_task', 'run_task', 'uninstall_adapter', 'upgrade_adapter'].sort(),
+      );
     await clientTransport.close();
     await serverTransport.close();
   });

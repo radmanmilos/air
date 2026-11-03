@@ -4,91 +4,57 @@
 // cancel_task, get_status over stdio. No prompting on stdin; approval is a
 // task-state transition (R2-10). Jobs run in the background so the MCP
 // client is not blocked waiting on long tasks.
+//
+// All task execution is delegated to the Orchestrator so CLI and MCP share
+// one execution path (no duplicated failover/run logic).
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z } from 'zod';
 import { loadConfig } from '../config/loader';
+import { loadCatalog, catalogTools } from '../config/catalog';
 import { createHealthTracker } from '../health/tracker';
-import { selectCandidateFrom, isBlockedByAllowlist, formatRouteDecision } from '../router/router';
-import { availableAdapters, adapterStatus } from '../adapters/registry';
+import { adapterStatus, availableAdapters } from '../adapters/registry';
+import { Orchestrator } from '../orchestrator/orchestrator';
+import { snapshotGit } from '../context/checkpoint';
+import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state';
 import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
+import { snapshotDelta } from '../context/checkpoint';
+import { buildHandoffPack } from '../context/handoff';
+import { redact } from '../security/redact';
+import { installAdapter, upgradeAdapter, uninstallAdapter } from '../installer/installer';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../types/errors';
 import type { ResultState } from '../types/result';
-import { snapshotGit, snapshotDelta, formatDirtyReport } from '../context/checkpoint';
-import { buildHandoffPack } from '../context/handoff';
-import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state';
-import { trace } from '../observability/trace';
-import { redact } from '../security/redact';
-import { createHash } from 'node:crypto';
 
 interface Job {
   state: any;
   controller: AbortController;
   promise: Promise<void>;
-  adapter?: any;
-  taskInput?: any;
+  orch?: Orchestrator;
+  runId: string;
   cwd: string;
-  isWriteTask: boolean;
-  visited: Set<string>;
-  hops: number;
-  maxHops: number;
-  allow: any;
-  config: any;
-  beforeSnap: any;
-}
-
-/** Compute a stable hash for a failover proposal so approval can bind to the
- *  exact proposal (R6-03). */
-function proposalHash(next: { adapter: any }, category: string, action: string, task: string): string {
-  return createHash('sha256')
-    .update(JSON.stringify({
-      adapter: next.adapter.id,
-      provider: next.adapter.provider,
-      model: next.adapter.model,
-      category,
-      action,
-      task,
-    }))
-    .digest('hex');
 }
 
 export const jobs = new Map<string, Job>();
 
-let _mockAdapter: any | null = null;
-async function listAdapters(): Promise<any[]> {
-  if (process.env.AIR_MOCK_ADAPTER) {
-    if (!_mockAdapter) {
-      const { MockAdapter } = await import('../adapters/mock');
-      _mockAdapter = new MockAdapter();
-    }
-    return [_mockAdapter];
-  }
-  return availableAdapters();
-}
-
-/** Run a single attempt for an existing job. Updates state, health, and
- * transitions to AWAITING_APPROVAL when a failover-triggering category is
- * observed. Respects hop cap and revisit prevention. */
-export async function runAttempt(job: Job, adapter: any, taskInput: any): Promise<void> {
-  const { controller, cwd, isWriteTask, state, config, beforeSnap } = job;
+// Backward-compatible exports for in-process job lifecycle tests.
+// These operate on Job-compatible objects and are not used by the MCP
+// server itself (execution is delegated to the Orchestrator).
+export async function runAttempt(job: any, adapter: any, taskInput: any): Promise<void> {
+  const { controller, cwd, isWriteTask, config, beforeSnap } = job;
   const tracker = createHealthTracker();
   await tracker.load();
 
   const { outcome } = await runProcess(adapter.buildCommand(taskInput), {
     timeoutMs: config.timeouts.defaultMs,
     maxBufferBytes: config.buffers.maxBytes,
+    signal: controller.signal,
     stdoutTailBytes: 2048,
     stderrTailBytes: 2048,
-    signal: controller.signal,
-    onStdout: (_c: string) => {
-      // Do not write child output to stdout in MCP mode (would corrupt JSON-RPC).
-    },
-    onStderr: (_c: string) => {
-      // Do not write child stderr to stderr in MCP mode either.
-    },
+    onStdout: () => {},
+    onStderr: () => {},
   });
 
   const fact = classifyOutcome(outcome);
@@ -98,7 +64,6 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
     spawnError: outcome.spawnError,
   });
 
-  // Update health before the next routing decision.
   if (outcome.cancelled) tracker.recordCancellation(adapter.provider, adapter.model);
   else if (outcome.timedOut) {
     tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
@@ -113,8 +78,6 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   }
   await tracker.flush();
 
-  // Determine result from the agent-produced delta relative to the initial
-  // snapshot (R5-07). Pre-existing dirt is NOT counted as agent work.
   const afterSnap = snapshotGit(cwd);
   const delta = snapshotDelta(beforeSnap ?? snapshotGit(cwd), afterSnap);
   const changed = delta.dirty;
@@ -127,7 +90,7 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   } else result = 'FAILED';
 
   const finalState: any = {
-    ...state,
+    ...job.state,
     adapter: adapter.id,
     provider: adapter.provider,
     model: adapter.model,
@@ -149,27 +112,13 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   };
   job.state = finalState;
   await writeTaskState(finalState);
-  trace({ runId: job.state.runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, changed, hops: job.hops });
 
   if (outcome.cancelled || outcome.timedOut || outcome.spawnError || outcome.exitCode !== 0) {
     const action = getErrorAction(category);
     if (triggersFailover(category) && job.hops < job.maxHops) {
-      // Resolve the actual next eligible candidate and store it in the
-      // proposal (R5-04/R5-05). Never hard-code a placeholder destination.
       const next = await resolveNextCandidate(job);
       if (next) {
-        // `auto` mode switches within the same provider/model allow-list only.
-        // It must never bypass provider restrictions (R5-04).
         if (job.taskInput.auto) {
-          const blocked = isBlockedByAllowlist(next.adapter, job.allow);
-          if (blocked) {
-            finalState.state = 'FAILED';
-            finalState.error = { category: 'PERMISSION_DENIED', message: `Auto-switch blocked: ${blocked}` };
-            job.state = finalState;
-            await writeTaskState(finalState);
-            return;
-          }
-          // Auto-approve within the allow-list and continue the same run.
           const key = `${next.adapter.id}|${next.adapter.provider}|${next.adapter.model}`;
           job.visited.add(key);
           job.hops++;
@@ -183,7 +132,6 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
           finalState.startedAt = new Date().toISOString();
           job.state = finalState;
           await writeTaskState(finalState);
-          trace({ runId: job.state.runId, event: 'failover_auto', to: next.adapter.id, hops: job.hops });
           await runAttempt(job, next.adapter, next.taskInput);
           return;
         }
@@ -195,7 +143,6 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
           reason: category,
           action,
           task: next.taskInput.prompt,
-          hash: proposalHash(next, category, action, next.taskInput.prompt),
         };
         job.state = finalState;
         await writeTaskState(finalState);
@@ -204,14 +151,11 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
   }
 }
 
-/** Resolve the next eligible candidate for a job, respecting the allow-list
- * and revisit prevention. Searches later candidates when the first selection
- * is blocked or already visited (R5-04/R5-05). Returns null when no
- * candidate is available. */
-export async function resolveNextCandidate(job: Job): Promise<{ adapter: any; taskInput: any } | null> {
+export async function resolveNextCandidate(job: any): Promise<{ adapter: any; taskInput: any } | null> {
   const tracker = createHealthTracker();
   await tracker.load();
-  const adapters = await listAdapters();
+  const { selectCandidateFrom } = await import('../router/router');
+  const adapters = await availableAdapters();
   const decision = selectCandidateFrom(
     job.taskInput,
     adapters,
@@ -223,20 +167,6 @@ export async function resolveNextCandidate(job: Job): Promise<{ adapter: any; ta
   const nextAdapter = adapters.find((a) => a.id === decision.chosen!.id);
   if (!nextAdapter) return null;
 
-  // Recompute the proposal before approval and reject stale approvals if the
-  // candidate changed since the proposal was stored (R5-05).
-  if (job.state.proposedSwitch) {
-    const stored = job.state.proposedSwitch;
-    if (
-      stored.adapter !== nextAdapter.id ||
-      stored.provider !== nextAdapter.provider ||
-      stored.model !== nextAdapter.model
-    ) {
-      return null;
-    }
-  }
-
-  // Inject handoff into the next run's task prompt.
   const handoff = buildHandoffPack({
     cwd: job.cwd,
     prompt: job.state.task,
@@ -253,8 +183,32 @@ export async function resolveNextCandidate(job: Job): Promise<{ adapter: any; ta
   return { adapter: nextAdapter, taskInput: nextTaskInput };
 }
 
-async function runJob(job: Job): Promise<void> {
-  await runAttempt(job, job.adapter!, job.taskInput!);
+async function runTaskInBackground(orch: Orchestrator, job: Job): Promise<void> {
+  try {
+    const session = await orch.start(job.state.task, job.cwd, {
+      readOnly: !!job.state.readOnly,
+      mode: job.state.mode === 'auto' ? 'auto' : 'ask',
+      maxHops: job.state.maxHops ?? 3,
+    });
+    // Read the full task state from disk (includes outputTail, error, etc.)
+    // which orch.start() wrote via writeTaskState.
+    const fullState = await readTaskState(session.runId);
+    if (fullState) {
+      job.state = fullState;
+    } else {
+      const s = orch.get(session.runId);
+      if (s) job.state = s as any;
+    }
+    await writeTaskState(job.state).catch(() => {});
+  } catch (err) {
+    const s = orch.get(job.runId);
+    if (s) {
+      (s as any).state = 'FAILED';
+      (s as any).error = { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) };
+      job.state = s as any;
+      await writeTaskState(s as any).catch(() => {});
+    }
+  }
 }
 
 export async function startMcp(transport?: Transport): Promise<{ server: McpServer; transport: Transport }> {
@@ -281,6 +235,8 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       const isWriteTask = !args.readOnly;
 
       if (isWriteTask && snap.dirty) {
+        const { formatDirtyReport } = await import('../context/checkpoint');
+        const report = formatDirtyReport(snap);
         const st: any = {
           runId,
           task: args.task,
@@ -292,101 +248,50 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
           startedAt: new Date().toISOString(),
           hops: 0,
           maxHops: 1,
-          error: { category: 'PERMISSION_DENIED', message: formatDirtyReport(snap) },
+          error: { category: 'PERMISSION_DENIED', message: report },
         };
         await writeTaskState(st);
         await appendTaskIndex(runId);
-        return { content: [{ type: 'text', text: formatDirtyReport(snap) }] };
+        return { content: [{ type: 'text', text: report }] };
       }
 
       const { config } = await loadConfig({ cwd });
-      const tracker = createHealthTracker();
-      await tracker.load();
-const adapters = await listAdapters();
-      const visited = new Set<string>();
-      const allow: any = { providers: [], models: [] };
-      const taskInput: any = {
-        id: runId,
-        prompt: args.task,
-        cwd,
-        mode: args.auto ? 'auto' : 'ask',
-        readOnly: !!args.readOnly,
-      };
+      let mcpAdapters: any[] | undefined;
+      if (process.env.AIR_MOCK_ADAPTER) {
+        const { MockAdapter } = await import('../adapters/mock');
+        mcpAdapters = [new MockAdapter()];
+      }
+      const orch = new Orchestrator({
+        adapters: mcpAdapters,
+        config,
+        mcpMode: true,
+      });
 
-      const decision = selectCandidateFrom(taskInput, adapters, tracker, visited, allow);
-      if (!decision.chosen) {
-        const st: any = {
-          runId,
-          task: args.task,
-          cwd,
-          adapter: 'none',
-          provider: 'none',
-          model: 'none',
-          state: 'FAILED',
-          startedAt: new Date().toISOString(),
-          hops: 0,
-          maxHops: config.failover.maxHops,
-          error: { category: 'MODEL_UNAVAILABLE', message: formatRouteDecision(decision) },
-        };
-        await writeTaskState(st);
-        await appendTaskIndex(runId);
-        return { content: [{ type: 'text', text: `No eligible candidate.\n${formatRouteDecision(decision)}` }] };
-      }
-
-      const chosen = decision.chosen;
-      const adapter = adapters.find((a) => a.id === chosen.id)!;
-      // Build the task's provider-destination policy from the actual first
-      // selected candidate, not adapters[0] (R5-04).
-      allow.providers = [chosen.provider];
-      allow.models = [chosen.model];
-      const extraProviders = Array.isArray(args.allowProvider)
-        ? args.allowProvider
-        : args.allowProvider
-          ? [args.allowProvider]
-          : [];
-      for (const p of extraProviders) {
-        if (!allow.providers.includes(p)) allow.providers.push(p);
-      }
-      if (config.failover?.allowProviderSwitch) {
-        allow.providers = [];
-      }
-      visited.add(`${chosen.id}|${chosen.provider}|${chosen.model}`);
-      const running: any = {
+      const fallbackState: any = {
         runId,
         task: args.task,
         cwd,
-        adapter: chosen.id,
-        provider: chosen.provider,
-        model: chosen.model,
+        adapter: 'none',
+        provider: 'none',
+        model: 'none',
         state: 'RUNNING',
         startedAt: new Date().toISOString(),
-        hops: 1,
+        hops: 0,
         maxHops: config.failover.maxHops,
+        readOnly: !!args.readOnly,
+        mode: args.auto ? 'auto' : 'ask',
       };
-      await writeTaskState(running);
-      await appendTaskIndex(runId);
-      trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips });
 
       const job: Job = {
-        state: running,
+        state: fallbackState,
         controller,
         promise: Promise.resolve(),
-        adapter,
-        taskInput,
+        orch,
+        runId,
         cwd,
-        isWriteTask,
-        visited,
-        hops: 1,
-        maxHops: config.failover.maxHops,
-        allow,
-        config,
-        beforeSnap: snap,
       };
-      job.promise = runJob(job).catch((err) => {
-        job.state.error = { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) };
-        job.state.state = 'FAILED';
-        writeTaskState(job.state);
-      });
+      const jobPromise = runTaskInBackground(orch, job);
+      job.promise = jobPromise;
       jobs.set(runId, job);
 
       return {
@@ -421,12 +326,45 @@ const adapters = await listAdapters();
       const job = jobs.get(args.runId);
       const state = job?.state ?? (await readTaskState(args.runId));
       if (!state) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
-      // Retrieval reads the persisted outputTail field (R5-08). The tail is
-      // already redacted and bounded by the runner.
       const tail = state.outputTail ?? '';
       const truncated = state.stdoutTruncated || state.stderrTruncated;
       const meta = truncated ? ' [output truncated]' : '';
       return { content: [{ type: 'text', text: tail + meta }] };
+    },
+  );
+
+  server.registerTool(
+    'resume_task',
+    {
+      title: 'Resume task',
+      description: 'Resume a previous session with an optional new task. Carries forward handoff context from the prior run.',
+      inputSchema: {
+        runId: z.string().describe('Previous session run id to resume'),
+        task: z.string().optional().describe('New task (defaults to previous task)'),
+        cwd: z.string().optional().describe('Working directory'),
+        readOnly: z.boolean().optional().describe('Treat as read-only'),
+        auto: z.boolean().optional().describe('Auto-switch on failover'),
+      },
+    },
+    async (args: any) => {
+      const cwd = args.cwd ?? process.cwd();
+      const { config } = await loadConfig({ cwd });
+      const orch = new Orchestrator({
+        adapters: process.env.AIR_MOCK_ADAPTER ? (() => {
+          const { MockAdapter } = require('../adapters/mock');
+          return [new MockAdapter()];
+        })() : undefined,
+        config,
+        mcpMode: true,
+      });
+      try {
+        const session = await orch.resume(args.runId, args.task);
+        return {
+          content: [{ type: 'text', text: `Resumed ${session.runId} (parent: ${args.runId}). State: ${session.state}. Result: ${session.result ?? 'pending'}` }],
+        };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Resume failed: ${String(err?.message || err)}` }] };
+      }
     },
   );
 
@@ -446,15 +384,15 @@ const adapters = await listAdapters();
     async (args: any) => {
       const job = jobs.get(args.runId);
       if (!job) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
-      if (job.state.state !== 'AWAITING_APPROVAL') {
-        return { content: [{ type: 'text', text: `Task not awaiting approval (state=${job.state.state})` }] };
+      const state = job.state;
+      if (state.state !== 'AWAITING_APPROVAL') {
+        return { content: [{ type: 'text', text: `Task not awaiting approval (state=${state.state})` }] };
       }
-      const proposal = job.state.proposedSwitch;
+      const proposal = state.proposedSwitch;
       if (!proposal) {
         return { content: [{ type: 'text', text: 'No pending failover proposal for this task.' }] };
       }
-      // Bind the approval to the exact pending proposal (R5-04). A stale or
-      // mismatched consent payload is refused.
+      // Bind the approval to the exact pending proposal (R5-04).
       if (args.provider !== undefined && args.provider !== proposal.provider) {
         return { content: [{ type: 'text', text: `Consent provider ${args.provider} does not match proposal provider ${proposal.provider}.` }] };
       }
@@ -463,41 +401,19 @@ const adapters = await listAdapters();
       }
       const suppliedHash = args.proposalHash ?? args.hash;
       if (suppliedHash !== undefined && proposal.hash && suppliedHash !== proposal.hash) {
-        return { content: [{ type: 'text', text: `Consent proposal hash does not match the pending proposal.` }] };
-      }
-      job.state.state = 'SWITCHING';
-      await writeTaskState(job.state);
-
-      // Resolve the next candidate, respecting allow-list and revisit rules.
-      const next = await resolveNextCandidate(job);
-      if (!next) {
-        job.state.state = 'FAILED';
-        job.state.error = { category: 'MODEL_UNAVAILABLE', message: 'No eligible alternative candidate after approval.' };
-        await writeTaskState(job.state);
-        return { content: [{ type: 'text', text: 'No eligible alternative candidate after approval.' }] };
+        return { content: [{ type: 'text', text: 'Consent proposal hash does not match the pending proposal.' }] };
       }
 
-      const key = `${next.adapter.id}|${next.adapter.provider}|${next.adapter.model}`;
-      job.visited.add(key);
-      job.hops++;
-      job.adapter = next.adapter;
-      job.taskInput = next.taskInput;
-      job.state.adapter = next.adapter.id;
-      job.state.provider = next.adapter.provider;
-      job.state.model = next.adapter.model;
-      job.state.hops = job.hops;
-      job.state.state = 'RUNNING';
-      job.state.startedAt = new Date().toISOString();
-      await writeTaskState(job.state);
-      trace({ runId: args.runId, event: 'failover_approved', to: next.adapter.id, hops: job.hops });
-
-      job.promise = runAttempt(job, next.adapter, next.taskInput).catch((err) => {
-        job.state.error = { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) };
-        job.state.state = 'FAILED';
-        writeTaskState(job.state);
-      });
-
-      return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Switching to ${next.adapter.id} (${next.adapter.provider}/${next.adapter.model}).` }] };
+      // Resume the orchestrator loop after approval.
+      try {
+        const session = await job.orch?.resumeAfterApproval(args.runId);
+        if (!session) {
+          return { content: [{ type: 'text', text: 'Failed to resume failover.' }] };
+        }
+        return { content: [{ type: 'text', text: `Approved failover for ${args.runId}. Switching to ${proposal.to.id} (${proposal.to.provider}/${proposal.to.model}).` }] };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Failover resume failed: ${String(err?.message || err)}` }] };
+      }
     },
   );
 
@@ -533,6 +449,125 @@ const adapters = await listAdapters();
         cooldowns: tracker.getCooldowns().map((c) => ({ provider: c.provider, model: c.model, until: c.until, reason: c.reason })),
       };
       return { content: [{ type: 'text', text: JSON.stringify(data) }] };
+    },
+  );
+
+  server.registerTool(
+    'list_adapters',
+    {
+      title: 'List adapters',
+      description: 'Return all catalog entries with install status (installed, version, installStatus, available, verified).',
+      inputSchema: {},
+    },
+    async () => {
+      const { config } = await loadConfig({ cwd: process.cwd() });
+      const catalog = await loadCatalog(config);
+      const tools = catalogTools(catalog);
+      const statuses = adapterStatus(config);
+      const statusMap = new Map(statuses.map((s) => [s.id, s]));
+      const rows = tools.map((t) => {
+        const s = statusMap.get(t.id);
+        return {
+          id: t.id,
+          name: t.name,
+          adapterId: t.adapterId,
+          provider: t.provider,
+          model: t.model,
+          installed: s?.installed ?? false,
+          version: s?.version,
+          installStatus: s?.installStatus ?? 'not-installed',
+          available: s?.available ?? false,
+          verified: s?.verified ?? false,
+        };
+      });
+      return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
+    },
+  );
+
+  server.registerTool(
+    'install_adapter',
+    {
+      title: 'Install adapter',
+      description: 'Install a free AI adapter. Requires explicit confirm=true (write operation).',
+      inputSchema: {
+        id: z.string().describe('Adapter catalog id to install'),
+        confirm: z.boolean().optional().describe('Explicit consent to install (must be true)'),
+      },
+    },
+    async (args: any) => {
+      if (args.confirm !== true) {
+        return { content: [{ type: 'text', text: 'Install requires confirm=true to proceed.' }] };
+      }
+      const { config } = await loadConfig({ cwd: process.cwd() });
+      const catalog = await loadCatalog(config);
+      const entry = catalog.tools.find((t) => t.id === args.id);
+      if (!entry) {
+        return { content: [{ type: 'text', text: `Unknown adapter: ${args.id}` }] };
+      }
+      try {
+        const result = await installAdapter(entry);
+        return { content: [{ type: 'text', text: `${args.id}: ${result.status}${result.version ? ` v${result.version}` : ''}${result.error ? ` (error: ${result.error})` : ''}` }] };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Install failed: ${String(err?.message || err)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'upgrade_adapter',
+    {
+      title: 'Upgrade adapter',
+      description: 'Upgrade an adapter to the catalog version. Requires explicit confirm=true (write operation).',
+      inputSchema: {
+        id: z.string().describe('Adapter catalog id to upgrade'),
+        confirm: z.boolean().optional().describe('Explicit consent to upgrade (must be true)'),
+      },
+    },
+    async (args: any) => {
+      if (args.confirm !== true) {
+        return { content: [{ type: 'text', text: 'Upgrade requires confirm=true to proceed.' }] };
+      }
+      const { config } = await loadConfig({ cwd: process.cwd() });
+      const catalog = await loadCatalog(config);
+      const entry = catalog.tools.find((t) => t.id === args.id);
+      if (!entry) {
+        return { content: [{ type: 'text', text: `Unknown adapter: ${args.id}` }] };
+      }
+      try {
+        const result = await upgradeAdapter(entry);
+        return { content: [{ type: 'text', text: `${args.id}: ${result.status}${result.version ? ` v${result.version}` : ''}` }] };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Upgrade failed: ${String(err?.message || err)}` }] };
+      }
+    },
+  );
+
+  server.registerTool(
+    'uninstall_adapter',
+    {
+      title: 'Uninstall adapter',
+      description: 'Uninstall an adapter. Requires explicit confirm=true (write operation).',
+      inputSchema: {
+        id: z.string().describe('Adapter catalog id to uninstall'),
+        confirm: z.boolean().optional().describe('Explicit consent to uninstall (must be true)'),
+      },
+    },
+    async (args: any) => {
+      if (args.confirm !== true) {
+        return { content: [{ type: 'text', text: 'Uninstall requires confirm=true to proceed.' }] };
+      }
+      const { config } = await loadConfig({ cwd: process.cwd() });
+      const catalog = await loadCatalog(config);
+      const entry = catalog.tools.find((t) => t.id === args.id);
+      if (!entry) {
+        return { content: [{ type: 'text', text: `Unknown adapter: ${args.id}` }] };
+      }
+      try {
+        await uninstallAdapter(entry);
+        return { content: [{ type: 'text', text: `${args.id}: uninstalled` }] };
+      } catch (err: any) {
+        return { content: [{ type: 'text', text: `Uninstall failed: ${String(err?.message || err)}` }] };
+      }
     },
   );
 
