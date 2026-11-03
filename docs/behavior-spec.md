@@ -38,7 +38,39 @@ CLI but not documented here, the conformance test in
 - When `air health` is run,
 - Then it displays exactly the same report as `air status` (true alias).
 
-### `air route-test "<task>" --explain`
+### `air resume <runId> [task]`
+- Given a previous session run id,
+- When `air resume <runId> [task]` is run,
+- Then it resumes the session carrying forward handoff context from the prior run,
+  with an optional new task (defaults to the previous task).
+
+### `air adapters`
+- Given a request to manage installable free AI adapters,
+- When `air adapters <subcommand>` is run,
+- Then it lists, installs, upgrades, uninstalls, or shows status of adapters
+  from the catalog (config/catalog.json, overridable via catalog.remoteUrl).
+- Subcommands:
+  - `list` — all catalog entries with install status
+  - `install <id>` — install a free AI adapter (requires --yes or confirmation)
+  - `upgrade <id>` — upgrade to the catalog version if outdated
+  - `uninstall <id>` — uninstall an adapter
+  - `status <id>` — detailed install status for one adapter
+
+### `air dashboard`
+- Given a request to view orchestrator state,
+- When `air dashboard` is run,
+- Then it shows sessions, decisions, events, and which adapters are connected.
+
+### `air export`
+- Given a request to export debug data,
+- When `air export [--out <file>]` is run,
+- Then it writes the orchestrator session log to a JSON file.
+
+### `air commands`
+- Given a request for side-panel help,
+- When `air commands` is run,
+- Then it lists available slash commands (/run, /status, /dashboard, /export,
+  /models, /verify, /mcp).
 - Given a task description,
 - When `air route-test --explain` is run,
 - Then it prints the routing reasoning (classification, candidates considered
@@ -77,8 +109,9 @@ CLI but not documented here, the conformance test in
 - When `air mcp` is run,
 - Then it starts the MCP server over stdio using async jobs. No prompting on
   stdin; approval is a task-state transition.
-- MCP tools: `run_task`, `get_task_status`, `get_task_output`,
-  `approve_failover`, `cancel_task`, `get_status`.
+- MCP tools: `run_task`, `get_task_status`, `get_task_output`, `approve_failover`,
+  `cancel_task`, `get_status`, `resume_task`, `list_adapters`, `install_adapter`,
+  `upgrade_adapter`, `uninstall_adapter`.
 
 ## Exit codes
 
