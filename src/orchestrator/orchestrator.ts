@@ -12,6 +12,12 @@ import { availableAdapters } from '../adapters/registry';
 import { runSession, type SessionConfig, type SessionHandle } from '../execution/sessions';
 import type { TaskInput } from '../types';
 
+export interface OrchestratorEvent {
+  ts: string;
+  type: string;
+  detail: string;
+}
+
 export interface OrchestratorSession {
   runId: string;
   task: string;
@@ -29,16 +35,19 @@ export interface OrchestratorSession {
 export interface OrchestratorDeps {
   adapters?: any[];
   config?: any;
+  cacheDir?: string;
 }
 
 export class Orchestrator {
   private sessions = new Map<string, OrchestratorSession>();
   private handles = new Map<string, SessionHandle>();
+  private events: OrchestratorEvent[] = [];
   private logFile: string;
 
   constructor(private deps: OrchestratorDeps = {}) {
-    mkdirSync(paths.cacheDir, { recursive: true });
-    this.logFile = join(paths.cacheDir, 'orchestrator.json');
+    const cacheDir = deps.cacheDir ?? paths.cacheDir;
+    mkdirSync(cacheDir, { recursive: true });
+    this.logFile = join(cacheDir, 'orchestrator.json');
     this.load();
   }
 
@@ -47,14 +56,24 @@ export class Orchestrator {
       if (existsSync(this.logFile)) {
         const raw = JSON.parse(readFileSync(this.logFile, 'utf8'));
         for (const s of raw.sessions ?? []) this.sessions.set(s.runId, s);
+        this.events = raw.events ?? [];
       }
     } catch { /* ignore corrupt log */ }
   }
 
   private persist(): void {
     try {
-      writeFileSync(this.logFile, JSON.stringify({ sessions: [...this.sessions.values()] }, null, 2));
+      writeFileSync(this.logFile, JSON.stringify({ sessions: [...this.sessions.values()], events: this.events }, null, 2));
     } catch { /* best-effort */ }
+  }
+
+  private log(type: string, detail: string): void {
+    this.events.push({ ts: new Date().toISOString(), type, detail });
+    this.persist();
+  }
+
+  get eventsLog(): OrchestratorEvent[] {
+    return [...this.events];
   }
 
   chooseAdapter(task: { mode: 'ask' | 'auto'; readOnly: boolean }): any | null {
@@ -62,14 +81,21 @@ export class Orchestrator {
     const catalog = buildModelCatalog(adapters);
     const best = bestModelFor(catalog, task);
     if (!best) return null;
-    return adapters.find((a: any) => a.id === best.id) ?? null;
+    const adapter = adapters.find((a: any) => a.id === best.id) ?? null;
+    this.log('model_selected', `${best.id} (${best.provider}/${best.model}) for mode=${task.mode} readOnly=${task.readOnly}`);
+    return adapter;
   }
 
   async start(task: string, cwd: string, options: { readOnly?: boolean; mode?: 'ask' | 'auto'; files?: string[] } = {}): Promise<OrchestratorSession> {
     const readOnly = !!options.readOnly;
     const mode = options.mode ?? 'ask';
+    this.log('request_received', task);
     const adapter = this.chooseAdapter({ mode, readOnly });
-    if (!adapter) throw new Error('No eligible adapter');
+    if (!adapter) {
+      this.log('no_adapter', task);
+      throw new Error('No eligible adapter');
+    }
+    this.log('session_starting', `${adapter.id} for: ${task}`);
     const handle = await runSession({
       id: `orch-${this.sessions.size + 1}`,
       task,
@@ -94,6 +120,7 @@ export class Orchestrator {
     this.sessions.set(handle.runId, session);
     this.handles.set(handle.runId, handle);
     this.persist();
+    this.log('session_started', `${handle.runId} via ${adapter.id}`);
     handle.promise.then(() => {
       const s = this.sessions.get(handle.runId);
       if (s) {
@@ -101,8 +128,11 @@ export class Orchestrator {
         s.result = handle.result;
         s.endedAt = new Date().toISOString();
         this.persist();
+        this.log('session_completed', `${handle.runId} result=${handle.result ?? 'unknown'}`);
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      this.log('session_error', `${handle.runId}: ${String(err)}`);
+    });
     return session;
   }
 
@@ -112,6 +142,10 @@ export class Orchestrator {
 
   get(runId: string): OrchestratorSession | undefined {
     return this.sessions.get(runId);
+  }
+
+  async waitForAll(): Promise<void> {
+    await Promise.all([...this.handles.values()].map((h) => h.promise));
   }
 
   async cancel(runId: string): Promise<void> {
