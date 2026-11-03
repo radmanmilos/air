@@ -9,6 +9,7 @@ import { runProcess } from '../execution/runner';
 import { redact } from '../security/redact';
 import { recordInstall, clearInstall, getInstallStatus, type InstallRecord } from './status';
 import type { InstallEntry } from '../config/catalog';
+import type { Config } from '../config/schema';
 import { paths } from '../config/paths';
 
 export interface PlatformInfo {
@@ -178,4 +179,37 @@ export async function uninstallAdapter(entry: InstallEntry): Promise<void> {
 
   clearInstall(entry.id);
   process.stderr.write(`air: uninstalled ${entry.id}\n`);
+}
+
+/**
+ * Auto-install missing adapters when catalog.autoInstall is enabled.
+ *
+ * Fire-and-forget: installs are kicked off in the background so the current
+ * task is not blocked. Newly installed adapters become available for
+ * subsequent tasks. Failures are recorded in installs.json and logged to
+ * stderr only (never stdout, to protect the MCP protocol).
+ *
+ * @param installFn - optional override for testing (defaults to installAdapter)
+ * @param getInstallStatusFn - optional override for testing (defaults to getInstallStatus)
+ */
+export async function autoInstallMissing(
+  config: Config,
+  installFn: typeof installAdapter = installAdapter,
+  getInstallStatusFn: typeof getInstallStatus = getInstallStatus,
+): Promise<void> {
+  if (config.catalog?.autoInstall !== true) return;
+
+  const { loadCatalog, catalogTools } = await import('../config/catalog');
+  const catalog = await loadCatalog(config);
+  const tools = catalogTools(catalog);
+
+  for (const entry of tools) {
+    const status = getInstallStatusFn(entry.id, entry.executable);
+    if (status.installed && status.status === 'installed') continue;
+
+    // Fire-and-forget: do not await, so the current task is not blocked.
+    installFn(entry).catch((err: any) => {
+      process.stderr.write(`air: auto-install ${entry.id} failed: ${String(err?.message || err)}\n`);
+    });
+  }
 }

@@ -2,27 +2,41 @@
 //
 // Mocks the installer to simulate install/upgrade/uninstall without real
 // binaries. Verifies: load catalog → install → status → upgrade → uninstall → removed.
+// Also tests autoInstallMissing behavior when catalog.autoInstall is enabled.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadCatalog } from '../src/config/catalog';
 import { adapterStatus, listAdapters } from '../src/adapters/registry';
-import { recordInstall, clearInstall, getInstallStatus } from '../src/installer/status';
-import { installAdapter, upgradeAdapter, uninstallAdapter } from '../src/installer/installer';
+import { getInstallStatus, recordInstall, clearInstall } from '../src/installer/status';
+import {
+  installAdapter,
+  upgradeAdapter,
+  uninstallAdapter,
+  autoInstallMissing,
+} from '../src/installer/installer';
 
-vi.mock('../src/installer/installer', () => ({
-  installAdapter: vi.fn(),
-  upgradeAdapter: vi.fn(),
-  uninstallAdapter: vi.fn(),
-}));
+vi.mock('../src/installer/installer', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/installer/installer')>();
+  return {
+    ...actual,
+    installAdapter: vi.fn(),
+    upgradeAdapter: vi.fn(),
+    uninstallAdapter: vi.fn(),
+  };
+});
+
+const mockInstallAdapter = vi.mocked(installAdapter);
+const mockUpgradeAdapter = vi.mocked(upgradeAdapter);
+const mockUninstallAdapter = vi.mocked(uninstallAdapter);
 
 describe('adapter catalog integration', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    vi.mocked(installAdapter).mockReset();
-    vi.mocked(upgradeAdapter).mockReset();
-    vi.mocked(uninstallAdapter).mockReset();
+    mockInstallAdapter.mockReset();
+    mockUpgradeAdapter.mockReset();
+    mockUninstallAdapter.mockReset();
   });
 
   afterEach(() => {
@@ -57,7 +71,7 @@ describe('adapter catalog integration', () => {
     const aiderEntry = catalog.tools.find((t) => t.id === 'aider')!;
 
     // Install: mock returns installed status
-    vi.mocked(installAdapter).mockResolvedValueOnce({
+    mockInstallAdapter.mockResolvedValueOnce({
       installed: true,
       version: '0.86.2',
       status: 'installed',
@@ -76,7 +90,7 @@ describe('adapter catalog integration', () => {
     expect(status.status).toBe('installed');
 
     // Upgrade: mock returns upgraded status
-    vi.mocked(upgradeAdapter).mockResolvedValueOnce({
+    mockUpgradeAdapter.mockResolvedValueOnce({
       installed: true,
       version: '0.87.0',
       status: 'installed',
@@ -88,7 +102,7 @@ describe('adapter catalog integration', () => {
     expect(upgraded.version).toBe('0.87.0');
 
     // Uninstall
-    vi.mocked(uninstallAdapter).mockResolvedValueOnce(undefined);
+    mockUninstallAdapter.mockResolvedValueOnce(undefined);
     await uninstallAdapter(aiderEntry);
     clearInstall('aider');
 
@@ -116,5 +130,66 @@ describe('adapter catalog integration', () => {
       expect(a.installStatus).toBeDefined();
       // version may be undefined if not installed
     }
+  });
+
+  it('autoInstallMissing does nothing when autoInstall is false (default)', async () => {
+    const mockInstallFn = vi.fn();
+    const mockGetInstallStatusFn = vi.fn().mockReturnValue({
+      installed: false,
+      status: 'not-installed',
+      installAttempts: 0,
+    });
+
+    await autoInstallMissing(
+      { catalog: { remoteUrl: undefined, autoInstall: false } },
+      mockInstallFn,
+      mockGetInstallStatusFn,
+    );
+
+    expect(mockInstallFn).not.toHaveBeenCalled();
+    expect(mockGetInstallStatusFn).not.toHaveBeenCalled();
+  });
+
+  it('autoInstallMissing installs missing adapters when autoInstall is true', async () => {
+    const mockInstallFn = vi.fn().mockResolvedValue({
+      installed: true,
+      version: '0.86.2',
+      status: 'installed',
+      installAttempts: 1,
+    });
+    const mockGetInstallStatusFn = vi.fn().mockReturnValue({
+      installed: false,
+      version: undefined,
+      status: 'not-installed',
+      installAttempts: 0,
+    });
+
+    await autoInstallMissing(
+      { catalog: { remoteUrl: undefined, autoInstall: true } },
+      mockInstallFn,
+      mockGetInstallStatusFn,
+    );
+
+    expect(mockGetInstallStatusFn).toHaveBeenCalled();
+    expect(mockInstallFn).toHaveBeenCalled();
+  });
+
+  it('autoInstallMissing skips already-installed adapters', async () => {
+    const mockInstallFn = vi.fn();
+    const mockGetInstallStatusFn = vi.fn().mockReturnValue({
+      installed: true,
+      version: '0.86.2',
+      status: 'installed',
+      installAttempts: 1,
+    });
+
+    await autoInstallMissing(
+      { catalog: { remoteUrl: undefined, autoInstall: true } },
+      mockInstallFn,
+      mockGetInstallStatusFn,
+    );
+
+    expect(mockGetInstallStatusFn).toHaveBeenCalled();
+    expect(mockInstallFn).not.toHaveBeenCalled();
   });
 });
