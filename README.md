@@ -4,7 +4,24 @@
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
-## How it works
+## VS Code setup
+
+Add AIR as an MCP server in your VS Code settings so agents can call it:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "air": {
+        "command": "air",
+        "args": ["mcp"]
+      }
+    }
+  }
+}
+```
+
+Then run `air status` in the integrated terminal to see available models, cooldowns, and task history. The orchestrator persists sessions under the cache dir, so work survives restarts.
 
 Work enters through the CLI or MCP, is routed to the best available adapter, executed in isolated sessions, monitored, and compiled into one response.
 
