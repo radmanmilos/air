@@ -6,6 +6,7 @@
 // Never includes model-generated prose as evidence.
 
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { redact } from '../security/redact';
 import type { GitSnapshot } from '../context/checkpoint';
 
@@ -45,7 +46,6 @@ function git(cwd: string, args: string[]): string {
 function readFileContent(cwd: string, path: string, cap: number): string | null {
   // Untracked files are not in the index; read them directly from disk.
   try {
-    const { readFileSync } = require('node:fs');
     const out = readFileSync(`${cwd}/${path}`, 'utf8');
     return out.length > cap ? out.slice(0, cap) + '\n[content truncated]\n' : out;
   } catch {
@@ -61,7 +61,7 @@ export function buildHandoffPack(opts: HandoffOptions): string {
   const branch = git(opts.cwd, ['rev-parse', '--abbrev-ref', 'HEAD']);
   const head = git(opts.cwd, ['rev-parse', 'HEAD']);
   const status = git(opts.cwd, ['status', '--porcelain']);
-  const diff = git(opts.cwd, ['diff', '--no-color', '--unified=3', 'HEAD']);
+  const diff = redact(git(opts.cwd, ['diff', '--no-color', '--unified=3', 'HEAD']));
   const truncatedDiff = diff.length > diffCap ? diff.slice(0, diffCap) + '\n[diff truncated]\n' : diff;
   const changedFiles = status
     .split('\n')
@@ -118,7 +118,7 @@ export function buildHandoffPack(opts: HandoffOptions): string {
       } else {
         lines.push(`- untracked ${f}:`);
         lines.push('```');
-        lines.push(content);
+        lines.push(redact(content));
         lines.push('```');
       }
     }

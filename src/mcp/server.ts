@@ -70,8 +70,8 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
     onStdout: (_c: string) => {
       // Do not write child output to stdout in MCP mode (would corrupt JSON-RPC).
     },
-    onStderr: (c: string) => {
-      process.stderr.write(c);
+    onStderr: (_c: string) => {
+      // Do not write child stderr to stderr in MCP mode either.
     },
   });
 

@@ -22,12 +22,12 @@ All work in E:\\GitHub\\air. Archive review files when all related tasks are com
 - [x] [DS-03][G5-04] Best-model: respect task.readOnly/mode/capabilities (write/read/headless), filter before ranking, return null with reason if none eligible.
 
 ### P0-3 MCP protocol + output
-- [ ] [R6-05][H-04] MCP stdout only JSON-RPC: remove process.stdout writes from runAttempt in MCP mode; persist redacted output to disk; get_task_output returns it with offsets; real stdio test.
+- [x] [R6-05][H-04] MCP stdout only JSON-RPC: remove process.stdout writes from runAttempt in MCP mode; persist redacted output to disk; get_task_output returns it with offsets; real stdio test.
 
 ### P0-4 Trust, verify, handoff, permissions
-- [ ] [R6-04][H-07] trustedRepos global-only (ignore in repo); canonicalize paths (realpath) before compare; checkVerifyTrust requires source; no execFileSync; tree-kill. Tests: repo tries to trust self -> refused.
-- [ ] [H-07][I-01] Repo config cannot set global-only keys (failover.mode/allowProviderSwitch, privacy, redaction, permission, tools[].executable, trustedRepos, concurrency, verify) - warn and ignore.
-- [ ] [R6-07][R6-08][H-15][G5-07] Redact handoff fully (tracked diff + untracked contents); fix ESM require -> import; preview destination/size before consent; bind approval to payload.
+- [x] [R6-04][H-07] trustedRepos global-only (ignore in repo); canonicalize paths (realpath) before compare; checkVerifyTrust requires source; no execFileSync; tree-kill. Tests: repo tries to trust self -> refused.
+- [x] [H-07][I-01] Repo config cannot set global-only keys (failover.mode/allowProviderSwitch, privacy, redaction, permission, tools[].executable, trustedRepos, concurrency, verify) - warn and ignore.
+- [x] [R6-07][R6-08][H-15][G5-07] Redact handoff fully (tracked diff + untracked contents); fix ESM require -> import; preview destination/size before consent; bind approval to payload.
 - [ ] [I-01][H-03] Permissions: wire permission config, adapter enforcement/refusal, read-only not routed to non-enforcing, no broad flags in unverified.
 
 ## P1 - High

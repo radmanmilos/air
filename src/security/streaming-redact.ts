@@ -27,11 +27,20 @@ const OVERLAP = 64; // chars retained from the end of each chunk (>= max token l
 // a prefix of one of these, or starts with one of these.
 const TOKEN_PREFIXES = [
   'sk-or-',
+  'sk-proj-',
+  'sk-ant-',
   'sk-',
   'ghp_',
+  'gho_',
+  'ghs_',
+  'ghu_',
   'github_pat_',
   'AKIA',
+  'ASIA',
+  'xox',
+  'AIza',
   'Bearer',
+  'bearer',
   '--api-key',
   '--apikey',
   '--token',
@@ -41,9 +50,10 @@ const TOKEN_PREFIXES = [
 
 function couldBeTokenPrefix(s: string): boolean {
   if (s.length === 0) return false;
+  const lower = s.toLowerCase();
   for (const t of TOKEN_PREFIXES) {
-    if (t.startsWith(s)) return true;
-    if (s.startsWith(t)) return true;
+    if (t.toLowerCase().startsWith(lower)) return true;
+    if (lower.startsWith(t.toLowerCase())) return true;
   }
   // ENV assignment prefix: [A-Z][A-Z_]*(_(KEY|TOKEN|SECRET))?
   if (/^[A-Z][A-Z_]*(_(KEY|TOKEN|SECRET))?$/.test(s)) return true;
