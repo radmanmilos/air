@@ -505,7 +505,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
         return { content: [{ type: 'text', text: `Unknown adapter: ${args.id}` }] };
       }
       try {
-        const result = await installAdapter(entry);
+        const result = await installAdapter(entry, config);
         return { content: [{ type: 'text', text: `${args.id}: ${result.status}${result.version ? ` v${result.version}` : ''}${result.error ? ` (error: ${result.error})` : ''}` }] };
       } catch (err: any) {
         return { content: [{ type: 'text', text: `Install failed: ${String(err?.message || err)}` }] };
@@ -534,7 +534,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
         return { content: [{ type: 'text', text: `Unknown adapter: ${args.id}` }] };
       }
       try {
-        const result = await upgradeAdapter(entry);
+        const result = await upgradeAdapter(entry, config);
         return { content: [{ type: 'text', text: `${args.id}: ${result.status}${result.version ? ` v${result.version}` : ''}` }] };
       } catch (err: any) {
         return { content: [{ type: 'text', text: `Upgrade failed: ${String(err?.message || err)}` }] };

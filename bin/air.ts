@@ -475,7 +475,7 @@ adaptersCmd
       }
     }
     try {
-      const result = await installAdapter(entry);
+      const result = await installAdapter(entry, config);
       console.log(chalk.green(`${id}: ${result.status}`));
       if (result.version) console.log(chalk.gray(`  version: ${result.version}`));
       if (result.error) console.log(chalk.red(`  error: ${result.error}`));
@@ -515,7 +515,7 @@ adaptersCmd
       }
     }
     try {
-      const result = await upgradeAdapter(entry);
+      const result = await upgradeAdapter(entry, config);
       console.log(chalk.green(`${id}: ${result.status}`));
       if (result.version) console.log(chalk.gray(`  version: ${result.version}`));
     } catch (err: any) {

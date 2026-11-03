@@ -60,7 +60,10 @@ function parseVersion(output: string): string | undefined {
 }
 
 /** Install an adapter via package-manager or direct-download. */
-export async function installAdapter(entry: InstallEntry): Promise<InstallRecord> {
+export async function installAdapter(
+  entry: InstallEntry,
+  config?: Config,
+): Promise<InstallRecord> {
   const { platform, arch } = detectPlatform();
   const method = entry.install.method;
 
@@ -122,6 +125,14 @@ export async function installAdapter(entry: InstallEntry): Promise<InstallRecord
 
   const downloadUrl = typeof url === 'string' ? { url } : url;
 
+  // Configure proxy for the download if specified in config.
+  const origHttpProxy = process.env.HTTP_PROXY;
+  const origHttpsProxy = process.env.HTTPS_PROXY;
+  if (config?.catalog?.proxy) {
+    process.env.HTTP_PROXY = config.catalog.proxy;
+    process.env.HTTPS_PROXY = config.catalog.proxy;
+  }
+
   try {
     process.stderr.write(`air: downloading ${entry.id} from ${downloadUrl.url}\n`);
     const res = await fetch(downloadUrl.url, { signal: AbortSignal.timeout(120_000) });
@@ -178,17 +189,32 @@ export async function installAdapter(entry: InstallEntry): Promise<InstallRecord
     process.stderr.write(`air: install ${entry.id}: ${error}\n`);
     recordInstall(entry.id, 'failed', { error });
     return getInstallStatus(entry.id, entry.executable);
+  } finally {
+    // Restore original proxy env vars.
+    if (origHttpProxy !== undefined) {
+      process.env.HTTP_PROXY = origHttpProxy;
+    } else {
+      delete process.env.HTTP_PROXY;
+    }
+    if (origHttpsProxy !== undefined) {
+      process.env.HTTPS_PROXY = origHttpsProxy;
+    } else {
+      delete process.env.HTTPS_PROXY;
+    }
   }
 }
 
 /** Upgrade an adapter to the catalog version if outdated. */
-export async function upgradeAdapter(entry: InstallEntry): Promise<InstallRecord> {
+export async function upgradeAdapter(
+  entry: InstallEntry,
+  config?: Config,
+): Promise<InstallRecord> {
   const current = getInstallStatus(entry.id, entry.executable);
   if (current.status === 'installed' && current.version === entry.install.version) {
     process.stderr.write(`air: ${entry.id} already at v${current.version}\n`);
     return current;
   }
-  return installAdapter(entry);
+  return installAdapter(entry, config);
 }
 
 /** Uninstall an adapter. */
@@ -237,7 +263,7 @@ export async function autoInstallMissing(
     if (status.installed && status.status === 'installed') continue;
 
     // Fire-and-forget: do not await, so the current task is not blocked.
-    installFn(entry).catch((err: any) => {
+    installFn(entry, config).catch((err: any) => {
       process.stderr.write(`air: auto-install ${entry.id} failed: ${String(err?.message || err)}\n`);
     });
   }

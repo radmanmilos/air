@@ -52,8 +52,9 @@ const CostOverridesSchema = z.record(z.string(), z.number().int().min(0).max(3))
 const CatalogSchema = z.object({
   remoteUrl: z.string().url().optional(),
   autoInstall: z.boolean().default(false),
+  proxy: z.string().optional(),
 });
-const DEFAULT_CATALOG = { remoteUrl: undefined as string | undefined, autoInstall: false };
+const DEFAULT_CATALOG = { remoteUrl: undefined as string | undefined, autoInstall: false, proxy: undefined as string | undefined };
 
 // zod 4 does not re-run inner defaults when an object field's `.default({})`
 // is an empty object, so each sub-schema default is spelled out explicitly.
