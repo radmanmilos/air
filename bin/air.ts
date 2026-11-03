@@ -26,7 +26,8 @@ const program = new Command();
 program
   .name('air')
   .description('Unified AI tool orchestrator')
-  .version('0.1.0');
+  .version('0.1.0')
+  .option('--dev', 'Developer mode: verbose diagnostics and full logs');
 
 async function listAdapters(config?: any): Promise<any[]> {
   // Production registry: real adapters only, discovered from PATH.
@@ -39,6 +40,7 @@ async function listAdapters(config?: any): Promise<any[]> {
 }
 
 async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string; noTty?: boolean; sessions?: string[]; allowProvider?: string }) {
+  if (process.argv.includes('--dev')) process.env.AIR_DEV = '1';
   console.log(chalk.cyan('╔══════════════════════════════════════╗'));
   console.log(chalk.cyan('║') + chalk.bold('   AIR - Adaptive Intelligence Router  ') + chalk.cyan('║'));
   console.log(chalk.cyan('╚══════════════════════════════════════╝'));
@@ -590,6 +592,24 @@ program
     for (const e of (raw.events ?? []).slice(-10)) {
       console.log(`  ${e.ts} ${e.type}: ${e.detail}`);
     }
+  });
+
+program
+  .command('export')
+  .description('Export orchestrator session log and events for debugging')
+  .option('--out <file>', 'Output file', 'air-export.json')
+  .action(async (options: { out: string }) => {
+    const { readFileSync, existsSync, writeFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { paths } = await import('../src/config/paths');
+    const file = join(paths.cacheDir, 'orchestrator.json');
+    if (!existsSync(file)) {
+      console.log('No orchestrator log found.');
+      return;
+    }
+    const raw = readFileSync(file, 'utf8');
+    writeFileSync(options.out, raw);
+    console.log(`Exported orchestrator log to ${options.out}`);
   });
 
 program
