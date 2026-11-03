@@ -4,7 +4,7 @@
 
 **Status:** Release candidate. 217 tests passing (parallel isolated workers). CLI + MCP server functional. Build, lint and package dry-run green on CI. All review tasks complete. Phase 0 (Orchestrator wiring) and Phase 1 (Free AI Adapter Catalog) complete.
 
-Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
+Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across adapter types (aider, goose verified by default; opencode, kilocode, codex, github-copilot visible but unverified) with automatic failover on rate limits.
 
 ## VS Code setup
 
@@ -54,7 +54,7 @@ flowchart LR
 - **Failover with control** - Asks before switching by default, optional auto-switch (`--auto`)
 - **Stream + buffer** - Live output while parsing for rate limits; bounded rolling buffer with truncation metadata
 - **Context handoff** - Builds handoff from git state (never model summary); redacts secrets
-- **MCP server** - Expose routing to other agents via stdio JSON-RPC. `run_task` runs jobs in the background; `get_task_status`, `get_task_output`, `approve_failover`, `cancel_task` and `get_status` poll and drive the same run.
+- **MCP server** - Expose routing to other agents via stdio JSON-RPC. `run_task` runs jobs in the background; `get_task_status`, `get_task_output`, `approve_failover`, `cancel_task`, `get_status`, `resume_task`, `list_adapters`, `install_adapter`, `upgrade_adapter`, `uninstall_adapter` poll and drive the same run.
 - **Safety** - Dirty-tree refusal by default (`--allow-dirty` opt-in); provider allow-list; hop cap; revisit prevention
 - **Success detection** - Uses actual workspace delta (git status/diff), not stdout length
 - **Process facts** - Timeout, cancellation, and spawn errors take precedence over stderr matching
@@ -65,7 +65,8 @@ flowchart LR
 
 ## Known limitations
 
-- Verified adapters require the external CLI to be installed and on PATH; command syntax and permission flags were smoke-tested locally.
+- Only aider and goose are CI-smoke-test verified and eligible for routing; opencode, kilocode, codex, and github-copilot are unverified spikes visible in `air status` but never routed.
+- Verified adapters require the external CLI to be installed and on PATH; headless flags were confirmed against locally installed binaries for aider and goose only.
 
 ## Quick Start
 
@@ -84,6 +85,7 @@ npm link
 ## Commands
 
 - `air run "<task>"` - Route and run task (`-f, --files`, `--auto`, `--allow-dirty`, `--read-only`)
+- `air resume <runId> [task]` - Resume a previous session with optional new task
 - `air status` / `air health` - Show tools, providers, models, and active cooldowns (health is a true alias; `--json`)
 - `air adapters list` - List installable free AI adapters with install status
 - `air adapters install <id>` - Install a free AI adapter
@@ -129,6 +131,15 @@ Precedence: CLI > env > repo `.airrc.yaml` > global > defaults.
 
 ## Development
 
+```bash
+npm run typecheck      # app typecheck
+npm run typecheck:test # test typecheck
+npm test               # vitest
+npm run build          # tsc
+npm run lint           # eslint
+npm run dev            # tsx bin/air.ts
+```
+
 ## Adapters
 
 ### Verified
@@ -137,12 +148,17 @@ Precedence: CLI > env > repo `.airrc.yaml` > global > defaults.
 |---|---|---|---|
 | aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
 | goose | `goose` | `goose run --text` | 1.57.0 |
-| opencode | `opencode` | `opencode run <prompt> --auto` | local |
-| kilocode | `kilocode` | `kilo run <prompt> --auto` | 7.5.16 |
-| codex | `codex` | `codex exec --skip-git-repo-check` | local |
-| github-copilot | `gh` | `gh copilot -- -p <prompt> --allow-all-tools` | local |
 
-Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code.
+### Unverified (visible, never routed)
+
+| Adapter | Executable | Headless | Verified |
+|---|---|---|---|
+| opencode | `opencode` | `run <prompt> --auto` | UNVERIFIED |
+| kilocode | `kilocode` | `run <prompt> --auto` | UNVERIFIED |
+| codex | `codex` | `exec --skip-git-repo-check <prompt>` | UNVERIFIED |
+| github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | UNVERIFIED |
+
+Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code. opencode, kilocode, codex, and github-copilot are UNVERIFIED spikes — see `docs/adapters/catalog.md` and confirm flags against the installed binaries before relying on them. They are visible in `air status` but are never selected by normal routing.
 
 ## Free AI Adapter Catalog
 

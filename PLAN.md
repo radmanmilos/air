@@ -59,12 +59,12 @@ air/
 ├── src/
 │   ├── adapters/         # adapter.ts (contract), conformance.ts
 │   ├── config/           # schema.ts, loader.ts, paths.ts, catalog.ts
-│   ├── execution/        # runner.ts (planned)
-│   ├── health/           # tracker.ts (planned)
+│   ├── execution/        # runner.ts, sessions.ts, task-state.ts, index.ts
+│   ├── health/           # tracker.ts, index.ts
 │   ├── installer/        # status.ts, installer.ts
-│   ├── mcp/              # server.ts (planned)
+│   ├── mcp/              # server.ts, index.ts
 │   ├── orchestrator/     # orchestrator.ts
-│   ├── router/           # router.ts (planned)
+│   ├── router/           # router.ts, catalog.ts, check-models.ts, index.ts
 │   ├── security/         # redact.ts
 │   ├── types/            # errors.ts, result.ts, outcome.ts, index.ts
 │   └── utils/
@@ -73,7 +73,7 @@ air/
 │   └── models/
 ├── docs/
 │   ├── behavior-spec.md
-│   └── adapters/         # aider.md, goose.md, catalog.md
+│   └── adapters/         # aider.md, goose.md, opencode.md, kilocode.md, codex.md, github-copilot.md, catalog.md
 ├── tests/
 │   ├── fixtures/         # mock-tool.js
 │   ├── mock-adapter.ts
@@ -399,10 +399,10 @@ applied. Conflicts were resolved as follows:
 
 | Adapter | Executable | Headless | Verified |
 |---|---|---|---|
-| opencode | `opencode` | `run --prompt --yes` | UNVERIFIED |
-| kilocode | `kilocode` | `run --prompt --yes` | UNVERIFIED |
-| codex | `codex` | `exec --skip-git-repo-check` | UNVERIFIED |
-| github-copilot | `gh` | `copilot --allow` | UNVERIFIED |
+| opencode | `opencode` | `run <prompt> --auto` | UNVERIFIED |
+| kilocode | `kilocode` | `run <prompt> --auto` | UNVERIFIED |
+| codex | `codex` | `exec --skip-git-repo-check <prompt>` | UNVERIFIED |
+| github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | UNVERIFIED |
 | mock (test-only) | `node tests/fixtures/mock-tool.js` | env-controlled | n/a |
 
 All adapters are discovered from PATH at runtime. The mock adapter is test-only
