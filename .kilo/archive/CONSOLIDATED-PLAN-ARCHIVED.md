@@ -56,7 +56,7 @@ This plan is archived. Every task in Phase 0 and Phase 1 has been implemented, t
 
 ## New files created
 
-- `CONSOLIDATED-PLAN.md` (this file — archived)
+- `.kilo/archive/CONSOLIDATED-PLAN-ARCHIVED.md` (this file — archived)
 - `config/catalog.json`
 - `src/config/catalog.ts`
 - `src/installer/status.ts`
