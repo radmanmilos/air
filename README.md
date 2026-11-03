@@ -6,7 +6,9 @@ Unified AI tool orchestrator with smart routing and failover. One CLI + MCP serv
 
 ## VS Code setup
 
-Add AIR as an MCP server in your VS Code settings so agents can call it:
+1. Install AIR globally: `npm install -g air` (or use `npx air`).
+2. Ensure at least one adapter CLI is installed and on PATH (aider, goose, opencode, kilocode, codex, or gh).
+3. Add AIR as an MCP server in VS Code settings:
 
 ```json
 {
@@ -21,7 +23,9 @@ Add AIR as an MCP server in your VS Code settings so agents can call it:
 }
 ```
 
-Then run `air status` in the integrated terminal to see available models, cooldowns, and task history. The orchestrator persists sessions under the cache dir, so work survives restarts.
+4. Open the integrated terminal and run `air dashboard` or `air commands` to see sessions, decisions, and available commands.
+
+The orchestrator persists sessions under the cache dir, so work survives restarts.
 
 Work enters through the CLI or MCP, is routed to the best available adapter, executed in isolated sessions, monitored, and compiled into one response.
 
