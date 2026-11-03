@@ -4,6 +4,7 @@
 // binaries. Verifies: load catalog → install → status → upgrade → uninstall → removed.
 // Also tests autoInstallMissing behavior when catalog.autoInstall is enabled.
 
+import { execSync } from 'node:child_process';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadCatalog } from '../src/config/catalog';
 import { adapterStatus, listAdapters } from '../src/adapters/registry';
@@ -21,6 +22,13 @@ import {
 } from '../src/installer/installer';
 import type { InstallEntry } from '../src/config/catalog';
 import type { Config } from '../src/config/schema';
+
+const mockExecSync = vi.mocked(execSync);
+
+vi.mock('node:child_process', () => ({
+  ...vi.importActual('node:child_process'),
+  execSync: vi.fn(),
+}));
 
 vi.mock('../src/installer/installer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/installer/installer')>();
@@ -75,6 +83,14 @@ describe('adapter catalog integration', () => {
     mockInstallAdapter.mockReset();
     mockUpgradeAdapter.mockReset();
     mockUninstallAdapter.mockReset();
+    // Simulate aider installed on PATH for getInstallStatus PATH checks.
+    mockExecSync.mockImplementation((cmd: string) => {
+      const c = String(cmd);
+      if (c.includes('aider')) {
+        return Buffer.from('/usr/bin/aider\n');
+      }
+      throw new Error('ENOENT: not found');
+    });
   });
 
   afterEach(() => {

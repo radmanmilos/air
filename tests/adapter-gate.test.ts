@@ -1,9 +1,27 @@
+import { execSync } from 'node:child_process';
 import { listAdapters, availableAdapters, adapterStatus } from '../src/adapters/registry';
 import { selectCandidate } from '../src/router/router';
 import { createHealthTracker } from '../src/health/tracker';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const mockExecSync = vi.mocked(execSync);
+
+vi.mock('node:child_process', () => ({
+  ...vi.importActual('node:child_process'),
+  execSync: vi.fn(),
+}));
 
 describe('adapter verification gate (R5-02)', () => {
+  beforeEach(() => {
+    // Simulate aider and goose installed on PATH; others not present.
+    mockExecSync.mockImplementation((cmd: string) => {
+      const c = String(cmd);
+      if (c.includes('aider') || c.includes('goose')) {
+        return Buffer.from('/usr/bin/aider\n');
+      }
+      throw new Error('ENOENT: not found');
+    });
+  });
   it('only verified + enabled adapters are routed by default', () => {
     const routed = availableAdapters();
     const ids = routed.map((a) => a.id);
