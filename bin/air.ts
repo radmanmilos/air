@@ -39,6 +39,9 @@ async function listAdapters(config?: any): Promise<any[]> {
 }
 
 async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string; noTty?: boolean; sessions?: string[]; allowProvider?: string }) {
+  console.log(chalk.cyan('╔══════════════════════════════════════╗'));
+  console.log(chalk.cyan('║') + chalk.bold('   AIR - Adaptive Intelligence Router  ') + chalk.cyan('║'));
+  console.log(chalk.cyan('╚══════════════════════════════════════╝'));
   console.log(chalk.cyan('air run'));
   console.log(chalk.gray('Task:'), task);
 
@@ -563,6 +566,30 @@ program
     const result = runVerify(cmd, cwd);
     console.log(formatVerifyReport(result));
     process.exit(result.ok ? 0 : 1);
+  });
+
+program
+  .command('dashboard')
+  .description('Show orchestrator sessions, decisions, and events')
+  .action(async () => {
+    const { readFileSync, existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { paths } = await import('../src/config/paths');
+    const file = join(paths.cacheDir, 'orchestrator.json');
+    if (!existsSync(file)) {
+      console.log('No orchestrator sessions yet.');
+      return;
+    }
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    console.log('=== AIR Dashboard ===');
+    console.log(`Sessions: ${raw.sessions?.length ?? 0}`);
+    for (const s of raw.sessions ?? []) {
+      console.log(`- ${s.runId}: ${s.adapterId} (${s.provider}/${s.model}) ${s.state} ${s.result ?? ''}`);
+    }
+    console.log(`Events: ${raw.events?.length ?? 0}`);
+    for (const e of (raw.events ?? []).slice(-10)) {
+      console.log(`  ${e.ts} ${e.type}: ${e.detail}`);
+    }
   });
 
 program
