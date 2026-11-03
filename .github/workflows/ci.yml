@@ -55,3 +55,31 @@ jobs:
             fs.rmSync(tgz, { force: true });
           }
         '
+
+  smoke-test:
+    name: Real-binary smoke tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ always() && needs.test.result == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm ci
+      - name: Install aider (verified adapter)
+        run: npm install -g aider
+      - name: Install goose (verified adapter)
+        run: |
+          curl -fsSL https://github.com/block/goose/releases/latest/download/goose-linux-x64 -o /usr/local/bin/goose
+          chmod +x /usr/local/bin/goose
+      - name: Verify adapters on PATH
+        run: |
+          aider --version
+          goose --version
+      - name: Run smoke tests
+        env:
+          AIR_SMOKE_TEST: "1"
+        run: npm test
