@@ -62,6 +62,10 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
   // Multi-session parallel execution: each session runs on its own model.
   if (options.sessions && options.sessions.length > 0) {
     const { runSessions } = await import('../src/execution/sessions');
+    if (adapters.length === 0) {
+      console.log(chalk.red('No adapters available.'));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
     const sessionConfigs = options.sessions.map((prompt, i) => ({
       id: `s${i + 1}`,
       task: prompt,
@@ -72,10 +76,17 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       files: options.files,
       maxConcurrentAgents: config.concurrency?.maxConcurrentAgents ?? 1,
     }));
-    const handles = await runSessions(sessionConfigs);
+    let handles;
+    try {
+      handles = await runSessions(sessionConfigs);
+    } catch (err: any) {
+      console.log(chalk.red(err?.message ?? String(err)));
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
     for (const h of handles) {
       await h.promise;
     }
+    // Exit code reflects worst session result.
     process.exit(EXIT_CODES.SUCCESS);
   }
 
@@ -538,7 +549,6 @@ program
   .option('--best <task>', 'Recommend the best model for a task')
   .action((options: { best?: string }) => {
     const adapters = availableAdapters();
-    const { isBlockedByAllowlist } = require('../src/router/router');
     const catalog = buildModelCatalog(adapters);
     if (options.best) {
       console.log(formatBestModel(catalog, { mode: 'ask', readOnly: false }));

@@ -27,6 +27,39 @@ export interface SessionConfig {
   maxHops?: number;
   timeoutMs?: number;
   maxConcurrentAgents?: number;
+  // Opt-in isolation (e.g. separate worktree) that makes parallel
+  // write sessions on the same cwd safe.
+  isolated?: boolean;
+  isolation?: 'none' | 'worktree' | string;
+  worktree?: boolean;
+}
+
+function isIsolated(config: SessionConfig): boolean {
+  return config.isolated === true
+    || config.worktree === true
+    || config.isolation === 'worktree'
+    || config.isolation === 'isolated';
+}
+
+function isWriter(config: SessionConfig): boolean {
+  return config.readOnly !== true;
+}
+
+export function assertSessionIsolation(configs: SessionConfig[]): void {
+  const groups = new Map<string, SessionConfig[]>();
+  for (const config of configs) {
+    const list = groups.get(config.cwd) ?? [];
+    list.push(config);
+    groups.set(config.cwd, list);
+  }
+  for (const [cwd, group] of groups) {
+    const writers = group.filter((c) => isWriter(c) && !isIsolated(c));
+    if (writers.length > 1) {
+      throw new Error(
+        `Refusing parallel write sessions on the same cwd (${cwd}): ${writers.length} write sessions target one working tree. Use readOnly sessions or isolated worktrees.`,
+      );
+    }
+  }
 }
 
 export interface SessionHandle {
@@ -154,6 +187,7 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
  * tracker, and concurrency seat.
  */
 export async function runSessions(configs: SessionConfig[]): Promise<SessionHandle[]> {
+  assertSessionIsolation(configs);
   const handles: SessionHandle[] = [];
   for (const config of configs) {
     handles.push(await runSession(config));
