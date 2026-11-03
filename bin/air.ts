@@ -38,7 +38,7 @@ async function listAdapters(config?: any): Promise<any[]> {
   return availableAdapters(config);
 }
 
-async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string; noTty?: boolean; sessions?: string[] }) {
+async function runAction(task: string, options: { files?: string[]; auto?: boolean; allowDirty?: boolean; readOnly?: boolean; cwd?: string; noTty?: boolean; sessions?: string[]; allowProvider?: string }) {
   console.log(chalk.cyan('air run'));
   console.log(chalk.gray('Task:'), task);
 
@@ -134,6 +134,17 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     if (hops === 1) {
       allow.providers = [chosen.provider];
       allow.models = [chosen.model];
+    }
+    // Apply --allow-provider / config allowProviderSwitch (R6-03).
+    const extraProviders = (options.allowProvider ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const p of extraProviders) {
+      if (!allow.providers.includes(p)) allow.providers.push(p);
+    }
+    if (config.failover?.allowProviderSwitch) {
+      allow.providers = [];
     }
 
     const spec = adapter.buildCommand(taskInput);
@@ -382,6 +393,7 @@ program
   .option('--read-only', 'Treat the task as read-only; empty diff is a valid outcome')
   .option('--cwd <dir>', 'Working directory (default: current directory)')
   .option('--no-tty', 'Disable interactive prompts (non-interactive failover)')
+  .option('--allow-provider <providers>', 'Allow failover to these providers (comma-separated)')
   .option('--sessions <tasks...>', 'Run multiple tasks concurrently, each on its own model')
   .action(runAction);
 function showStatus(options: { json?: boolean }) {

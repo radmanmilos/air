@@ -34,6 +34,7 @@ export interface TaskState {
     reason: string;
     action?: string;
     task?: string;
+    hash?: string;
   };
   outputTail?: string;
   stdoutTruncated?: boolean;

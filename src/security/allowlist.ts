@@ -50,9 +50,7 @@ export function checkHandoffAllowlist(
   if (!isProviderAllowed(to.provider, allow)) {
     return { ok: false, reason: `provider ${to.provider} not in allow-list` };
   }
-  if (!isModelAllowed(to.model, allow)) {
-    return { ok: false, reason: `model ${to.model} not in allow-list` };
-  }
+  // Cross-provider: an explicitly allowed provider may use any of its models.
   return { ok: true };
 }
 

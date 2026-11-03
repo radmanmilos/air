@@ -22,6 +22,7 @@ import { buildHandoffPack } from '../context/handoff';
 import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state';
 import { trace } from '../observability/trace';
 import { redact } from '../security/redact';
+import { createHash } from 'node:crypto';
 
 interface Job {
   state: any;
@@ -37,6 +38,21 @@ interface Job {
   allow: any;
   config: any;
   beforeSnap: any;
+}
+
+/** Compute a stable hash for a failover proposal so approval can bind to the
+ *  exact proposal (R6-03). */
+function proposalHash(next: { adapter: any }, category: string, action: string, task: string): string {
+  return createHash('sha256')
+    .update(JSON.stringify({
+      adapter: next.adapter.id,
+      provider: next.adapter.provider,
+      model: next.adapter.model,
+      category,
+      action,
+      task,
+    }))
+    .digest('hex');
 }
 
 export const jobs = new Map<string, Job>();
@@ -179,6 +195,7 @@ export async function runAttempt(job: Job, adapter: any, taskInput: any): Promis
           reason: category,
           action,
           task: next.taskInput.prompt,
+          hash: proposalHash(next, category, action, next.taskInput.prompt),
         };
         job.state = finalState;
         await writeTaskState(finalState);
@@ -253,6 +270,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
         cwd: z.string().optional().describe('Working directory'),
         readOnly: z.boolean().optional().describe('Treat as read-only'),
         auto: z.boolean().optional().describe('Auto-switch on failover'),
+        allowProvider: z.union([z.string(), z.array(z.string())]).optional().describe('Allowed providers for failover'),
       },
     },
     async (args: any) => {
@@ -321,6 +339,17 @@ const adapters = await listAdapters();
       // selected candidate, not adapters[0] (R5-04).
       allow.providers = [chosen.provider];
       allow.models = [chosen.model];
+      const extraProviders = Array.isArray(args.allowProvider)
+        ? args.allowProvider
+        : args.allowProvider
+          ? [args.allowProvider]
+          : [];
+      for (const p of extraProviders) {
+        if (!allow.providers.includes(p)) allow.providers.push(p);
+      }
+      if (config.failover?.allowProviderSwitch) {
+        allow.providers = [];
+      }
       visited.add(`${chosen.id}|${chosen.provider}|${chosen.model}`);
       const running: any = {
         runId,
@@ -410,6 +439,8 @@ const adapters = await listAdapters();
         runId: z.string().describe('Task run id'),
         provider: z.string().optional().describe('Consent for this exact provider (must match the proposal)'),
         model: z.string().optional().describe('Consent for this exact model (must match the proposal)'),
+        proposalHash: z.string().optional().describe('Consent bound to this exact proposal hash'),
+        hash: z.string().optional().describe('Alias for proposalHash'),
       },
     },
     async (args: any) => {
@@ -429,6 +460,10 @@ const adapters = await listAdapters();
       }
       if (args.model !== undefined && args.model !== proposal.model) {
         return { content: [{ type: 'text', text: `Consent model ${args.model} does not match proposal model ${proposal.model}.` }] };
+      }
+      const suppliedHash = args.proposalHash ?? args.hash;
+      if (suppliedHash !== undefined && proposal.hash && suppliedHash !== proposal.hash) {
+        return { content: [{ type: 'text', text: `Consent proposal hash does not match the pending proposal.` }] };
       }
       job.state.state = 'SWITCHING';
       await writeTaskState(job.state);

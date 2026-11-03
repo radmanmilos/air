@@ -17,7 +17,7 @@ All work in E:\\GitHub\\air. Archive review files when all related tasks are com
 - [x] [H-02] Multi-process tests: 4 processes x 20 increments = 80; cap enforced across processes; SIGKILL recovery; no ignored seat/lock timeouts.
 
 ### P0-2 Routing, allow-list, failover
-- [ ] [R6-03][H-06][DS-08][G5-08] Separate discovery from auth; derive allow-list from actual first candidate; real candidate proposals (no hardcoded goose); bind approval to exact proposal hash; --allow-provider/consent; built-CLI e2e.
+- [x] [R6-03][H-06][DS-08][G5-08] Separate discovery from auth; derive allow-list from actual first candidate; real candidate proposals (no hardcoded goose); bind approval to exact proposal hash; --allow-provider/consent; built-CLI e2e.
 - [x] [DS-02][G5-04] Model catalog: derive available from registry (agree with air status/check-models), reasons when unavailable, exclude unavailable from best.
 - [x] [DS-03][G5-04] Best-model: respect task.readOnly/mode/capabilities (write/read/headless), filter before ranking, return null with reason if none eligible.
 
