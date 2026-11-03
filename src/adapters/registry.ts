@@ -4,6 +4,11 @@
 // are still returned by listAdapters() so `air status` can show them, but
 // availableAdapters() excludes them by default. PATH presence alone cannot
 // enable an unverified adapter.
+//
+// Dynamic adapters: catalog entries may specify a factoryModule path. AIR
+// dynamically imports the module and calls its createAdapter() export to
+// construct the adapter, enabling operators to add adapters without code
+// changes. Call ensureDynamicAdaptersLoaded() to populate them.
 
 import { execSync } from 'node:child_process';
 import type { AgentAdapter, AdapterMeta } from './adapter';
@@ -25,6 +30,10 @@ export interface AdapterInfo {
   installStatus: InstallStatus;
   reason?: string;
 }
+
+/** Cache of dynamically loaded adapters (factoryModule entries from catalog). */
+const DYNAMIC_ADAPTERS = new Map<string, AdapterInfo>();
+let dynamicAdaptersLoaded = false;
 
 function isOnPath(exe: string): boolean {
   try {
@@ -105,14 +114,17 @@ export function listAdapters(config?: Config): AdapterInfo[] {
     for (const t of config.tools) tools[t.id] = t;
   }
 
-  return Object.entries(FACTORY).map(([id, factory]) => {
+  const results: AdapterInfo[] = [];
+
+  // 1. Hardcoded factories
+  for (const [id, factory] of Object.entries(FACTORY)) {
     const { adapter, metaOverride } = applyConfig(factory(), tools[id]);
     const meta = META[id] ?? { verified: false, enabled: false, headlessSupported: false };
     // Configured enablement overrides the default.
     const enabled = metaOverride.enabled ?? meta.enabled;
     const available = isOnPath(EXE[id]);
     const install = getInstallStatus(id, EXE[id]);
-    return {
+    results.push({
       adapter,
       meta: { ...meta, enabled },
       available,
@@ -120,8 +132,15 @@ export function listAdapters(config?: Config): AdapterInfo[] {
       version: install.version,
       installStatus: install.status,
       reason: available ? undefined : `executable '${EXE[id]}' not found on PATH`,
-    };
-  });
+    });
+  }
+
+  // 2. Dynamically loaded adapters (from catalog factoryModule entries)
+  for (const info of DYNAMIC_ADAPTERS.values()) {
+    results.push(info);
+  }
+
+  return results;
 }
 
 /** Adapters that are verified, enabled, and have their binary on PATH. */
@@ -167,4 +186,61 @@ export function routedAdapters(config?: Config): AgentAdapter[] {
 export function refreshAdapterAvailability(id: string): AdapterInfo | undefined {
   const all = listAdapters();
   return all.find((a) => a.adapter.id === id);
+}
+
+/**
+ * Load dynamic adapters from the catalog (entries with factoryModule).
+ * Dynamically imports each factory module and calls its createAdapter() export.
+ * Safe to call multiple times; only loads once.
+ */
+export async function ensureDynamicAdaptersLoaded(config?: Config): Promise<void> {
+  if (dynamicAdaptersLoaded) return;
+  dynamicAdaptersLoaded = true;
+
+  const { loadCatalog, catalogTools } = await import('../config/catalog');
+  const catalog = await loadCatalog(config);
+  const tools: Record<string, ToolConfig> = {};
+  if (config?.tools) {
+    for (const t of config.tools) tools[t.id] = t;
+  }
+
+  for (const entry of catalogTools(catalog)) {
+    if (!entry.factoryModule) continue;
+    try {
+      const mod = await import(entry.factoryModule);
+      const createAdapter = (mod as { createAdapter?: () => AgentAdapter; default?: () => AgentAdapter })
+        .createAdapter ?? (mod as { default: () => AgentAdapter }).default;
+      if (!createAdapter) {
+        process.stderr.write(`air: dynamic adapter ${entry.id}: ${entry.factoryModule} exports no createAdapter\n`);
+        continue;
+      }
+      const adapter = createAdapter();
+      const { adapter: configuredAdapter, metaOverride } = applyConfig(adapter, tools[entry.id]);
+      const meta: AdapterMeta = {
+        verified: false,
+        enabled: true,
+        headlessSupported: false,
+        ...metaOverride,
+      };
+      const executable = configuredAdapter.executable || entry.executable;
+      const available = isOnPath(executable);
+      const install = getInstallStatus(entry.id, executable);
+      DYNAMIC_ADAPTERS.set(entry.id, {
+        adapter: configuredAdapter,
+        meta: { ...meta, enabled: metaOverride.enabled ?? true },
+        available,
+        installed: install.installed,
+        version: install.version,
+        installStatus: install.status,
+        reason: available ? undefined : `executable '${executable}' not found on PATH`,
+      });
+    } catch (err: any) {
+      process.stderr.write(`air: failed to load dynamic adapter ${entry.id} from ${entry.factoryModule}: ${String(err?.message || err)}\n`);
+    }
+  }
+}
+
+/** Return dynamically loaded adapters (empty until ensureDynamicAdaptersLoaded() is called). */
+export function getDynamicAdapters(): AdapterInfo[] {
+  return [...DYNAMIC_ADAPTERS.values()];
 }

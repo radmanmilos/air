@@ -27,6 +27,7 @@ import { getErrorAction, triggersFailover, type ErrorCategory } from '../types/e
 import type { ResultState } from '../types/result';
 import type { TaskInput } from '../types';
 import { autoInstallMissing } from '../installer/installer';
+import { ensureDynamicAdaptersLoaded } from '../adapters/registry';
 
 export interface OrchestratorEvent {
   ts: string;
@@ -150,6 +151,8 @@ export class Orchestrator {
     // Fire-and-forget: does not block the current task; newly installed
     // adapters become available on subsequent routing decisions.
     autoInstallMissing(config).catch(() => { /* best-effort */ });
+    // Load dynamic adapters from catalog factoryModule entries.
+    await ensureDynamicAdaptersLoaded(config);
     const tracker = createHealthTracker();
     await tracker.load();
 

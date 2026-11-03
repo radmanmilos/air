@@ -29,6 +29,10 @@ export interface InstallEntry {
     verify: string;
     version: string;
   };
+  /** Optional: dynamic factory module path. When set, AIR dynamically imports
+   *  this module and calls its createAdapter() export to construct the
+   *  adapter, enabling operators to add adapters without code changes. */
+  factoryModule?: string;
 }
 
 export interface CatalogData {
