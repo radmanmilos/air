@@ -14,7 +14,6 @@
 import { execFile } from 'node:child_process';
 import { StreamingRedactor } from '../security/streaming-redact';
 import type { CommandSpec, ProcessOutcome } from '../types';
-import { utf8Bytes } from '../types/outcome';
 
 // cross-spawn has no published @types package and ships as ESM-only.
 // We import it lazily so the module graph stays compatible with both
@@ -120,44 +119,45 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     }
 
     const pushStdout = (text: string) => {
-      // Keep a prefix-capped capture for full output, plus a rolling tail
-      // for handoff/debugging (R5-10).
+      // Byte-accurate accumulation (UTF-8 safe).
+      const buf = Buffer.from(text, 'utf8');
       if (stdoutBytes < maxBuffer) {
         const remaining = maxBuffer - stdoutBytes;
-        stdout += text.slice(0, remaining);
-        stdoutBytes += utf8Bytes(text.slice(0, remaining));
-        if (utf8Bytes(text) > remaining) stdoutTruncated = true;
+        const sliceBuf = buf.subarray(0, remaining);
+        stdout += sliceBuf.toString('utf8');
+        stdoutBytes += sliceBuf.length;
+        if (buf.length > remaining) stdoutTruncated = true;
       } else {
         stdoutTruncated = true;
       }
-      // Rolling tail (last N bytes).
-      const nextTail = stdoutTail + text;
-      if (utf8Bytes(nextTail) > tailCap) {
-        let out = nextTail;
-        while (utf8Bytes(out) > tailCap) out = out.slice(1);
-        stdoutTail = out;
-      } else {
-        stdoutTail = nextTail;
+      // Rolling tail (last N bytes), UTF-8 boundary safe.
+      stdoutTail += text;
+      const tailBuf = Buffer.from(stdoutTail, 'utf8');
+      if (tailBuf.length > tailCap) {
+        let start = tailBuf.length - tailCap;
+        while (start < tailBuf.length && (tailBuf[start] & 0xc0) === 0x80) start++;
+        stdoutTail = tailBuf.subarray(start).toString('utf8');
       }
       options.onStdout?.(text);
     };
 
     const pushStderr = (text: string) => {
+      const buf = Buffer.from(text, 'utf8');
       if (stderrBytes < maxBuffer) {
         const remaining = maxBuffer - stderrBytes;
-        stderr += text.slice(0, remaining);
-        stderrBytes += utf8Bytes(text.slice(0, remaining));
-        if (utf8Bytes(text) > remaining) stderrTruncated = true;
+        const sliceBuf = buf.subarray(0, remaining);
+        stderr += sliceBuf.toString('utf8');
+        stderrBytes += sliceBuf.length;
+        if (buf.length > remaining) stderrTruncated = true;
       } else {
         stderrTruncated = true;
       }
-      const nextTail = stderrTail + text;
-      if (utf8Bytes(nextTail) > tailCap) {
-        let out = nextTail;
-        while (utf8Bytes(out) > tailCap) out = out.slice(1);
-        stderrTail = out;
-      } else {
-        stderrTail = nextTail;
+      stderrTail += text;
+      const tailBuf = Buffer.from(stderrTail, 'utf8');
+      if (tailBuf.length > tailCap) {
+        let start = tailBuf.length - tailCap;
+        while (start < tailBuf.length && (tailBuf[start] & 0xc0) === 0x80) start++;
+        stderrTail = tailBuf.subarray(start).toString('utf8');
       }
       options.onStderr?.(text);
     };

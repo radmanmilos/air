@@ -67,6 +67,7 @@ export interface SessionHandle {
   runId: string;
   promise: Promise<void>;
   cancel: () => void;
+  result?: string;
 }
 
 /**
@@ -82,7 +83,8 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
   await tracker.load();
 
   const controller = new AbortController();
-  const promise = (async () => {
+  const handle: SessionHandle = { id, runId, promise: null as any, cancel: () => controller.abort(), result: undefined };
+  handle.promise = (async () => {
     const seat = await acquireSeat('agent', maxConcurrentAgents, { timeoutMs: 30_000 });
     if (!seat) {
       await writeTaskState({
@@ -93,13 +95,14 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
         provider: adapter.provider,
         model: adapter.model,
         state: 'FAILED',
-        result: 'FAILED',
+        result: 'FAILED' as any,
         startedAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
         hops: 0,
         maxHops,
         error: { category: 'TIMEOUT', message: 'SEAT_TIMEOUT' },
       });
+      handle.result = 'FAILED';
       return;
     }
     try {
@@ -187,17 +190,13 @@ export async function runSession(config: SessionConfig): Promise<SessionHandle> 
           ? { category, message: outcome.stderr.slice(0, 500) }
           : undefined,
       });
+      handle.result = result;
     } finally {
       await seat.release();
     }
   })();
 
-  return {
-    id,
-    runId,
-    promise,
-    cancel: () => controller.abort(),
-  };
+  return handle;
 }
 
 /**

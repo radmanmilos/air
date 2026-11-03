@@ -15,6 +15,9 @@ export interface AgentAdapter {
   /** Model this adapter is configured to use. */
   model: string;
 
+  /** Executable to spawn (configurable). */
+  executable?: string;
+
   /** Capabilities advertised by this adapter. */
   capabilities: {
     headlessExecution: boolean;

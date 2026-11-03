@@ -28,7 +28,7 @@ export interface ModelEntry {
 }
 
 /** Build the model catalog from the registered adapters. */
-export function buildModelCatalog(adapters: AgentAdapter[], opts: { availableMap?: Map<string, { available: boolean; reason?: string }> } = {}): ModelEntry[] {
+export function buildModelCatalog(adapters: AgentAdapter[], opts: { availableMap?: Map<string, { available: boolean; reason?: string }>; costOverrides?: Record<string, number> } = {}): ModelEntry[] {
   return adapters.map((a) => {
     const av = opts.availableMap?.get(a.id);
     return {
@@ -44,13 +44,17 @@ export function buildModelCatalog(adapters: AgentAdapter[], opts: { availableMap
         read: !!a.capabilities.headlessExecution,
         headless: !!a.capabilities.headlessExecution,
       },
-      costTier: costTierFor(a),
+      costTier: costTierFor(a, opts.costOverrides),
       contextWindow: a.capabilities.contextWindow,
     };
   });
 }
 
-function costTierFor(adapter: AgentAdapter): 0 | 1 | 2 | 3 {
+function costTierFor(adapter: AgentAdapter, overrides?: Record<string, number>): 0 | 1 | 2 | 3 {
+  if (overrides && overrides[adapter.id] !== undefined) {
+    const v = overrides[adapter.id];
+    if (v === 0 || v === 1 || v === 2 || v === 3) return v as 0 | 1 | 2 | 3;
+  }
   // Free tiers first, then cheap, then standard, then premium.
   if (adapter.provider === 'ollama' || adapter.provider === 'lm-studio') return 0;
   if (adapter.provider === 'openrouter' && /free/i.test(adapter.model)) return 0;
@@ -70,8 +74,8 @@ export function bestModelFor(catalog: ModelEntry[], task: { mode: 'ask' | 'auto'
     return true;
   });
   if (eligible.length === 0) return null;
-  // Prefer the cheapest model that can do the task.
-  eligible.sort((a, b) => a.costTier - b.costTier);
+  // Prefer the cheapest model that can do the task; tie-break by larger context window.
+  eligible.sort((a, b) => a.costTier - b.costTier || (b.contextWindow ?? 0) - (a.contextWindow ?? 0));
   return eligible[0];
 }
 

@@ -17,6 +17,7 @@ export class GooseAdapter implements AgentAdapter {
   id = 'goose';
   provider = 'openai';
   model = 'gpt-4o';
+  executable = 'goose';
 
   capabilities = {
     headlessExecution: true,
@@ -36,7 +37,7 @@ export class GooseAdapter implements AgentAdapter {
   buildCommand(task: TaskInput): CommandSpec {
     const args = ['run', '--text', task.prompt];
     return {
-      executable: 'goose',
+      executable: this.executable ?? 'goose',
       args,
       cwd: task.cwd,
     };

@@ -77,6 +77,13 @@ export function resolvePaths(
     }
   }
 
+  if (env.AIR_CONFIG_DIR) {
+    configDir = env.AIR_CONFIG_DIR;
+  }
+  if (env.AIR_CACHE_DIR) {
+    cacheDir = env.AIR_CACHE_DIR;
+  }
+
   return {
     configDir: normalize(configDir),
     cacheDir: normalize(cacheDir),

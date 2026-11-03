@@ -9,7 +9,9 @@
 // the repo path is listed in the global trusted-repos list. CLI-supplied
 // commands are always trusted.
 
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { redact } from '../security/redact';
 
 export interface VerifyResult {
@@ -38,13 +40,16 @@ export function checkVerifyTrust(
   command: string[],
   trustedRepos: string[],
   cwd: string,
-  source: 'cli' | 'repo' = 'cli',
+  source: 'cli' | 'repo',
 ): VerifyTrust {
   if (source === 'cli') {
     return { trusted: true, source: 'cli' };
   }
+  const cwdReal = canonical(cwd);
   for (const trusted of trustedRepos) {
-    if (cwd === trusted || cwd.startsWith(trusted + '/') || cwd.startsWith(trusted + '\\')) {
+    const tReal = canonical(trusted);
+    const rel = relative(tReal, cwdReal);
+    if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
       return { trusted: true, source: 'global' };
     }
   }
@@ -55,21 +60,29 @@ export function checkVerifyTrust(
   };
 }
 
-export function runVerify(command: string[], cwd: string, timeoutMs = 60_000): VerifyResult {
+function canonical(p: string): string {
   try {
-    const stdout = execFileSync(command[0], command.slice(1), {
-      cwd,
-      stdio: ['ignore', 'pipe', 'ignore'],
-      encoding: 'utf8',
-      timeout: timeoutMs,
-    });
-    return { ok: true, code: 0, stdout: redact(stdout), stderr: '', command };
-  } catch (err: any) {
-    const code = err?.status ?? err?.code ?? null;
-    const stdout = redact(err?.stdout?.toString?.() ?? '');
-    const stderr = redact(err?.stderr?.toString?.() ?? '');
-    return { ok: false, code, stdout, stderr, command };
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
   }
+}
+
+export function runVerify(command: string[], cwd: string, timeoutMs = 60_000): VerifyResult {
+  const res = spawnSync(command[0], command.slice(1), {
+    cwd,
+    encoding: 'utf8',
+    timeout: timeoutMs,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const ok = res.status === 0;
+  return {
+    ok,
+    code: res.status ?? null,
+    stdout: redact(res.stdout ?? ''),
+    stderr: redact(res.stderr ?? ''),
+    command,
+  };
 }
 
 export function formatVerifyReport(result: VerifyResult): string {

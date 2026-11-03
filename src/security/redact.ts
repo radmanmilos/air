@@ -9,9 +9,9 @@ const REDACTED = '[REDACTED]';
 
 // Detection copies (non-global) so containsSecret() is deterministic.
 const TOKEN_DETECT = /\b(sk-[A-Za-z0-9]{20,}|sk-or-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})\b/;
-const BEARER_DETECT = /Bearer\s+[A-Za-z0-9._\-]{12,}/;
-const FLAG_DETECT = /(?:--api-key|--apikey|--token|--auth|--key)(?:\s*=\s*|\s+)[^\s"']+/;
-const ENV_DETECT = /[A-Z][A-Z_]*_(?:KEY|TOKEN|SECRET)\s*=\s*(?:[^\s"']+|"[^"]*"|'[^']*')/;
+const BEARER_DETECT = /Bearer\s+[A-Za-z0-9._\-]{12,}/i;
+const FLAG_DETECT = /(?:--api-key|--apikey|--token|--auth|--key)(?:\s*=\s*|\s+)[^\s"']+/i;
+const ENV_DETECT = /[A-Z][A-Z_]*_(?:KEY|TOKEN|SECRET)\s*=\s*(?:[^\s"']+|"[^"]*"|'[^']*')/i;
 
 // Replacement copies (global).
 const TOKEN_RE = /\b(sk-[A-Za-z0-9]{20,}|sk-or-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})\b/g;

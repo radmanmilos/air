@@ -28,23 +28,23 @@ All work in E:\\GitHub\\air. Archive review files when all related tasks are com
 - [x] [R6-04][H-07] trustedRepos global-only (ignore in repo); canonicalize paths (realpath) before compare; checkVerifyTrust requires source; no execFileSync; tree-kill. Tests: repo tries to trust self -> refused.
 - [x] [H-07][I-01] Repo config cannot set global-only keys (failover.mode/allowProviderSwitch, privacy, redaction, permission, tools[].executable, trustedRepos, concurrency, verify) - warn and ignore.
 - [x] [R6-07][R6-08][H-15][G5-07] Redact handoff fully (tracked diff + untracked contents); fix ESM require -> import; preview destination/size before consent; bind approval to payload.
-- [ ] [I-01][H-03] Permissions: wire permission config, adapter enforcement/refusal, read-only not routed to non-enforcing, no broad flags in unverified.
+- [x] [I-01][H-03] Permissions: wire permission config, adapter enforcement/refusal, read-only not routed to non-enforcing, no broad flags in unverified.
 
 ## P1 - High
 ### P1-1 Redaction/streaming/output
-- [ ] [R6-06][H-09] Streaming redactor: case-insensitive prefix/guards, unbounded withheld buffer fixed, UTF-8 string decoding safe, property tests for split boundaries.
-- [ ] [H-10][G5-05] Byte-accurate limits: Buffer-based accumulation, UTF-8 boundary safe, ring buffer tail, truncation flags in state/MCP.
+- [x] [R6-06][H-09] Streaming redactor: case-insensitive prefix/guards, unbounded withheld buffer fixed, UTF-8 string decoding safe, property tests for split boundaries.
+- [x] [H-10][G5-05] Byte-accurate limits: Buffer-based accumulation, UTF-8 boundary safe, ring buffer tail, truncation flags in state/MCP.
 ### P1-2 Deltas/tests/isolation
-- [ ] [H-11][G5-06] Delta detection by content fingerprints; track untracked deletions; pre-existing dirt not counted.
-- [ ] [I-02][F-16][G5-09] Test isolation: AIR_CONFIG_DIR/AIR_CACHE_DIR per test, global setup, guard real cache writes; make tests parallel-safe; real stdio MCP test.
-- [ ] [H-14] Adapter-gate must inject/mock or use fixtures, not rely on host tools.
+- [x] [H-11][G5-06] Delta detection by content fingerprints; track untracked deletions; pre-existing dirt not counted.
+- [x] [I-02][F-16][G5-09] Test isolation: AIR_CONFIG_DIR/AIR_CACHE_DIR per test, global setup, guard real cache writes; make tests parallel-safe; real stdio MCP test.
+- [x] [H-14] Adapter-gate must inject/mock or use fixtures, not rely on host tools.
 ### P1-3 Orchestrator/sessions
-- [ ] [H-13] Extract src/orchestrator/runTask with DI; unify CLI/MCP/sessions.
-- [ ] [H-05][R6-09] Sessions: one worktree per write session or refuse same-cwd writes; route through orchestrator; correct exit codes; guard empty adapters.
-- [ ] [H-03] Adapter construction from config without prototype loss; pass configured model/executable to argv.
+- [x] [H-13] Extract src/orchestrator/runTask with DI; unify CLI/MCP/sessions.
+- [x] [H-05][R6-09] Sessions: one worktree per write session or refuse same-cwd writes; route through orchestrator; correct exit codes; guard empty adapters.
+- [x] [H-03] Adapter construction from config without prototype loss; pass configured model/executable to argv.
 
 ## P2 - Polish
-- [ ] [H-08] Signal handling, process tree kill, CANCELLED state.
-- [ ] [H-12][G5-13] Model recommender scoring improvements, cost overrides.
-- [ ] [I-03][I-04][I-05] Import rewrite robustness/NodeNext, docs accuracy, verify arg parsing.
-- [ ] [G5-10][G5-11][G5-12] Docs polish, seat backoff, MCP restart behavior docs.
+- [x] [H-08] Signal handling, process tree kill, CANCELLED state.
+- [x] [H-12][G5-13] Model recommender scoring improvements, cost overrides.
+- [x] [I-03][I-04][I-05] Import rewrite robustness/NodeNext, docs accuracy, verify arg parsing.
+- [x] [G5-10][G5-11][G5-12] Docs polish, seat backoff, MCP restart behavior docs.

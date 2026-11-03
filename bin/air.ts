@@ -87,6 +87,10 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       await h.promise;
     }
     // Exit code reflects worst session result.
+    const results = handles.map((h: any) => h.result ?? 'FAILED');
+    if (results.includes('CANCELLED')) process.exit(EXIT_CODES.USER_CANCELLED);
+    if (results.includes('FAILED')) process.exit(EXIT_CODES.TASK_FAILURE);
+    if (results.includes('NO_CHANGES')) process.exit(EXIT_CODES.NO_CHANGES);
     process.exit(EXIT_CODES.SUCCESS);
   }
 
@@ -98,6 +102,11 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     mode: options.auto ? 'auto' : 'ask',
     readOnly: !!options.readOnly,
   };
+
+  const controller = new AbortController();
+  const onSig = () => controller.abort();
+  process.on('SIGINT', onSig);
+  process.on('SIGTERM', onSig);
 
   const allow = defaultAllowList(adapters);
   const visited = new Set<string>();
@@ -167,6 +176,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
     const { outcome } = await runProcess(spec, {
       timeoutMs: config.timeouts.defaultMs,
       maxBufferBytes: config.buffers.maxBytes,
+      signal: controller.signal,
       stdoutTailBytes: 2048,
       stderrTailBytes: 2048,
       onStdout: (c: string) => process.stdout.write(c),

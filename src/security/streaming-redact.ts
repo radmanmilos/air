@@ -22,6 +22,7 @@
 import { redact, containsSecret } from '../security/redact';
 
 const OVERLAP = 64; // chars retained from the end of each chunk (>= max token length)
+const MAX_WITHHELD = 4096; // cap to prevent unbounded withheld buffers
 
 // Known token string prefixes. A suffix is a partial token prefix if it is
 // a prefix of one of these, or starts with one of these.
@@ -70,11 +71,19 @@ function findTokenPrefixStart(s: string): number {
 
 export class StreamingRedactor {
   private rawWithheld = '';
+  private decoder = new TextDecoder('utf-8', { fatal: false });
 
   /** Feed one chunk; returns the redacted text safe to emit now. */
   feed(chunk: Buffer | string): string {
-    const text = typeof chunk === 'string' ? chunk : chunk.toString();
+    const text = typeof chunk === 'string' ? chunk : this.decoder.decode(chunk, { stream: true });
     this.rawWithheld += text;
+
+    // Cap withheld buffer to avoid unbounded growth.
+    if (this.rawWithheld.length > MAX_WITHHELD) {
+      const out = redact(this.rawWithheld);
+      this.rawWithheld = '';
+      return out;
+    }
 
     // No secret anywhere: emit everything that cannot be a partial token prefix.
     if (!containsSecret(this.rawWithheld)) {
@@ -109,6 +118,8 @@ export class StreamingRedactor {
 
   /** Finalize: emit the remaining withheld suffix exactly once. */
   flush(): string {
+    const remaining = this.decoder.decode();
+    this.rawWithheld += remaining;
     const tail = redact(this.rawWithheld);
     this.rawWithheld = '';
     return tail;

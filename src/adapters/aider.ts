@@ -17,6 +17,7 @@ export class AiderAdapter implements AgentAdapter {
   id = 'aider';
   provider = 'openrouter';
   model = 'gemma-4-31b-it:free';
+  executable = 'aider';
 
   capabilities = {
     headlessExecution: true,
@@ -54,7 +55,7 @@ export class AiderAdapter implements AgentAdapter {
     }
 
     return {
-      executable: 'aider',
+      executable: this.executable ?? 'aider',
       args,
       cwd: task.cwd,
       env: Object.keys(env).length > 0 ? env : undefined,

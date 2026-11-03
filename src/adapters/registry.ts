@@ -73,10 +73,17 @@ function applyConfig(adapter: AgentAdapter, tool?: ToolConfig): { adapter: Agent
     // buildCommand uses the adapter's own executable. Callers that need a
     // different binary should construct a custom adapter.
   }
-  const nextAdapter =
-    tool.provider || tool.model
-      ? { ...adapter, provider: tool.provider ?? adapter.provider, model: tool.model ?? adapter.model }
-      : adapter;
+  let nextAdapter = adapter;
+  if (tool.provider || tool.model || tool.executable) {
+    // Preserve the prototype (class methods) instead of spreading into a
+    // plain object (H-03).
+    const clone = Object.create(Object.getPrototypeOf(adapter));
+    Object.assign(clone, adapter);
+    if (tool.provider) clone.provider = tool.provider;
+    if (tool.model) clone.model = tool.model;
+    if (tool.executable) clone.executable = tool.executable;
+    nextAdapter = clone;
+  }
   return { adapter: nextAdapter, metaOverride };
 }
 

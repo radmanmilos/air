@@ -18,6 +18,8 @@ export interface GitSnapshot {
   isGitRepo: boolean;
   /** Error message when isGitRepo is false. */
   gitError?: string;
+  /** Content fingerprints (blob hashes) for changed files. */
+  fingerprints?: Record<string, string>;
 }
 
 function git(cwd: string, args: string[]): { ok: boolean; out: string } {
@@ -52,6 +54,11 @@ export function snapshotGit(cwd: string): GitSnapshot {
   const staged = git(cwd, ['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
   const unstaged = git(cwd, ['diff', '--name-only']).out.split('\n').filter(Boolean);
   const untracked = git(cwd, ['ls-files', '--others', '--exclude-standard']).out.split('\n').filter(Boolean);
+  const fingerprints: Record<string, string> = {};
+  for (const f of [...staged, ...unstaged, ...untracked]) {
+    const h = git(cwd, ['hash-object', '--', f]);
+    if (h.ok) fingerprints[f] = h.out;
+  }
   return {
     branch: branchCheck.out || null,
     head: head.out || null,
@@ -60,6 +67,7 @@ export function snapshotGit(cwd: string): GitSnapshot {
     untracked,
     dirty: staged.length > 0 || unstaged.length > 0 || untracked.length > 0,
     isGitRepo: true,
+    fingerprints,
   };
 }
 
@@ -88,14 +96,18 @@ export function snapshotDelta(
   const beforeUnstaged = set(before.unstaged);
   const beforeUntracked = set(before.untracked);
 
-  const staged = after.staged.filter((f) => !beforeStaged.has(f));
-  const unstaged = after.unstaged.filter((f) => !beforeUnstaged.has(f));
-  const untracked = after.untracked.filter((f) => !beforeUntracked.has(f));
+  const beforeFp = before.fingerprints ?? {};
+  const afterFp = after.fingerprints ?? {};
 
-  // Deleted: present before but absent after.
+  const staged = after.staged.filter((f) => !beforeStaged.has(f) || beforeFp[f] !== afterFp[f]);
+  const unstaged = after.unstaged.filter((f) => !beforeUnstaged.has(f) || beforeFp[f] !== afterFp[f]);
+  const untracked = after.untracked.filter((f) => !beforeUntracked.has(f) || beforeFp[f] !== afterFp[f]);
+
+  // Deleted: present before but absent after (tracked or untracked).
   const deleted: string[] = [];
-  for (const f of beforeStaged) if (!set(after.staged).has(f) && !set(after.unstaged).has(f)) deleted.push(f);
-  for (const f of beforeUnstaged) if (!set(after.staged).has(f) && !set(after.unstaged).has(f)) deleted.push(f);
+  for (const f of beforeStaged) if (!after.staged.includes(f) && !after.unstaged.includes(f)) deleted.push(f);
+  for (const f of beforeUnstaged) if (!after.staged.includes(f) && !after.unstaged.includes(f)) deleted.push(f);
+  for (const f of beforeUntracked) if (!after.untracked.includes(f) && !after.staged.includes(f) && !after.unstaged.includes(f)) deleted.push(f);
 
   const dirty = staged.length > 0 || unstaged.length > 0 || untracked.length > 0 || deleted.length > 0;
   const preexisting = before.dirty && !dirty;
