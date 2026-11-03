@@ -3,6 +3,7 @@
 //
 // All operations record results in installs.json (see installer/status.ts).
 
+import { createHash } from 'node:crypto';
 import { writeFileSync, mkdirSync, existsSync, rmSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { runProcess } from '../execution/runner';
@@ -119,15 +120,43 @@ export async function installAdapter(entry: InstallEntry): Promise<InstallRecord
     return getInstallStatus(entry.id, entry.executable);
   }
 
+  const downloadUrl = typeof url === 'string' ? { url } : url;
+
   try {
-    process.stderr.write(`air: downloading ${entry.id} from ${url}\n`);
-    const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+    process.stderr.write(`air: downloading ${entry.id} from ${downloadUrl.url}\n`);
+    const res = await fetch(downloadUrl.url, { signal: AbortSignal.timeout(120_000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const bytes = await res.arrayBuffer();
     const binDir = join(paths.cacheDir, 'bin');
     mkdirSync(binDir, { recursive: true });
     const binPath = join(binDir, entry.executable);
     writeFileSync(binPath, Buffer.from(bytes));
+
+    // Signature verification: if a signatureUrl is provided, download it and
+    // compare the SHA-256 hash of the binary against the expected hash.
+    if (downloadUrl.signatureUrl) {
+      try {
+        const sigRes = await fetch(downloadUrl.signatureUrl, {
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!sigRes.ok) throw new Error(`HTTP ${sigRes.status}`);
+        const expectedHash = (await sigRes.text()).trim();
+        const actualHash = createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+        if (actualHash !== expectedHash) {
+          throw new Error(
+            `signature mismatch: expected ${expectedHash}, got ${actualHash}`,
+          );
+        }
+      } catch (err: any) {
+        // Remove the downloaded binary on signature failure.
+        try { rmSync(binPath, { force: true }); } catch { /* noop */ }
+        const error = `signature verification failed: ${String(err?.message || err)}`;
+        process.stderr.write(`air: install ${entry.id}: ${error}\n`);
+        recordInstall(entry.id, 'failed', { error });
+        return getInstallStatus(entry.id, entry.executable);
+      }
+    }
+
     if (platform !== 'win32') {
       try { chmodSync(binPath, 0o755); } catch { /* best-effort */ }
     }

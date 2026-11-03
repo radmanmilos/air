@@ -25,7 +25,7 @@ export interface InstallEntry {
   install: {
     method: 'package-manager' | 'direct-download';
     commands?: Record<string, string>;
-    urls?: Record<string, Record<string, string>>;
+    urls?: Record<string, Record<string, DownloadUrl>>;
     verify: string;
     version: string;
   };
@@ -33,6 +33,14 @@ export interface InstallEntry {
    *  this module and calls its createAdapter() export to construct the
    *  adapter, enabling operators to add adapters without code changes. */
   factoryModule?: string;
+}
+
+/** Download URL with optional signature file for integrity verification. */
+export interface DownloadUrl {
+  url: string;
+  /** Optional URL to a signature/hash file. If present, AIR downloads it
+   *  and verifies the downloaded binary matches before installing. */
+  signatureUrl?: string;
 }
 
 export interface CatalogData {
