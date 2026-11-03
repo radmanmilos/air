@@ -63,8 +63,7 @@ flowchart LR
 
 ## Known limitations
 
-- All adapters verified where binaries are installed; unverified spikes removed.
-- Verified adapters (aider, goose) require the external CLI to be installed and on PATH; their command syntax and permission flags were smoke-tested locally.
+- Verified adapters require the external CLI to be installed and on PATH; command syntax and permission flags were smoke-tested locally.
 
 ## Quick Start
 
