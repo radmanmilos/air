@@ -4,7 +4,28 @@
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
-## What works today
+## How it works
+
+Work enters through the CLI or MCP, is routed to the best available adapter, executed in isolated sessions, monitored, and compiled into one response.
+
+```mermaid
+flowchart LR
+    U[User / Agent] -->|task| E[Entry: CLI or MCP]
+    E --> O[Orchestrator brain]
+    O --> R[Router: best model/tool]
+    R --> A1[Adapter A]
+    R --> A2[Adapter B]
+    A1 --> M[Monitor: health, cooldowns, seats]
+    A2 --> M
+    M --> C[Compile results + handoff]
+    C --> U
+```
+
+- **Entry**: `air run` or MCP `run_task`
+- **Orchestration**: central orchestrator selects adapters and manages sessions
+- **Distribution**: multiple sessions run in parallel when safe
+- **Monitoring**: health, cooldowns, concurrency seats, process trees
+- **Compilation**: results, deltas, and handoff are merged into one response
 
 - **Routing** - Priority-list candidate selection with exact skip reasons (cooldown_active, capability_mismatch, cannot_handle, tool_not_registered)
 - **Failover with control** - Asks before switching by default, optional auto-switch (`--auto`)
