@@ -592,6 +592,8 @@ program
     for (const e of (raw.events ?? []).slice(-10)) {
       console.log(`  ${e.ts} ${e.type}: ${e.detail}`);
     }
+    console.log('--- Help (type /command) ---');
+    console.log('  /run /status /dashboard /export /models /verify /mcp');
   });
 
 program
@@ -610,6 +612,21 @@ program
     const raw = readFileSync(file, 'utf8');
     writeFileSync(options.out, raw);
     console.log(`Exported orchestrator log to ${options.out}`);
+  });
+
+program
+  .command('commands')
+  .description('List available commands (side-panel help)')
+  .action(() => {
+    console.log('AIR commands:');
+    console.log('  /run <task>        Run a task');
+    console.log('  /status            Show health and cooldowns');
+    console.log('  /dashboard         Show sessions and events');
+    console.log('  /export            Export session log');
+    console.log('  /models            List models');
+    console.log('  /verify <cmd...>   Run verification');
+    console.log('  /mcp               Start MCP server');
+    console.log('Type "/" then a command, or run "air <command>".');
   });
 
 program
