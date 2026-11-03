@@ -1,6 +1,6 @@
 # air
 
-**Status:** Release candidate. 208 tests passing (single-fork; parallel workers race on the shared global health file). CLI + MCP server functional. Build, lint and package dry-run green on CI. All review tasks complete.
+**Status:** Release candidate. 211 tests passing (parallel isolated workers). CLI + MCP server functional. Build, lint and package dry-run green on CI. All review tasks complete.
 
 Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across aider and goose with automatic failover on rate limits.
 
