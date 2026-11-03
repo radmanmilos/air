@@ -538,6 +538,7 @@ program
   .option('--best <task>', 'Recommend the best model for a task')
   .action((options: { best?: string }) => {
     const adapters = availableAdapters();
+    const { isBlockedByAllowlist } = require('../src/router/router');
     const catalog = buildModelCatalog(adapters);
     if (options.best) {
       console.log(formatBestModel(catalog, { mode: 'ask', readOnly: false }));

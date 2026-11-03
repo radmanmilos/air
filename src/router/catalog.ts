@@ -28,22 +28,26 @@ export interface ModelEntry {
 }
 
 /** Build the model catalog from the registered adapters. */
-export function buildModelCatalog(adapters: AgentAdapter[]): ModelEntry[] {
-  return adapters.map((a) => ({
-    id: a.id,
-    provider: a.provider,
-    model: a.model,
-    available: true,
-    capabilities: {
-      code: a.capabilities.headlessExecution,
-      reasoning: a.capabilities.supportsStreaming,
-      write: a.capabilities.headlessExecution,
-      read: a.capabilities.supportsStreaming,
-      headless: a.capabilities.headlessExecution,
-    },
-    costTier: costTierFor(a),
-    contextWindow: a.capabilities.contextWindow,
-  }));
+export function buildModelCatalog(adapters: AgentAdapter[], opts: { availableMap?: Map<string, { available: boolean; reason?: string }> } = {}): ModelEntry[] {
+  return adapters.map((a) => {
+    const av = opts.availableMap?.get(a.id);
+    return {
+      id: a.id,
+      provider: a.provider,
+      model: a.model,
+      available: av?.available ?? true,
+      reason: av?.reason,
+      capabilities: {
+        code: !!a.capabilities.fileEditing || !!a.capabilities.headlessExecution,
+        reasoning: !!a.capabilities.supportsStreaming,
+        write: !!a.capabilities.fileEditing,
+        read: !!a.capabilities.headlessExecution,
+        headless: !!a.capabilities.headlessExecution,
+      },
+      costTier: costTierFor(a),
+      contextWindow: a.capabilities.contextWindow,
+    };
+  });
 }
 
 function costTierFor(adapter: AgentAdapter): 0 | 1 | 2 | 3 {
@@ -56,8 +60,15 @@ function costTierFor(adapter: AgentAdapter): 0 | 1 | 2 | 3 {
 }
 
 /** Filter the catalog to models that can handle a task. */
-export function bestModelFor(catalog: ModelEntry[], _task: { mode: 'ask' | 'auto'; readOnly: boolean }): ModelEntry | null {
-  const eligible = catalog.filter((m) => m.available && m.capabilities.headless);
+export function bestModelFor(catalog: ModelEntry[], task: { mode: 'ask' | 'auto'; readOnly: boolean }): ModelEntry | null {
+  const eligible = catalog.filter((m) => {
+    if (!m.available) return false;
+    if (!m.capabilities.headless) return false;
+    if (task.mode === 'auto' && !m.capabilities.headless) return false;
+    if (!task.readOnly && !m.capabilities.write) return false;
+    if (task.readOnly && !m.capabilities.read && !m.capabilities.headless) return false;
+    return true;
+  });
   if (eligible.length === 0) return null;
   // Prefer the cheapest model that can do the task.
   eligible.sort((a, b) => a.costTier - b.costTier);
