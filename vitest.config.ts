@@ -8,13 +8,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    // Single fork: several test files mutate the same global cache
-    // (health.json, task index, traces) and parallel workers race on
-    // Windows rename(). Serializing keeps the on-disk state consistent.
+    setupFiles: ['tests/setup.ts'],
     pool: 'forks',
     poolOptions: {
       forks: {
-        singleFork: true,
+        singleFork: false,
       },
     },
   },
