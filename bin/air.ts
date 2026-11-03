@@ -70,6 +70,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       mode: (options.auto ? 'auto' : 'ask') as 'ask' | 'auto',
       readOnly: !!options.readOnly,
       files: options.files,
+      maxConcurrentAgents: config.concurrency?.maxConcurrentAgents ?? 1,
     }));
     const handles = await runSessions(sessionConfigs);
     for (const h of handles) {

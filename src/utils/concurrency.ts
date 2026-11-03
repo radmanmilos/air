@@ -44,7 +44,6 @@ async function readSeat(path: string): Promise<{ pid: number; start: number } | 
 async function isSeatStale(path: string): Promise<boolean> {
   const data = await readSeat(path);
   if (!data) return true;
-  if (data.start !== PROCESS_START) return true;
   if (!(await isPidAlive(data.pid))) return true;
   return false;
 }

@@ -87,7 +87,7 @@ export async function acquireLock(
     const existing = await readLock(path);
     let stale = false;
     if (existing) {
-      if (existing.start !== PROCESS_START || !(await isPidAlive(existing.pid))) {
+      if (!(await isPidAlive(existing.pid))) {
         stale = true;
       }
     }
@@ -104,9 +104,9 @@ export async function acquireLock(
           release: async () => {
             try {
               const cur = await readLock(path);
-              if (cur && cur.pid === process.pid && cur.start === PROCESS_START) {
-                await fs.unlink(path);
-              }
+            if (cur && cur.pid === process.pid) {
+              await fs.unlink(path);
+            }
             } catch { /* noop */ }
           },
         };

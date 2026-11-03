@@ -26,6 +26,7 @@ export interface SessionConfig {
   files?: string[];
   maxHops?: number;
   timeoutMs?: number;
+  maxConcurrentAgents?: number;
 }
 
 export interface SessionHandle {
@@ -42,14 +43,14 @@ export interface SessionHandle {
  * runs the adapter's process, and persists task state on completion.
  */
 export async function runSession(config: SessionConfig): Promise<SessionHandle> {
-  const { id, task, cwd, adapter, mode, readOnly, files, maxHops = 3, timeoutMs = 300_000 } = config;
+  const { id, task, cwd, adapter, mode, readOnly, files, maxHops = 3, timeoutMs = 300_000, maxConcurrentAgents = 1 } = config;
   const runId = makeRunId();
   const tracker = createHealthTracker();
   await tracker.load();
 
   const controller = new AbortController();
   const promise = (async () => {
-    await withSeat(id, 1, async () => {
+    await withSeat('agent', maxConcurrentAgents, async () => {
       const beforeSnap = snapshotGit(cwd);
       const taskInput: TaskInput = {
         id: runId,
@@ -157,8 +158,5 @@ export async function runSessions(configs: SessionConfig[]): Promise<SessionHand
   for (const config of configs) {
     handles.push(await runSession(config));
   }
-  // Wait for all sessions to settle; a cancelled session does not abort
-  // the others.
-  await Promise.allSettled(handles.map((h) => h.promise));
   return handles;
 }
