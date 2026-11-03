@@ -84,7 +84,7 @@ npm link
 - `air config --validate` - Validate config against the Zod schema
 - `air config migrate` - Upgrade config to the current schema version
 - `air verify -- <cmd...>` - Run an approved verification command (array args, no shell)
-- `air mcp` - Start MCP server (stdio)
+- `air dashboard` - Show orchestrator sessions, decisions, and events (side-panel style)
 
 ## Exit codes
 
