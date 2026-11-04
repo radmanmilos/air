@@ -361,7 +361,7 @@
   - CLI: `air conversations list/show`; MCP: `get_conversation`.
 - **Acceptance:** persist/reload round-trip; concurrent appends don't corrupt; crash recovery.
 
-### T-022 — Non-blocking `air chat` REPL with follow-ups
+### T-022 [DONE] — Non-blocking `air chat` REPL with follow-ups
 - **Priority:** P1
 - **Review refs:** chatGPT P1-07, P1-11; claude J-06; deepseek SA-02; grok G6-02
 - **Area:** chat UX
@@ -376,7 +376,7 @@
   - `--dev` verbose diagnostics.
 - **Acceptance:** scenario: submit 10s edit job, at t=1s ask unrelated question → answered while job runs; task completion message appears unprompted.
 
-### T-023 — Async result injection into conversation
+### T-023 [DONE] — Async result injection into conversation
 - **Priority:** P1
 - **Review refs:** chatGPT P1-07; deepseek SA-03; grok G6-04, G6-05
 - **Area:** conversation / injection
@@ -391,7 +391,7 @@
   - Summarize via front agent if context allows, else cheap secondary model (SA-08).
 - **Acceptance:** mock task end-to-end → assistant message references what task did without user asking; crash mid-injection recovered.
 
-### T-024 — Front agent model selection and same-provider fallback
+### T-024 [DONE] — Front agent model selection and same-provider fallback
 - **Priority:** P1
 - **Review refs:** deepseek SA-05, SA-11; grok (front agent); chatGPT (supervisor)
 - **Area:** front agent
@@ -539,7 +539,7 @@
   - Cost/free observability: `free` + `estimatedCostUsd` in trace events per spawn; `air chat --stats` / `/stats` showing messages, tasks, tools, all-free-yes/no, estimated cost; aggregate per session/day.
 - **Acceptance:** event cursor polling works; dashboard shows required sections; traces contain skip reasons + cost.
 
-### T-033 — MCP conversation tools
+### T-033 [DONE] — MCP conversation tools
 - **Priority:** P1
 - **Review refs:** deepseek SA-09; grok G6-07; chatGPT (MCP behavior)
 - **Area:** MCP
@@ -588,7 +588,7 @@
 
 ## P1-G. Tests and CI honesty
 
-### T-036 — Built-binary e2e tests (no adapter injection)
+### T-036 [DONE] — Built-binary e2e tests (no adapter injection)
 - **Priority:** P1
 - **Review refs:** chatGPT P1-23, P2-26, P2-27; claude J-01, J-12; deepseek (tests); grok (tests)
 - **Area:** tests / CI
@@ -603,7 +603,7 @@
   - Windows + Linux CI matrix.
 - **Acceptance:** e2e suite green in CI on both platforms.
 
-### T-037 — Concurrency and live-cancellation proof tests
+### T-037 [DONE] — Concurrency and live-cancellation proof tests
 - **Priority:** P1
 - **Review refs:** chatGPT P2-26; claude (tests); deepseek (tests); grok (tests)
 - **Area:** tests
