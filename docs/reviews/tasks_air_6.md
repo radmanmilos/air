@@ -47,7 +47,7 @@
 
 ## P0-A. Security and config trust
 
-### T-001 — Repo config cannot control global-only security keys
+### T-001 [DONE] — Repo config cannot control global-only security keys
 - **Priority:** P0
 - **Review refs:** chatGPT P0-01, P0-06, P1-04, P1-21; claude J-03, J-04; deepseek SA-00 (carryover H-07); grok G6-06
 - **Area:** config / security
@@ -61,7 +61,7 @@
   - `trustedRepos` must be loaded from a user/global-only trust store; reject `trustedRepos` from repo config. Keep config provenance for security-sensitive settings.
 - **Acceptance:** repo probe suite passes; a repo cannot set any global-only key; global values survive an unrelated repo file; malformed YAML surfaces as error.
 
-### T-002 — Remove remote-code-execution chain through catalog
+### T-002 [DONE] — Remove remote-code-execution chain through catalog
 - **Priority:** P0
 - **Review refs:** chatGPT P0-01, P1-24; claude J-03; deepseek (catalog); grok G6-09
 - **Area:** catalog / installer / security
@@ -79,7 +79,7 @@
   - Verify actual binary version against catalog pin after install and before routing.
 - **Acceptance:** tests that repo/remote cannot set executable fields; hash mismatch leaves no file at final path; no install runs without confirmation; `catalog-lint` CI job passes.
 
-### T-003 — Correct catalog package names and add catalog-lint CI
+### T-003 [DONE] — Correct catalog package names and add catalog-lint CI
 - **Priority:** P0
 - **Review refs:** chatGPT P1-23; claude J-02, J-11; deepseek (catalog); grok G6-06, G6-12
 - **Area:** catalog / CI
@@ -109,7 +109,7 @@
 
 ## P0-B. Core runtime (air run / MCP actually works)
 
-### T-005 — Fix adapter registry mismatch breaking `air run` and MCP
+### T-005 [DONE] — Fix adapter registry mismatch breaking `air run` and MCP
 - **Priority:** P0
 - **Review refs:** claude J-01; chatGPT P0-02; deepseek SA-00b; grok (adapters)
 - **Area:** orchestrator / adapters / MCP
@@ -165,7 +165,7 @@
   - Surface `SEAT_TIMEOUT`.
 - **Acceptance:** `maxConcurrentAgents: 2` limits concurrency to 2 across CLI and MCP; 3-session test proves it.
 
-### T-009 — Fix seat pool race (atomic create + grace period)
+### T-009 [DONE] — Fix seat pool race (atomic create + grace period)
 - **Priority:** P0
 - **Review refs:** chatGPT P1-18; claude J-08; deepseek (locks); grok G6-11
 - **Area:** concurrency / locks
@@ -180,7 +180,7 @@
   - Update stale comments to match PID-alive policy.
 - **Acceptance:** 4 processes x 20 increments = 80; cap holds under 20 concurrent submissions; genuine independent-process race tests pass.
 
-### T-010 — Cross-process lock ownership token + additive counters
+### T-010 [DONE] — Cross-process lock ownership token + additive counters
 - **Priority:** P0
 - **Review refs:** chatGPT P1-18; claude (locks); deepseek (health); grok G6-11
 - **Area:** locks / health
@@ -193,7 +193,7 @@
 
 ## P0-D. Redaction and output safety
 
-### T-011 — Fix redaction coverage and streaming stall
+### T-011 [DONE] — Fix redaction coverage and streaming stall
 - **Priority:** P0
 - **Review refs:** chatGPT P1-09, P1-20; claude J-09; deepseek (redaction); grok (safety)
 - **Area:** security / redaction
@@ -208,7 +208,7 @@
   - Redaction idempotent and deterministic; `allow` option protects allowlisted values.
 - **Acceptance:** property tests for all token families, lower/mixed-case bearer schemes, flags, env vars, MAX_WITHHELD overflow, tokens split at every chunk boundary; no supported secret appears in streams/logs/handoffs/MCP/final responses.
 
-### T-012 — Byte caps must be code-point-safe
+### T-012 [DONE] — Byte caps must be code-point-safe
 - **Priority:** P0
 - **Review refs:** chatGPT P1-19; claude J-13 (minor); deepseek (runner); grok (runner)
 - **Area:** execution / runner
@@ -223,7 +223,7 @@
 
 ## P0-E. Free/cost honesty and adapter verification
 
-### T-013 — Fix cross-provider failover (allow-provider wiring)
+### T-013 [DONE] — Fix cross-provider failover (allow-provider wiring)
 - **Priority:** P0
 - **Review refs:** chatGPT P0-05; claude J-07; deepseek (routing); grok (routing)
 - **Area:** router / failover / CLI / MCP
@@ -237,7 +237,7 @@
   - Add built-binary e2e: fake aider rate limit → fake goose succeeds.
 - **Acceptance:** cross-provider failover e2e passes; USER_CANCELLED never triggers failover; auth/permission failures do not retry broken credentials.
 
-### T-014 — Model recommender must respect task requirements and use bestModel
+### T-014 [DONE] — Model recommender must respect task requirements and use bestModel
 - **Priority:** P0
 - **Review refs:** chatGPT P1-09; claude (H-12); deepseek SA-00c; grok (routing)
 - **Area:** router
@@ -252,7 +252,7 @@
   - Cost tier must be explicit catalog data, not regex (`/mini/`).
 - **Acceptance:** read-only/write/ask/auto cases each have passing tests; `--explain` shows inputs.
 
-### T-015 — Make "verified adapters" claims accurate in CI
+### T-015 [DONE] — Make "verified adapters" claims accurate in CI
 - **Priority:** P0
 - **Review refs:** chatGPT P1-23; claude J-12, J-11; deepseek (adapters); grok G6-06
 - **Area:** adapters / CI / docs
@@ -266,7 +266,7 @@
   - README single source of truth matching registry META; remove contradictory statements.
 - **Acceptance:** CI runs real-binary smoke for all routed adapters; README/PLAN consistent.
 
-### T-016 — Free-first ranking as enforceable policy (catalog cost/auth/limits)
+### T-016 [DONE] — Free-first ranking as enforceable policy (catalog cost/auth/limits)
 - **Priority:** P0
 - **Review refs:** chatGPT P1-16; claude J-11, J-03; deepseek SA-04; grok G6-03, G6-12
 - **Area:** catalog / router / free policy
@@ -313,7 +313,7 @@
   - Record worker PIDs; manage process groups; release leases/slots safely.
 - **Acceptance:** kill daemon mid-job, restart → state recovered, no orphan processes; tests pass.
 
-### T-019 — Task-level baseline across whole work item (not per hop)
+### T-019 [DONE] — Task-level baseline across whole work item (not per hop)
 - **Priority:** P0
 - **Review refs:** chatGPT P1-15; claude (delta); deepseek (delta); grok (delta)
 - **Area:** orchestrator / context / git
@@ -326,7 +326,7 @@
   - Content fingerprints (`git hash-object`) before/after; track untracked deletions; pre-existing dirt not counted.
 - **Acceptance:** failover A→B where A made changes → final delta not empty; commit case handled.
 
-### T-020 — Handoff diff redaction and scope
+### T-020 [DONE] — Handoff diff redaction and scope
 - **Priority:** P0
 - **Review refs:** chatGPT P0-06 (handoff), P1-20; claude J-09; deepseek (redaction); grok (handoff)
 - **Area:** context / redaction
@@ -346,7 +346,7 @@
 
 ## P1-A. Conversation and front agent (new layer)
 
-### T-021 — Introduce persistent ConversationSession store
+### T-021 [DONE] — Introduce persistent ConversationSession store
 - **Priority:** P1
 - **Review refs:** chatGPT P1-07; claude J-06; deepseek SA-01; grok G6-01
 - **Area:** conversation
@@ -640,7 +640,7 @@
   - Adapter docs with confirmed flags/versions.
 - **Acceptance:** docs consistent with registry/CI; help test passes.
 
-### T-039 — Hygiene: imports, test hooks, spawnSync, Node engine
+### T-039 [DONE] — Hygiene: imports, test hooks, spawnSync, Node engine
 - **Priority:** P2
 - **Review refs:** chatGPT P2-29; claude J-13; deepseek (hygiene); grok (hygiene)
 - **Area:** tooling / hygiene
