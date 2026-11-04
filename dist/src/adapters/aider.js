@@ -28,6 +28,8 @@ export class AiderAdapter {
     }
     buildCommand(task) {
         const args = [];
+        const modelToUse = task.preferredModel ?? this.model ?? 'gemma-4-31b-it:free';
+        args.push('--model', modelToUse);
         if (task.files && task.files.length > 0) {
             for (const f of task.files)
                 args.push(f);
@@ -39,9 +41,6 @@ export class AiderAdapter {
         args.push('--no-stream');
         args.push('--exit');
         const env = {};
-        if (task.preferredModel) {
-            args.push('--model', task.preferredModel);
-        }
         if (process.env.OPENROUTER_API_KEY) {
             env.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
         }
