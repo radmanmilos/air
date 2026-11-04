@@ -31,6 +31,10 @@ export function decide(message: string, _conv: Conversation): any[] {
   // Pure Q&A / explain / research with no workspace need.
   const isQuestion = /\?\s*$/.test(trimmed) || /^(what|how|why|explain|describe|tell)\b/.test(lower);
   const wantsCodeWork = /\b(fix|edit|modify|refactor|implement|add|create|change|write|bug|test)\b/.test(lower);
+  const wantsRepo = /\b(repo|repository|codebase|files|project|directory)\b/.test(lower);
+  if (isQuestion && wantsRepo && !wantsCodeWork) {
+    return [{ type: 'spawn_job', goal: trimmed, hints: { requiresWrite: false, requiresCode: true } }];
+  }
   if (isQuestion && !wantsCodeWork) {
     return [{ type: 'answer', text: '' }]; // placeholder; caller fills
   }

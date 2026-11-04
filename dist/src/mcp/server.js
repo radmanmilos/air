@@ -552,7 +552,7 @@ export async function startMcp(transport) {
                 const enriched = contextParts.join('\n');
                 const plan = planFromRequest(enriched, a.hints ?? {});
                 const item = plan.workItems[0];
-                const session = await orch.start(item.objective, process.cwd(), { mode: 'auto', freeOnly: conv.userPreferences.freeOnly });
+                const session = await orch.start(item.objective, process.cwd(), { mode: 'auto', freeOnly: conv.userPreferences.freeOnly, readOnly: a.hints?.requiresWrite === false });
                 conv.activeWorkIds.push(session.runId);
                 saveConversation(conv);
                 replies.push(`Started job ${session.runId}.`);

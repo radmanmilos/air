@@ -647,7 +647,8 @@ program
 
     const waiters = new Map<string, Promise<void>>();
 
-    async function runJob(task: string, _workId?: string): Promise<void> {
+    async function runJob(task: string, _workId?: string, hints?: { requiresWrite?: boolean; requiresCode?: boolean }): Promise<void> {
+      const requiresWrite = hints?.requiresWrite !== false;
       // Build worker prompt from conversation context (T7-009).
       const contextParts = [task];
       if (conv!.summary) contextParts.push(`Context summary: ${conv!.summary}`);
@@ -655,9 +656,9 @@ program
       const enriched = contextParts.join('\n');
       const { Orchestrator } = await import('../src/orchestrator/orchestrator');
       const orch = new (Orchestrator as any)({ config, mcpMode: false });
-      const plan = planFromRequest(enriched, { requiresWrite: true, requiresCode: true });
+      const plan = planFromRequest(enriched, { requiresWrite, requiresCode: hints?.requiresCode !== false });
       const item = plan.workItems[0];
-      const session = await orch.start(item.objective, cwd, { mode: 'ask', freeOnly: conv!.userPreferences.freeOnly });
+      const session = await orch.start(item.objective, cwd, { mode: 'ask', readOnly: !requiresWrite, freeOnly: conv!.userPreferences.freeOnly });
       await appendMessage(conv!.id, { role: 'assistant', content: `Started job ${session.runId}.` });
       console.log(chalk.green(`Started job ${session.runId}`));
       conv!.activeWorkIds.push(session.runId);
@@ -739,7 +740,7 @@ program
       const actions = decide(trimmed, conv!);
       for (const a of actions) {
         if (a.type === 'spawn_job') {
-          void runJob(a.goal, undefined);
+          void runJob(a.goal, undefined, a.hints);
         } else if (a.type === 'answer') {
           await appendMessage(conv!.id, { role: 'assistant', content: 'Acknowledged.' });
           console.log(chalk.gray('air: acknowledged'));
