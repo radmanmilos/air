@@ -2,7 +2,7 @@
 
 Preferred (materializes fully, works on Windows):
 
-```
+```bash
 npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
 ```
 
@@ -13,7 +13,7 @@ Or run the bootstrap script:
 
 Note: `npm install -g github:radmanmilos/air` often leaves a dangling symlink on Windows. If `air` is not found after install, run:
 
-```
+```bash
 npm uninstall -g air
 npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
 ``` — Unified AI Tool Orchestrator
