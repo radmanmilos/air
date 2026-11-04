@@ -29,7 +29,8 @@ export class AiderAdapter {
     buildCommand(task) {
         const args = [];
         const modelToUse = task.preferredModel ?? this.model ?? 'gemma-4-31b-it:free';
-        args.push('--model', modelToUse);
+        const prefixed = modelToUse.includes('/') ? modelToUse : `openrouter/${modelToUse}`;
+        args.push('--model', prefixed);
         if (task.files && task.files.length > 0) {
             for (const f of task.files)
                 args.push(f);
