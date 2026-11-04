@@ -16,7 +16,7 @@ Note: `npm install -g github:radmanmilos/air` often leaves a dangling symlink on
 ```bash
 npm uninstall -g air
 npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
-``` — Unified AI Tool Orchestrator
+# air — Unified AI Tool Orchestrator
 
 *AIR is free and so are we.*
 
