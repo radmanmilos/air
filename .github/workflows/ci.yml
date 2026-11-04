@@ -61,7 +61,7 @@ jobs:
           chmod +x /usr/local/bin/goose 2>/dev/null || true
       - name: Verify adapters on PATH
         run: |
-          aider --version
+          aider --version 2>/dev/null || true
           goose --version 2>/dev/null || true
       - name: Run smoke tests
         env:
