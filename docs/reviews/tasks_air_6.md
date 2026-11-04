@@ -490,7 +490,7 @@
 
 ## P1-D. Workspace isolation and results
 
-### T-030 — Real git worktree isolation per write job
+### T-030 [DONE] — Real git worktree isolation per write job
 - **Priority:** P1
 - **Review refs:** chatGPT P1-13; claude (isolation); deepseek (isolation); grok (isolation)
 - **Area:** workspace / isolation
