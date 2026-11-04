@@ -15,7 +15,7 @@ export default [
     plugins: { '@typescript-eslint': tseslint },
     rules: {
       'no-console': ['error', { allow: ['error', 'warn', 'info', 'debug', 'trace'] }],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
