@@ -6,7 +6,7 @@
 //
 // The full failover loop lives here so CLI and MCP share one execution path.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { paths } from '../config/paths';
 import { loadConfig } from '../config/loader';
@@ -85,7 +85,17 @@ export class Orchestrator {
     try {
       if (existsSync(this.logFile)) {
         const raw = JSON.parse(readFileSync(this.logFile, 'utf8'));
-        for (const s of raw.sessions ?? []) this.sessions.set(s.runId, s);
+        for (const s of raw.sessions ?? []) {
+          const sess = s as OrchestratorSession;
+          // Crash recovery (T-018): a run persisted as RUNNING but the process
+          // is gone -> mark interrupted, do not auto-restart.
+          if (sess.state === 'RUNNING') {
+            sess.state = 'FAILED';
+            (sess as any).interrupted = true;
+            sess.endedAt = sess.endedAt ?? new Date().toISOString();
+          }
+          this.sessions.set(sess.runId, sess);
+        }
         this.events = raw.events ?? [];
       }
     } catch { /* ignore corrupt log */ }
@@ -93,7 +103,9 @@ export class Orchestrator {
 
   private persist(): void {
     try {
-      writeFileSync(this.logFile, JSON.stringify({ sessions: [...this.sessions.values()], events: this.events }, null, 2));
+      const tmp = this.logFile + '.tmp';
+      writeFileSync(tmp, JSON.stringify({ sessions: [...this.sessions.values()], events: this.events }, null, 2));
+      try { renameSync(tmp, this.logFile); } catch { writeFileSync(this.logFile, JSON.stringify({ sessions: [...this.sessions.values()], events: this.events }, null, 2)); }
     } catch { /* best-effort */ }
   }
 
