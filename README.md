@@ -1,35 +1,21 @@
-# air
+# air — Unified AI Tool Orchestrator
 
-*AIR is free and so are we*
+*AIR is free and so are we.*
 
-**Status:** Release candidate. 217 tests passing (parallel isolated workers). CLI + MCP server functional. Build, lint and package dry-run green on CI. All review tasks complete. Phase 0 (Orchestrator wiring) and Phase 1 (Free AI Adapter Catalog) complete.
+**Status:** Release candidate. 234 tests passing (parallel isolated workers). CLI + MCP server functional. Build, lint and package dry-run green. All review tasks complete.
 
-Unified AI tool orchestrator with smart routing and failover. One CLI + MCP server to route tasks across adapter types (aider, goose verified by default; opencode, kilocode, codex, github-copilot visible but unverified) with automatic failover on rate limits.
+AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
 
-## VS Code setup
+## Purpose and benefit
 
-1. Install AIR globally: `npm install -g air` (or use `npx air`).
-2. Ensure at least one adapter CLI is installed and on PATH (aider, goose, opencode, kilocode, codex, or gh).
-3. Add AIR as an MCP server in VS Code settings:
+- **One agent feel:** You talk to AIR. It owns the conversation, plan, execution, monitoring and evidence; background tools are interchangeable hands, not the face of AIR.
+- **Free-first by policy:** Local and verified free models are preferred; paid fallback requires explicit consent; unknown cost is never treated as free.
+- **Non-blocking:** Submit work, keep talking. Follow-ups arrive while jobs run; results are compiled into one coherent reply.
+- **Safe:** Dirty-tree refusal by default, provider allow-list, hop cap, revisit prevention, redaction of secrets in all output/logs/handoffs.
+- **Evidence over claims:** Success is computed from the actual workspace delta (`git status`/`git diff`) and verification output, never from a model saying "done".
+- **Cross-platform:** Windows, macOS, Linux. Self-contained: all config, model lists and data live inside `air/`.
 
-```json
-{
-  "mcp": {
-    "servers": {
-      "air": {
-        "command": "air",
-        "args": ["mcp"]
-      }
-    }
-  }
-}
-```
-
-4. Open the integrated terminal and run `air dashboard` or `air commands` to see sessions, decisions, and available commands.
-
-The orchestrator persists sessions under the cache dir, so work survives restarts.
-
-Work enters through the CLI or MCP, is routed to the best available adapter, executed in isolated sessions, monitored, and compiled into one response.
+## Architecture
 
 ```mermaid
 flowchart LR
@@ -44,31 +30,24 @@ flowchart LR
     C --> U
 ```
 
-- **Entry**: `air run` or MCP `run_task`
-- **Orchestration**: central orchestrator selects adapters and manages sessions
-- **Distribution**: multiple sessions run in parallel when safe
-- **Monitoring**: health, cooldowns, concurrency seats, process trees
-- **Compilation**: results, deltas, and handoff are merged into one response
+Components:
+- **CLI (`air`)** — `bin/air.ts` with commands: run, status/health, route-test, config, mcp, adapters, chat, resume, verify, dashboard, commands, models.
+- **Config** — Zod schema is single source of truth, versioned (`version: 1`); `air config migrate` upgrades. Platform-appropriate global config + optional repo `.airrc.yaml` (untrusted). Precedence: CLI > env > repo > global > defaults.
+- **Router** — Priority list with free-first cost sorting, cooldowns keyed by (provider, model), exact skip reasons.
+- **Adapters** — Per-tool connectors implementing `AgentAdapter` (id, provider, model, capabilities, canHandle, buildCommand, parseOutput, classifyError). Conformance suite gates registration. Test-only mock adapter under `src/adapters/mock.ts`.
+- **Context packer / handoff** — Builds handoff from git state only (never model prose), redacts secrets.
+- **Health tracker** — Keyed by (provider, model), persisted atomically with cooldowns and free-tier usage.
+- **MCP server** — Async jobs, stdio, no prompting on stdio; approval is a task-state transition.
+- **Execution** — Shared process runner with cross-spawn, timeouts, tree kill, code-point-safe byte caps, streaming redaction.
+- **Security** — Redaction choke point (`src/security/redact.ts`), provider allow-list, verify trust gate, global-only config keys.
+- **Observability** — Structured JSONL traces; `air status --json`; `air route-test --explain`; `air dashboard`.
+- **Concurrency** — Per-config-dir lock/semaphore; `maxConcurrentAgents` (default 1); atomic health/cooldown writes; real git worktrees for write jobs.
+- **Conversation** — Persistent `ConversationSession` store (`src/conversation/`) with neutral message format; `air chat` REPL; MCP `chat_send`/`get_conversation`.
+- **Planner / result compiler** — Lightweight task decomposition and coherent reply compilation (`src/planner`, `src/result-compiler`).
+- **Permissions** — Shared permission policy (`src/permissions`) applied before worker invocation.
+- **Workspace** — Real git worktree isolation per write job (`src/workspace`).
 
-- **Routing** - Priority-list candidate selection with exact skip reasons (cooldown_active, capability_mismatch, cannot_handle, tool_not_registered)
-- **Failover with control** - Asks before switching by default, optional auto-switch (`--auto`)
-- **Stream + buffer** - Live output while parsing for rate limits; bounded rolling buffer with truncation metadata
-- **Context handoff** - Builds handoff from git state (never model summary); redacts secrets
-- **MCP server** - Expose routing to other agents via stdio JSON-RPC. `run_task` runs jobs in the background; `get_task_status`, `get_task_output`, `approve_failover`, `cancel_task`, `get_status`, `resume_task`, `list_adapters`, `install_adapter`, `upgrade_adapter`, `uninstall_adapter` poll and drive the same run.
-- **Safety** - Dirty-tree refusal by default (`--allow-dirty` opt-in); provider allow-list; hop cap; revisit prevention
-- **Success detection** - Uses actual workspace delta (git status/diff), not stdout length
-- **Process facts** - Timeout, cancellation, and spawn errors take precedence over stderr matching
-- **Streaming redaction** - Secrets redacted per-chunk with overlap to catch split tokens
-- **Model catalog** - Lists every adapter's provider/model, capabilities, cost tier, and context window; `air models --best <task>` recommends the cheapest eligible model
-- **Multi-session parallel** - Runs multiple tasks concurrently, each on its own model, with independent job state and concurrency seats
-- **Inter-process coordination** - Lock files with stale-lock recovery; health flush and task-index append are concurrency-safe
-
-## Known limitations
-
-- Only aider and goose are CI-smoke-test verified and eligible for routing; opencode, kilocode, codex, and github-copilot are unverified spikes visible in `air status` but never routed.
-- Verified adapters require the external CLI to be installed and on PATH; headless flags were confirmed against locally installed binaries for aider and goose only.
-
-## Quick Start
+## Quick start
 
 ```bash
 npm ci
@@ -84,20 +63,18 @@ npm link
 
 ## Commands
 
-- `air run "<task>"` - Route and run task (`-f, --files`, `--auto`, `--allow-dirty`, `--read-only`)
-- `air resume <runId> [task]` - Resume a previous session with optional new task
-- `air status` / `air health` - Show tools, providers, models, and active cooldowns (health is a true alias; `--json`)
-- `air adapters list` - List installable free AI adapters with install status
-- `air adapters install <id>` - Install a free AI adapter
-- `air adapters upgrade <id>` - Upgrade an adapter to the catalog version
-- `air adapters uninstall <id>` - Uninstall an adapter
-- `air adapters status <id>` - Detailed install status for one adapter
+- `air run "<task>"` - Route and run task (`-f, --files`, `--auto`, `--allow-dirty`, `--read-only`, `--allow-provider`)
+- `air resume <runId> [task]` - Resume a previous session with handoff context
+- `air status` / `air health` - Show tools, providers, models, cooldowns, install status (`--json`)
+- `air adapters list|install|upgrade|uninstall|status` - Manage free AI adapters from the catalog
 - `air route-test "<task>" --explain` - Test routing without executing (`--json`)
-- `air config --validate` - Validate config against the Zod schema
-- `air config migrate` - Upgrade config to the current schema version
+- `air config --validate` / `air config migrate` - Validate/migrate config
 - `air verify -- <cmd...>` - Run an approved verification command (array args, no shell)
-- `air dashboard` - Show orchestrator sessions, decisions, and events (side-panel style)
-- `air commands` - List available commands (slash-style help)
+- `air dashboard` - Show orchestrator sessions, decisions, events, connected adapters
+- `air commands` - List available commands
+- `air models` - List adapters with provider/model and allow-list status
+- `air chat` - Interactive non-blocking conversation (`--resume <id>`, `--free-only`, `--allow-paid`)
+- `air mcp` - Start MCP server over stdio
 - `--dev` - Developer mode with verbose diagnostics
 
 ## Exit codes
@@ -114,8 +91,7 @@ npm link
 
 ## Configuration
 
-Configuration lives in a platform-appropriate directory, resolved by a single
-central path module:
+Configuration lives in a platform-appropriate directory, resolved by a single central path module:
 
 | Platform | Config | Cache/State |
 |---|---|---|
@@ -123,58 +99,36 @@ central path module:
 | macOS | `~/Library/Application Support/air` | `~/Library/Caches/air` |
 | Windows | `%APPDATA%/air` | `%LOCALAPPDATA%/air` |
 
-Global config: platform config directory / `config.yaml`  
-Repo config: `.airrc.yaml` (untrusted by default; validation required)  
+Global config: platform config directory / `config.yaml`
+Repo config: `.airrc.yaml` (untrusted by default; validation required)
 Cache: platform cache directory / `air/`
 
 Precedence: CLI > env > repo `.airrc.yaml` > global > defaults.
-
-## Development
-
-```bash
-npm run typecheck      # app typecheck
-npm run typecheck:test # test typecheck
-npm test               # vitest
-npm run build          # tsc
-npm run lint           # eslint
-npm run dev            # tsx bin/air.ts
-```
+Repo config cannot set global-only keys (failover, permission, redaction, trustedRepos, tools, concurrency, verify, catalog, timeouts, buffers, logging).
 
 ## Adapters
 
-### Verified
+### Verified (CI-smoke-tested and eligible for routing)
 
-| Adapter | Executable | Headless | Verified |
-|---|---|---|---|
-| aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
-| goose | `goose` | `goose run --text` | 1.57.0 |
-| opencode | `opencode` | `run <prompt> --auto` | 2.2.5 |
-| kilocode | `kilocode` | `run <prompt> --auto` | 7.5.16 |
-| codex | `codex` | `exec --skip-git-repo-check <prompt>` | 0.166.0 |
-| github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | 2.102.0 |
+| Adapter | Executable | Headless | Verified | Version |
+|---|---|---|---|---|
+| aider | `aider` | `--message`, `--yes-always`, `--exit` | yes | 0.86.2 |
+| goose | `goose` | `goose run --text` | yes | 1.57.0 |
 
-Only aider and goose are CI-smoke-test verified and eligible for routing. opencode, kilocode, codex, and github-copilot are unverified spikes visible in `air status` but never routed.
+### Unverified spikes (visible in `air status`, never routed)
 
-Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code. opencode, kilocode, codex, and github-copilot are UNVERIFIED spikes — see `docs/adapters/catalog.md` and confirm flags against the installed binaries before relying on them. They are visible in `air status` but are never selected by normal routing.
+| Adapter | Executable | Version (claimed) |
+|---|---|---|
+| opencode | `opencode` | 2.2.5 |
+| kilocode | `kilocode` | 7.5.16 |
+| codex | `codex` | 0.166.0 |
+| github-copilot | `gh` | 2.102.0 |
+
+Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code. Unverified adapters require confirmation of headless flags before they become eligible.
 
 ## Free AI Adapter Catalog
 
-AIR bundles a catalog of free, no-login, no-license AI tools that can be installed in the background through `air adapters install <id>`. The catalog lives in `config/catalog.json` and can be overridden via the `catalog.remoteUrl` config setting.
-
-Catalog entries declare an install method (`package-manager` or `direct-download`) with per-platform commands/URLs, a verify command, and a version pin. Install status (installed, version, install status) is persisted in the cache dir and shown in `air status` and `air adapters list`.
-
-### Adapter verification
-
-Only adapters confirmed via CI smoke tests are marked verified and eligible for routing:
-
-| Adapter | Verified | Version |
-|---|---|---|
-| aider | yes | 0.86.2 |
-| goose | yes | 1.57.0 |
-| opencode | no | unverified |
-| kilocode | no | unverified |
-| codex | no | unverified |
-| github-copilot | no | unverified |
+AIR bundles a catalog of free AI tools installable in the background through `air adapters install <id>`. Catalog lives in `config/catalog.json` and can be overridden via `catalog.remoteUrl` (HTTPS only, metadata-only merge). Install status persisted in cache dir and shown in `air status` and `air adapters list`.
 
 ## Development
 
@@ -186,3 +140,11 @@ npm run build          # tsc
 npm run lint           # eslint
 npm run dev            # tsx bin/air.ts
 ```
+
+## Known limitations
+
+- Only aider and goose are CI-smoke-test verified and eligible for routing.
+- Verified adapters require the external CLI installed and on PATH.
+- Cross-provider front-agent fallback is not implemented in MVP (same-provider fallback only).
+- Daemon/IPC mode is not yet implemented; state is file-based with atomic writes and crash recovery.
+- Web UI not included; CLI + MCP only.
