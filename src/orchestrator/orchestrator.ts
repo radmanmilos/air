@@ -6,9 +6,10 @@
 //
 // The full failover loop lives here so CLI and MCP share one execution path.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { lockedReadModifyWrite } from '../utils/lock';
 import { paths } from '../config/paths';
 import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
@@ -111,9 +112,20 @@ export class Orchestrator {
 
   private persist(): void {
     try {
-      const tmp = this.logFile + '.tmp';
-      writeFileSync(tmp, JSON.stringify({ sessions: [...this.sessions.values()], events: this.events }, null, 2));
-      try { renameSync(tmp, this.logFile); } catch { writeFileSync(this.logFile, JSON.stringify({ sessions: [...this.sessions.values()], events: this.events }, null, 2)); }
+      void lockedReadModifyWrite<any>(
+        'orchestrator',
+        this.logFile,
+        async (current: any) => {
+          const base = current ?? { sessions: [], events: [] };
+          const byId = new Map<string, any>((base.sessions ?? []).map((s: any) => [s.runId, s]));
+          for (const s of this.sessions.values()) byId.set(s.runId, s);
+          const mergedEvents = [...(base.events ?? [])];
+          for (const e of this.events) {
+            if (!mergedEvents.some((x: any) => x.id === e.id)) mergedEvents.push(e);
+          }
+          return { sessions: [...byId.values()], events: mergedEvents };
+        },
+      );
     } catch { /* best-effort */ }
   }
 
@@ -177,6 +189,11 @@ export class Orchestrator {
     const { config } = await loadConfig({ cwd });
     const tracker = createHealthTracker();
     await tracker.load();
+
+    const { fromConfig, enforce } = await import('../permissions');
+    const policy = fromConfig(config);
+    const permCheck = enforce(policy, { write: !readOnly, shell: false, network: false });
+    if (!permCheck.ok) throw new Error(`Permission denied: ${permCheck.reason}`);
 
     const adaptersRaw = this.deps.adapters ?? availableAdapters(config);
     let adapters = adaptersRaw;

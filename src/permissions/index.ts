@@ -26,13 +26,22 @@ export const DEFAULT_POLICY: PermissionPolicy = {
 };
 
 export function fromConfig(cfg: any): PermissionPolicy {
-  const p = cfg?.permission ?? {};
-  const mode = (p.mode === 'edit' || p.mode === 'edit_and_shell') ? p.mode : 'read_only';
+  const p = cfg?.permission;
+  if (!p) return { ...DEFAULT_POLICY };
+  const cfgMode = p.mode ?? 'ask';
+  const mode: PermissionMode =
+    cfgMode === 'deny' ? 'read_only' :
+    cfgMode === 'edit_and_shell' ? 'edit_and_shell' :
+    cfgMode === 'edit' ? 'edit' :
+    cfgMode === 'ask' || cfgMode === 'auto' ? 'edit' : 'read_only';
+  // Shell only if explicitly allowed.
+  const allowShell = !!p.allowShell;
+  const finalMode: PermissionMode = allowShell ? 'edit_and_shell' : mode;
   return {
-    mode,
+    mode: finalMode,
     broadApproval: !!p.broadApproval,
     autoCommit: !!p.autoCommit,
-    allowShell: !!p.allowShell || mode === 'edit_and_shell',
+    allowShell,
     allowedPaths: p.allowedPaths,
     allowNetwork: !!p.allowNetwork,
     allowInstall: !!p.allowInstall,

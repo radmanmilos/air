@@ -61,7 +61,7 @@ function fullConfig(overrides: Partial<Config> = {}): Config {
     version: 1,
     tools: [],
     failover: { mode: 'ask', maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false },
-    permission: { mode: 'ask', broadApproval: false, autoCommit: false, allowShell: false },
+    permission: { mode: 'ask', broadApproval: false, autoCommit: false, allowShell: false, allowNetwork: false, allowInstall: false },
     verify: { enabled: false },
     redaction: { enabled: true },
     concurrency: { maxConcurrentAgents: 1 },

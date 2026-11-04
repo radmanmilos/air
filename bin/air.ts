@@ -57,34 +57,30 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
   // Multi-session parallel execution: each session runs on its own model.
   if (options.sessions && options.sessions.length > 0) {
-    const adapters = await listAdapters(config);
-    if (adapters.length === 0) {
-      console.log(chalk.red('No adapters available.'));
-      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
-    }
-    const { runSessions } = await import('../src/execution/sessions');
-    const sessionConfigs = options.sessions.map((prompt, i) => ({
-      id: `s${i + 1}`,
-      task: prompt,
-      cwd,
-      adapter: adapters[i % adapters.length],
-      mode: (options.auto ? 'auto' : 'ask') as 'ask' | 'auto',
-      readOnly: !!options.readOnly,
-      files: options.files,
-      maxConcurrentAgents: config.concurrency?.maxConcurrentAgents ?? 1,
-    }));
-    let handles;
+    const sessions = [];
     try {
-      handles = await runSessions(sessionConfigs);
+      for (const prompt of options.sessions) {
+        const s = await orch.start(prompt, cwd, { mode: options.auto ? 'auto' : 'ask', readOnly: !!options.readOnly, files: options.files });
+        sessions.push(s);
+      }
+      // Wait for all to finish by polling task state.
+      const { readTaskState } = await import('../src/execution/task-state');
+      for (const s of sessions) {
+        while (true) {
+          const st = await readTaskState(s.runId);
+          if (st && (st.state === 'COMPLETED' || st.state === 'FAILED' || st.state === 'CANCELLED')) break;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      }
     } catch (err: any) {
       console.log(chalk.red(err?.message ?? String(err)));
       process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
-    for (const h of handles) {
-      await h.promise;
-    }
-    // Exit code reflects worst session result.
-    const results = handles.map((h: any) => h.result ?? 'FAILED');
+    const results = await Promise.all(sessions.map(async (s: any) => {
+      const { readTaskState } = await import('../src/execution/task-state');
+      const st = await readTaskState(s.runId);
+      return st?.result ?? s.result ?? 'FAILED';
+    }));
     if (results.includes('CANCELLED')) process.exit(EXIT_CODES.USER_CANCELLED);
     if (results.includes('FAILED')) process.exit(EXIT_CODES.TASK_FAILURE);
     if (results.includes('NO_CHANGES')) process.exit(EXIT_CODES.NO_CHANGES);

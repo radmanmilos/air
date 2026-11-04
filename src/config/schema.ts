@@ -29,6 +29,9 @@ const PermissionSchema = z.object({
   broadApproval: z.boolean().default(false),
   autoCommit: z.boolean().default(false),
   allowShell: z.boolean().default(false),
+  allowedPaths: z.array(z.string()).optional(),
+  allowNetwork: z.boolean().default(false),
+  allowInstall: z.boolean().default(false),
 });
 
 const VerifySchema = z.object({
@@ -59,7 +62,7 @@ const DEFAULT_CATALOG = { remoteUrl: undefined as string | undefined, autoInstal
 // zod 4 does not re-run inner defaults when an object field's `.default({})`
 // is an empty object, so each sub-schema default is spelled out explicitly.
 const DEFAULT_FAILOVER = { mode: 'ask' as const, maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false };
-const DEFAULT_PERMISSION = { mode: 'ask' as const, broadApproval: false, autoCommit: false, allowShell: false };
+const DEFAULT_PERMISSION = { mode: 'ask' as const, broadApproval: false, autoCommit: false, allowShell: false, allowNetwork: false, allowInstall: false };
 const DEFAULT_VERIFY = { enabled: false };
 const DEFAULT_REDACTION = { enabled: true };
 const DEFAULT_CONCURRENCY = { maxConcurrentAgents: 1 };

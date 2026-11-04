@@ -80,7 +80,7 @@
 - **Details:** separate candidate filtering from destination authorization; remove implicit `allow.models=[firstModel]` unless documented; build immutable proposal with source/dest adapter/provider/model, data classification, context digest, cost class, reason, nonce/hash; verify against `proposal.to.*`; mandatory digest for cross-provider/paid egress; persist approval; prevent replay.
 - **Acceptance:** A→B failover success/decline/altered consent tests work through MCP.
 
-## T7-005 [BLOCKED] — Permission enforcement in real execution path
+## T7-005 [DONE] — Permission enforcement in real execution path
 - **Priority:** P0
 - **Review refs:** chatGPT R6-04/R6-14; grok G7-03
 - **Area:** permissions / adapters
@@ -161,7 +161,7 @@
 - **Details:** stress test completing 10 tasks in rapid succession: all 10 results appear exactly once; conversation file valid; front agent reply references correct taskId. Idempotency on double injection. Causal order: task start before completion; completions ordered by completedAt.
 - **Acceptance:** stress test green.
 
-## T7-014 [BLOCKED] — Transactional job store (replace snapshot) + crash recovery
+## T7-014 [DONE] — Transactional job store (replace snapshot) + crash recovery
 - **Priority:** P0
 - **Review refs:** chatGPT R6-15; deepseek M2 (durability)
 - **Area:** persistence / orchestrator
@@ -215,7 +215,7 @@
 - **Details:** at discovery execute safe version check, normalize/compare against supported ranges, store result; gate routing on measured version + required feature probes; separate exists/version compatible/headless verified/task smoke verified states.
 - **Acceptance:** arbitrary binary on PATH not routed unless version compatible.
 
-## T7-020 [BLOCKED] — Adapter permission conformance table + refuse non-conforming
+## T7-020 [DONE] — Adapter permission conformance table + refuse non-conforming
 - **Priority:** P0
 - **Review refs:** chatGPT R6-14; grok G7-03
 - **Area:** adapters / permissions
@@ -318,7 +318,7 @@
 - **Details:** events with stable event ID, sequence, conversation/work/work-item/execution reference, payload schema, actor, cursor semantics. Typed events not ad-hoc strings.
 - **Acceptance:** event cursor polling works across processes.
 
-## T7-031 [BLOCKED] — Multi-session CLI path uses central scheduler
+## T7-031 [DONE] — Multi-session CLI path uses central scheduler
 - **Priority:** P1 (P2 review)
 - **Review refs:** chatGPT R6-27
 - **Area:** CLI / orchestrator
@@ -355,7 +355,7 @@
 - **Details:** show conversation id, active jobs, last message ts in `air dashboard`.
 - **Acceptance:** dashboard displays them.
 
-## T7-035 [BLOCKED] — E2E smoke path for conversation loop
+## T7-035 [DONE] — E2E smoke path for conversation loop
 - **Priority:** P2
 - **Review refs:** grok G7-14; deepseek M2-A
 - **Area:** tests
@@ -388,7 +388,7 @@
 - **Area:** docs
 - **Details:** absorbed into T7-036.
 
-## T7-039 [BLOCKED] — Verification gate V-01..V-15 automated
+## T7-039 [DONE] — Verification gate V-01..V-15 automated
 - **Priority:** P0 (gate)
 - **Review refs:** deepseek §1
 - **Area:** tests / docs
