@@ -399,4 +399,4 @@ applied. Conflicts were resolved as follows:
 | codex | `codex` | `exec --skip-git-repo-check <prompt>` | 0.166.0 |
 | github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | 2.102.0 |
 
-All adapters are verified against real installed CLIs and are eligible for routing.
+Only aider and goose are CI-smoke-test verified and eligible for routing. opencode, kilocode, codex, and github-copilot are unverified spikes visible in `air status` but never routed.
