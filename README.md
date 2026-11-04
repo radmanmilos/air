@@ -16,13 +16,15 @@ Note: `npm install -g github:radmanmilos/air` often leaves a dangling symlink on
 ```bash
 npm uninstall -g air
 npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
+```
+
 # air — Unified AI Tool Orchestrator
 
 *AIR is free and so are we.*
 
 **Status:** Release candidate. Tests passing. CLI + MCP server functional. Build, lint and package dry-run green. Chat, planner, result-compiler, worktrees, and permissions modules partially wired; see docs/reviews/tasks_air_8.md.
 
-AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
+AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot, ollama) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
 
 ## Purpose and benefit
 
