@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-latest]
         node: [22]
     steps:
       - uses: actions/checkout@v5
@@ -41,7 +41,7 @@ jobs:
 
   smoke-test:
     name: Real-binary smoke tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: test
     if: ${{ always() && needs.test.result == 'success' }}
     steps:
