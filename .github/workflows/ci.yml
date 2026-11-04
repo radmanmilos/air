@@ -13,11 +13,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [20, 22]
+        node: [22]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Setup Node ${{ matrix.node }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
       - name: Install
@@ -45,11 +45,11 @@ jobs:
     needs: test
     if: ${{ always() && needs.test.result == 'success' }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - name: Setup Node 22
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
       - name: Install
         run: npm ci
       - name: Install aider (verified adapter)
