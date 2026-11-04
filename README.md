@@ -20,24 +20,24 @@ AIR is a single terminal entrypoint and MCP server that routes tasks across AI c
 ```mermaid
 flowchart LR
     U[User / Agent] -->|task or follow-up| E[Entry: CLI, MCP, or air chat]
-    E --> CV[Conversation layer\n(ConversationSession, facts, summary)]
-    CV --> FA[Front agent\n(action schema, Zod)]
+    E --> CV[Conversation layer<br/>(ConversationSession, facts, summary)]
+    CV --> FA[Front agent<br/>(action schema, Zod)]
     FA -->|direct answer| CV
-    FA -->|delegate| PL[Planner\n(work graph, dependencies)]
-    PL --> SC[Scheduler\n(free-first ranking, seats, allow-list)]
-    SC --> WM[Workspace manager\n(real git worktrees)]
-    SC --> EX[CliExecutor / ApiExecutor\n(cross-spawn, timeouts, tree-kill)]
-    EX --> AD[Adapters\n(aider, goose, ...)]
-    AD --> RN[Process runner\n(streaming redaction, byte caps)]
-    RN --> MN[Monitor\n(events, heartbeat, progress, cursor)]
-    MN --> RC[Result compiler\n(delta + verify + redacted tail)]
+    FA -->|delegate| PL[Planner<br/>(work graph, dependencies)]
+    PL --> SC[Scheduler<br/>(free-first ranking, seats, allow-list)]
+    SC --> WM[Workspace manager<br/>(real git worktrees)]
+    SC --> EX[CliExecutor / ApiExecutor<br/>(cross-spawn, timeouts, tree-kill)]
+    EX --> AD[Adapters<br/>(aider, goose, ...)]
+    AD --> RN[Process runner<br/>(streaming redaction, byte caps)]
+    RN --> MN[Monitor<br/>(events, heartbeat, progress, cursor)]
+    MN --> RC[Result compiler<br/>(delta + verify + redacted tail)]
     RC --> CV
     CV -->|one coherent reply| U
-    MN --> HS[Health tracker\n(cooldowns, free-tier quota, ledger)]
+    MN --> HS[Health tracker<br/>(cooldowns, free-tier quota, ledger)]
     HS --> SC
-    CV --> SE[Security\n(redaction, allow-list, verify trust, global-only config)]
+    CV --> SE[Security<br/>(redaction, allow-list, verify trust, global-only config)]
     SE --> EX
-    CV --> OB[Observability\n(JSONL traces, status --json, dashboard)]
+    CV --> OB[Observability<br/>(JSONL traces, status --json, dashboard)]
 ```
 
 Components:
