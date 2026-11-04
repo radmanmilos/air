@@ -9,7 +9,7 @@
 // the repo path is listed in the global trusted-repos list. CLI-supplied
 // commands are always trusted.
 
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { redact } from '../security/redact';
@@ -28,14 +28,6 @@ export interface VerifyTrust {
   reason?: string;
 }
 
-/**
- * Trust gate for verify commands (G3-11).
- *
- * - CLI-supplied commands are always trusted (the user typed them).
- * - Repo-config commands are refused unless the cwd is in the global
- *   trusted-repos list. The caller passes the source explicitly so the
- *   decision is deterministic and testable.
- */
 export function checkVerifyTrust(
   command: string[],
   trustedRepos: string[],
@@ -68,21 +60,36 @@ function canonical(p: string): string {
   }
 }
 
-export function runVerify(command: string[], cwd: string, timeoutMs = 60_000): VerifyResult {
-  const res = spawnSync(command[0], command.slice(1), {
-    cwd,
-    encoding: 'utf8',
-    timeout: timeoutMs,
-    stdio: ['ignore', 'pipe', 'pipe'],
+export function runVerify(command: string[], cwd: string, timeoutMs = 60_000): Promise<VerifyResult> {
+  return new Promise((resolve) => {
+    const child = spawn(command[0], command.slice(1), {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let timer: NodeJS.Timeout | null = null;
+    let settled = false;
+    const finish = (code: number | null) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve({
+        ok: code === 0,
+        code,
+        stdout: redact(stdout),
+        stderr: redact(stderr),
+        command,
+      });
+    };
+    child.stdout?.on('data', (b: Buffer) => { stdout += b.toString('utf8'); });
+    child.stderr?.on('data', (b: Buffer) => { stderr += b.toString('utf8'); });
+    child.on('error', () => finish(null));
+    child.on('close', (code) => finish(code));
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} finish(null); }, timeoutMs);
+    }
   });
-  const ok = res.status === 0;
-  return {
-    ok,
-    code: res.status ?? null,
-    stdout: redact(res.stdout ?? ''),
-    stderr: redact(res.stderr ?? ''),
-    command,
-  };
 }
 
 export function formatVerifyReport(result: VerifyResult): string {

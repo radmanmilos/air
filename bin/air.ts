@@ -288,14 +288,14 @@ program
   .description('Run an approved verification command (array args, no shell)')
   .argument('<cmd...>', 'Command and arguments')
   .option('--cwd <dir>', 'Working directory')
-  .action((cmd: string[], options: { cwd?: string }) => {
+  .action(async (cmd: string[], options: { cwd?: string }) => {
     // CLI-supplied commands are always trusted (G3-11).
     const trust = checkVerifyTrust(cmd, [], options.cwd ?? process.cwd(), 'cli');
     if (!trust.trusted) {
       console.log(chalk.red(`Verify refused: ${trust.reason}`));
       process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
-    const result = runVerify(cmd, options.cwd ?? process.cwd());
+    const result = await runVerify(cmd, options.cwd ?? process.cwd());
     console.log(formatVerifyReport(result));
     process.exit(result.ok ? 0 : 1);
   });
@@ -319,7 +319,7 @@ program
       process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     const cmd = config.verify.command.split(/\s+/).filter(Boolean);
-    const result = runVerify(cmd, cwd);
+    const result = await runVerify(cmd, cwd);
     console.log(formatVerifyReport(result));
     process.exit(result.ok ? 0 : 1);
   });

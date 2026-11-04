@@ -24,10 +24,12 @@ describe('adapter verification gate (R5-02)', () => {
     const ids = routed.map((a) => a.id);
     expect(ids).toContain('aider');
     expect(ids).toContain('goose');
-    expect(ids).toContain('opencode');
-    expect(ids).toContain('kilocode');
-    expect(ids).toContain('codex');
-    expect(ids).toContain('github-copilot');
+    // Unverified adapters (opencode, kilocode, codex, github-copilot) are
+    // visible in status but never routed by default.
+    expect(ids).not.toContain('opencode');
+    expect(ids).not.toContain('kilocode');
+    expect(ids).not.toContain('codex');
+    expect(ids).not.toContain('github-copilot');
   });
 
   it('all adapters are visible in status', () => {
@@ -38,14 +40,10 @@ describe('adapter verification gate (R5-02)', () => {
     expect(ids).toContain('codex');
     expect(ids).toContain('github-copilot');
     const verified = status.filter((s) => s.verified);
-    // All 6 adapters are verified against real CLIs.
-    expect(verified.length).toBe(6);
+    // Only aider and goose are CI-verified.
+    expect(verified.length).toBe(2);
     expect(verified.map((s) => s.id)).toContain('aider');
     expect(verified.map((s) => s.id)).toContain('goose');
-    expect(verified.map((s) => s.id)).toContain('opencode');
-    expect(verified.map((s) => s.id)).toContain('kilocode');
-    expect(verified.map((s) => s.id)).toContain('codex');
-    expect(verified.map((s) => s.id)).toContain('github-copilot');
   });
 
   it('availableAdapters includes all verified adapters when installed', () => {
@@ -53,10 +51,10 @@ describe('adapter verification gate (R5-02)', () => {
     const ids = routed.map((a) => a.id);
     expect(ids).toContain('aider');
     expect(ids).toContain('goose');
-    expect(ids).toContain('opencode');
-    expect(ids).toContain('kilocode');
-    expect(ids).toContain('codex');
-    expect(ids).toContain('github-copilot');
+    expect(ids).not.toContain('opencode');
+    expect(ids).not.toContain('kilocode');
+    expect(ids).not.toContain('codex');
+    expect(ids).not.toContain('github-copilot');
   });
 
   it('router routes verified adapters with an explicit skip reason', () => {
@@ -82,7 +80,7 @@ describe('adapter verification gate (R5-02)', () => {
   it('PATH presence enables verified adapters', () => {
     const status = adapterStatus();
     const opencode = status.find((s) => s.id === 'opencode')!;
-    expect(opencode.verified).toBe(true);
+    expect(opencode.verified).toBe(false);
     const aider = status.find((s) => s.id === 'aider')!;
     expect(aider.verified).toBe(true);
   });
