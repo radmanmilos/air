@@ -19,15 +19,25 @@ AIR is a single terminal entrypoint and MCP server that routes tasks across AI c
 
 ```mermaid
 flowchart LR
-    U[User / Agent] -->|task| E[Entry: CLI or MCP]
-    E --> O[Orchestrator brain]
-    O --> R[Router: best model/tool]
-    R --> A1[Adapter A]
-    R --> A2[Adapter B]
-    A1 --> M[Monitor: health, cooldowns, seats]
-    A2 --> M
-    M --> C[Compile results + handoff]
-    C --> U
+    U[User / Agent] -->|task or follow-up| E[Entry: CLI, MCP, or air chat]
+    E --> CV[Conversation layer\n(ConversationSession, facts, summary)]
+    CV --> FA[Front agent\n(action schema, Zod)]
+    FA -->|direct answer| CV
+    FA -->|delegate| PL[Planner\n(work graph, dependencies)]
+    PL --> SC[Scheduler\n(free-first ranking, seats, allow-list)]
+    SC --> WM[Workspace manager\n(real git worktrees)]
+    SC --> EX[CliExecutor / ApiExecutor\n(cross-spawn, timeouts, tree-kill)]
+    EX --> AD[Adapters\n(aider, goose, ...)]
+    AD --> RN[Process runner\n(streaming redaction, byte caps)]
+    RN --> MN[Monitor\n(events, heartbeat, progress, cursor)]
+    MN --> RC[Result compiler\n(delta + verify + redacted tail)]
+    RC --> CV
+    CV -->|one coherent reply| U
+    MN --> HS[Health tracker\n(cooldowns, free-tier quota, ledger)]
+    HS --> SC
+    CV --> SE[Security\n(redaction, allow-list, verify trust, global-only config)]
+    SE --> EX
+    CV --> OB[Observability\n(JSONL traces, status --json, dashboard)]
 ```
 
 Components:
