@@ -696,7 +696,8 @@ program
             return;
         }
         if (trimmed === '/status') {
-            console.log(chalk.gray(`messages=${conv.messages.length} active=${conv.activeWorkIds.join(',')}`));
+            const c = (await import('../src/conversation/index.js')).loadConversation(conv.id) ?? conv;
+            console.log(chalk.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`));
             return;
         }
         if (trimmed === '/jobs' || trimmed === '/tasks') {
@@ -749,7 +750,7 @@ program
     rl.on('close', async () => { try {
         await Promise.all([...waiters.values()]);
     }
-    catch { } saveConversation(conv); process.exit(0); });
+    catch { } process.exit(0); });
 });
 program
     .command('merge')

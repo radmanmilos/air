@@ -710,7 +710,7 @@ program
         console.log(chalk.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel <id>, /last, /stats, /tasks, /quit'));
         return;
       }
-      if (trimmed === '/status') { console.log(chalk.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`)); return; }
+      if (trimmed === '/status') { const c = (await import('../src/conversation')).loadConversation(conv!.id) ?? conv!; console.log(chalk.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`)); return; }
       if (trimmed === '/jobs' || trimmed === '/tasks') {
         console.log(chalk.gray(`active: ${conv!.activeWorkIds.join(',') || '(none)'}`));
         return;
@@ -754,7 +754,7 @@ program
         }
       }
     });
-    rl.on('close', async () => { try { await Promise.all([...waiters.values()]); } catch {} saveConversation(conv!); process.exit(0); });
+    rl.on('close', async () => { try { await Promise.all([...waiters.values()]); } catch {} process.exit(0); });
   });
 
 program
