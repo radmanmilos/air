@@ -1,4 +1,22 @@
-# air — Unified AI Tool Orchestrator
+## Install
+
+Preferred (materializes fully, works on Windows):
+
+```
+npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
+```
+
+Or run the bootstrap script:
+
+- Windows: `powershell -ExecutionPolicy Bypass -File scripts/bootstrap.ps1`
+- Unix: `bash scripts/bootstrap.sh`
+
+Note: `npm install -g github:radmanmilos/air` often leaves a dangling symlink on Windows. If `air` is not found after install, run:
+
+```
+npm uninstall -g air
+npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
+``` — Unified AI Tool Orchestrator
 
 *AIR is free and so are we.*
 
