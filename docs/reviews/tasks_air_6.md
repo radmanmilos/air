@@ -456,7 +456,7 @@
 
 ## P1-C. Routing and free-first policy
 
-### T-028 — Task capability typing and cost-aware routing
+### T-028 [DONE] — Task capability typing and cost-aware routing
 - **Priority:** P1
 - **Review refs:** chatGPT P1-09, P1-16; claude (routing); deepseek SA-06, SA-07; grok G6-03
 - **Area:** router / health
