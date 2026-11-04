@@ -622,4 +622,43 @@ program
   .option('--sessions <tasks...>', 'Run multiple tasks concurrently, each on its own model')
   .action(runAction);
 
+program
+  .command('chat')
+  .description('Interactive conversation (non-blocking follow-ups)')
+  .option('--resume <id>', 'Resume a conversation')
+  .option('--free-only', 'Prefer free models (default true)')
+  .action(async (options: { resume?: string; freeOnly?: boolean }) => {
+    const { createConversation, loadConversation, saveConversation, appendMessage } = await import('../src/conversation');
+    const { loadConfig } = await import('../src/config/loader');
+    const readline = await import('node:readline');
+    const cwd = process.cwd();
+    const { config } = await loadConfig({ cwd });
+    let conv = options.resume ? loadConversation(options.resume) : null;
+    if (!conv) conv = createConversation({ freeOnly: options.freeOnly !== false });
+    saveConversation(conv);
+    console.log(chalk.cyan(`air chat (conversation ${conv.id})`));
+    console.log(chalk.gray('Type a message, /run <task>, /status, /quit'));
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.on('line', async (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      if (trimmed === '/quit' || trimmed === '/exit') { rl.close(); return; }
+      if (trimmed === '/status') { console.log(chalk.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`)); return; }
+      if (trimmed.startsWith('/run ')) {
+        const task = trimmed.slice(5).trim();
+        await appendMessage(conv!.id, { role: 'user', content: task });
+        const { Orchestrator } = await import('../src/orchestrator/orchestrator');
+        const orch = new (Orchestrator as any)({ config, mcpMode: false });
+        const session = await orch.start(task, cwd, { mode: 'ask' });
+        await appendMessage(conv!.id, { role: 'assistant', content: `Started job ${session.runId}.` });
+        console.log(chalk.green(`Started job ${session.runId}`));
+        return;
+      }
+      await appendMessage(conv!.id, { role: 'user', content: trimmed });
+      await appendMessage(conv!.id, { role: 'assistant', content: 'Acknowledged.' });
+      console.log(chalk.gray('air: acknowledged'));
+    });
+    rl.on('close', () => { saveConversation(conv!); process.exit(0); });
+  });
+
 program.parse();

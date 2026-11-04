@@ -575,6 +575,42 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
     },
   );
 
+  server.registerTool(
+    'chat_send',
+    {
+      title: 'Send a chat message',
+      description: 'Append a user message to a conversation and return an ack (non-blocking).',
+      inputSchema: {
+        conversationId: z.string().optional().describe('Conversation id (creates one if omitted)'),
+        message: z.string().describe('User message'),
+      },
+    },
+    async (args: any) => {
+      const { createConversation, loadConversation, saveConversation, appendMessage } = await import('../conversation');
+      let conv = args.conversationId ? loadConversation(args.conversationId) : null;
+      if (!conv) conv = createConversation();
+      saveConversation(conv);
+      await appendMessage(conv.id, { role: 'user', content: args.message });
+      await appendMessage(conv.id, { role: 'assistant', content: 'Acknowledged.' });
+      return { content: [{ type: 'text', text: `conversation=${conv.id}` }] };
+    },
+  );
+
+  server.registerTool(
+    'get_conversation',
+    {
+      title: 'Get conversation',
+      description: 'Return a conversation thread.',
+      inputSchema: { conversationId: z.string().describe('Conversation id') },
+    },
+    async (args: any) => {
+      const { loadConversation } = await import('../conversation');
+      const conv = loadConversation(args.conversationId);
+      if (!conv) return { content: [{ type: 'text', text: 'not found' }] };
+      return { content: [{ type: 'text', text: JSON.stringify(conv) }] };
+    },
+  );
+
   const serverTransport = transport ?? new StdioServerTransport();
   await server.connect(serverTransport);
 

@@ -103,6 +103,10 @@ export async function appendMessage(id: string, msg: Omit<ConversationMessage, '
   );
 }
 
+export async function injectResult(convId: string, summary: string, workId?: string): Promise<void> {
+  await appendMessage(convId, { role: 'tool', content: summary, workId });
+}
+
 export function listConversations(): string[] {
   const d = dir();
   try {
