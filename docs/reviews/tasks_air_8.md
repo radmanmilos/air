@@ -17,34 +17,34 @@
 
 ### Phase 0 — Make what exists real
 
-#### T8-001 [IN_PROGRESS] — Fix packaging: NodeNext + explicit import specifiers, remove fix-imports
+#### T8-001 [DONE] — Fix packaging: NodeNext + explicit import specifiers, remove fix-imports
 - Priority: P0
 - Review refs: K-01, C-01
 - Files: tsconfig.json, src/**/*.ts, bin/air.ts, scripts/fix-imports.mjs, scripts/check-dist-imports.mjs
 - Details: Switch to "module": "NodeNext", write explicit .js / /index.js specifiers in all source imports. Delete fix-imports or make it resolve directories. Add scripts/check-dist-imports.mjs and run in CI after build.
 - Acceptance: scan reports 0 unresolved; node dist/bin/air.js chat starts; import('dist/src/index.js') succeeds.
 
-#### T8-002 [TODO] — Built-binary test per command and MCP tool
+#### T8-002 [DONE] — Built-binary test per command and MCP tool
 - Priority: P0
 - Review refs: K-01
 - Details: Add tests that run the built binary for every CLI command and MCP tool (chat, chat_send, get_conversation, resume_task, approve_failover, cancel_task).
 
-#### T8-003 [TODO] — Fix MCP stdout purity and run-id consistency
+#### T8-003 [DONE] — Fix MCP stdout purity and run-id consistency
 - Priority: P0
 - Review refs: K-02
 - Details: Orchestrator must not write to stdout; one run id created by job manager used everywhere. Add stdio conformance test.
 
-#### T8-004 [TODO] — Fix chat data loss and /status
+#### T8-004 [DONE] — Fix chat data loss and /status
 - Priority: P0
 - Review refs: C-04
 - Details: Single conversation write path (append under lock, atomic), loadConversation before every read.
 
-#### T8-005 [TODO] — Explain failures and fix --allow-paid/--free-only options
+#### T8-005 [DONE] — Explain failures and fix --allow-paid/--free-only options
 - Priority: P0
 - Review refs: K-05, C-07
 - Details: Print plain-language result with category, skipped candidates, reason, exact command. Align options with policy model.
 
-#### T8-006 [TODO] — Honest docs
+#### T8-006 [DONE] — Honest docs
 - Priority: P0
 - Review refs: K-09
 - Details: Mark unwired modules; correct README claims; reduce PLAN.md.

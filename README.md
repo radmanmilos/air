@@ -20,7 +20,7 @@ npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.g
 
 *AIR is free and so are we.*
 
-**Status:** Release candidate. 234 tests passing (parallel isolated workers). CLI + MCP server functional. Build, lint and package dry-run green. All review tasks complete.
+**Status:** Release candidate. Tests passing. CLI + MCP server functional. Build, lint and package dry-run green. Chat, planner, result-compiler, worktrees, and permissions modules partially wired; see docs/reviews/tasks_air_8.md.
 
 AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
 
