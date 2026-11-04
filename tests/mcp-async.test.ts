@@ -145,7 +145,7 @@ await client.connect(clientTransport);
     const names = list.tools.map((t) => t.name).sort();
       expect(names).toEqual(
         ['approve_failover', 'cancel_task', 'chat_send', 'get_conversation', 'get_status', 'get_task_output',
-          'get_task_status', 'install_adapter', 'list_adapters', 'resume_task', 'run_task', 'uninstall_adapter',
+          'get_task_status', 'install_adapter', 'list_adapters', 'list_conversations', 'list_jobs', 'resume_task', 'run_task', 'uninstall_adapter',
           'upgrade_adapter'].sort(),
       );
     await clientTransport.close();

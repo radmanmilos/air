@@ -118,6 +118,7 @@ export async function resetHealth(): Promise<void> {
 }
 
 export function createHealthTracker(state: HealthState = freshState()): HealthTracker {
+  const base: HealthState = JSON.parse(JSON.stringify(state));
   return {
 setCooldown(provider, model, untilMs, reason) {
        state.cooldowns = state.cooldowns
@@ -159,27 +160,48 @@ setCooldown(provider, model, untilMs, reason) {
       state.cancellations[key(provider, model)] = (state.cancellations[key(provider, model)] ?? 0) + 1;
     },
     async flush() {
-      // Serialize the read-modify-write cycle across processes (R5-09):
-      // re-read persisted state, merge in our in-memory mutations, and
-      // write atomically under the lock. Two concurrent flushes cannot
-      // overwrite each other.
       const snapshot = { ...state };
+      // Compute deltas relative to the base snapshot taken at load/last-flush.
+      const deltaSuccesses: Record<string, number> = {};
+      for (const k of Object.keys(snapshot.successes)) {
+        const d = (snapshot.successes[k] ?? 0) - (base.successes[k] ?? 0);
+        if (d > 0) deltaSuccesses[k] = d;
+      }
+      const deltaFailures: Record<string, number> = {};
+      for (const k of Object.keys(snapshot.failures)) {
+        const d = (snapshot.failures[k] ?? 0) - (base.failures[k] ?? 0);
+        if (d > 0) deltaFailures[k] = d;
+      }
+      const deltaCancellations: Record<string, number> = {};
+      for (const k of Object.keys(snapshot.cancellations)) {
+        const d = (snapshot.cancellations[k] ?? 0) - (base.cancellations[k] ?? 0);
+        if (d > 0) deltaCancellations[k] = d;
+      }
       await lockedReadModifyWrite<HealthState>(
         'health',
         paths.healthFile,
         async (current) => {
-          const base: HealthState = current ?? freshState();
+          const basePersisted: HealthState = current ?? freshState();
           const merged: HealthState = {
             cooldowns: [
-              ...base.cooldowns.filter(
+              ...basePersisted.cooldowns.filter(
                 (c) => !snapshot.cooldowns.some((s) => s.provider === c.provider && s.model === c.model),
               ),
               ...snapshot.cooldowns,
             ],
-            successes: { ...base.successes, ...snapshot.successes },
-            failures: { ...base.failures, ...snapshot.failures },
-            cancellations: { ...base.cancellations, ...snapshot.cancellations },
+            successes: { ...basePersisted.successes },
+            failures: { ...basePersisted.failures },
+            cancellations: { ...basePersisted.cancellations },
           };
+          for (const k of Object.keys(deltaSuccesses)) {
+            merged.successes[k] = (merged.successes[k] ?? 0) + deltaSuccesses[k];
+          }
+          for (const k of Object.keys(deltaFailures)) {
+            merged.failures[k] = (merged.failures[k] ?? 0) + deltaFailures[k];
+          }
+          for (const k of Object.keys(deltaCancellations)) {
+            merged.cancellations[k] = (merged.cancellations[k] ?? 0) + deltaCancellations[k];
+          }
           return merged;
         },
         { timeoutMs: 5000 },
@@ -193,6 +215,11 @@ setCooldown(provider, model, untilMs, reason) {
         state.failures = reloaded.failures ?? {};
         state.cancellations = reloaded.cancellations ?? {};
       }
+      // Reset base to current persisted state.
+      base.cooldowns = [...(state.cooldowns ?? [])];
+      base.successes = { ...(state.successes ?? {}) };
+      base.failures = { ...(state.failures ?? {}) };
+      base.cancellations = { ...(state.cancellations ?? {}) };
     },
     async load() {
       const loaded = await readJsonFile<HealthState>(paths.healthFile);
@@ -202,6 +229,10 @@ setCooldown(provider, model, untilMs, reason) {
         state.failures = loaded.failures ?? {};
         state.cancellations = loaded.cancellations ?? {};
       }
+      base.cooldowns = [...(state.cooldowns ?? [])];
+      base.successes = { ...(state.successes ?? {}) };
+      base.failures = { ...(state.failures ?? {}) };
+      base.cancellations = { ...(state.cancellations ?? {}) };
     },
     snapshot(now?: number) {
       return healthSnapshot(state, now);

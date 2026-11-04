@@ -31,6 +31,23 @@ export function createWorktree(jobId: string, sourceCwd: string): WorktreeInfo {
   return { jobId, sourceCwd, worktreePath, branch, sourceHead };
 }
 
+export function worktreeDiff(info: WorktreeInfo): string {
+  try {
+    return execFileSync('git', ['diff', '--stat', info.sourceHead, 'HEAD'], { cwd: info.worktreePath, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
+  } catch {
+    return '';
+  }
+}
+
+export function applyWorktree(info: WorktreeInfo): { ok: boolean; message: string } {
+  try {
+    // Merge the worktree branch into the current branch of source repo.
+    execFileSync('git', ['merge', '--no-ff', info.branch, '-m', `air: apply ${info.jobId}`], { cwd: info.sourceCwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+    return { ok: true, message: `Applied ${info.branch} into ${info.sourceCwd}.` };
+  } catch (err: any) {
+    return { ok: false, message: `Apply failed: ${String(err?.message || err)}` };
+  }
+}
 export function removeWorktree(info: WorktreeInfo): void {
   try {
     execFileSync('git', ['worktree', 'remove', '--force', info.worktreePath], { cwd: info.sourceCwd, stdio: 'ignore' });

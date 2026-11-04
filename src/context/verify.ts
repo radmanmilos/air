@@ -10,6 +10,7 @@
 // commands are always trusted.
 
 import { spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { redact } from '../security/redact';
@@ -65,6 +66,7 @@ export function runVerify(command: string[], cwd: string, timeoutMs = 60_000): P
     const child = spawn(command[0], command.slice(1), {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
     let stdout = '';
     let stderr = '';
@@ -87,7 +89,18 @@ export function runVerify(command: string[], cwd: string, timeoutMs = 60_000): P
     child.on('error', () => finish(null));
     child.on('close', (code) => finish(code));
     if (timeoutMs > 0) {
-      timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} finish(null); }, timeoutMs);
+      timer = setTimeout(() => {
+        try {
+          if (process.platform === 'win32' && child.pid) {
+            execFileSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+          } else if (child.pid) {
+            try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+          } else {
+            child.kill('SIGKILL');
+          }
+        } catch { /* noop */ }
+        finish(null);
+      }, timeoutMs);
     }
   });
 }

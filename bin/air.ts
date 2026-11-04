@@ -628,7 +628,10 @@ program
   .option('--resume <id>', 'Resume a conversation')
   .option('--free-only', 'Prefer free models (default true)')
   .action(async (options: { resume?: string; freeOnly?: boolean }) => {
-    const { createConversation, loadConversation, saveConversation, appendMessage } = await import('../src/conversation');
+    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../src/conversation');
+    const { decide } = await import('../src/conversation/decide');
+    const { planFromRequest } = await import('../src/planner');
+    const { compileJobResult } = await import('../src/result-compiler');
     const { loadConfig } = await import('../src/config/loader');
     const readline = await import('node:readline');
     const cwd = process.cwd();
@@ -637,28 +640,130 @@ program
     if (!conv) conv = createConversation({ freeOnly: options.freeOnly !== false });
     saveConversation(conv);
     console.log(chalk.cyan(`air chat (conversation ${conv.id})`));
-    console.log(chalk.gray('Type a message, /run <task>, /status, /quit'));
+    console.log(chalk.gray('Type a message, /run <task>, /status, /jobs, /cancel <id>, /last, /help, /quit'));
+
+    const waiters = new Map<string, Promise<void>>();
+
+    async function runJob(task: string, _workId?: string): Promise<void> {
+      const { Orchestrator } = await import('../src/orchestrator/orchestrator');
+      const orch = new (Orchestrator as any)({ config, mcpMode: false });
+      const plan = planFromRequest(task, { requiresWrite: true, requiresCode: true });
+      const item = plan.workItems[0];
+      const session = await orch.start(item.objective, cwd, { mode: 'ask', freeOnly: conv!.userPreferences.freeOnly });
+      await appendMessage(conv!.id, { role: 'assistant', content: `Started job ${session.runId}.` });
+      console.log(chalk.green(`Started job ${session.runId}`));
+      conv!.activeWorkIds.push(session.runId);
+      saveConversation(conv!);
+      // Background waiter.
+      const p = (async () => {
+        try {
+          // poll task state until terminal
+          const { readTaskState } = await import('../src/execution/task-state');
+          let state: any = null;
+          while (true) {
+            state = await readTaskState(session.runId);
+            if (state && (state.state === 'COMPLETED' || state.state === 'FAILED' || state.state === 'CANCELLED')) break;
+            await new Promise((r) => setTimeout(r, 500));
+          }
+          const facts = {
+            runId: session.runId,
+            result: state?.result ?? state?.state ?? 'FAILED',
+            adapterId: state?.adapter ?? session.adapterId,
+            provider: state?.provider ?? session.provider,
+            model: state?.model ?? session.model,
+            durationMs: undefined,
+            changedFiles: state?.delta ? [...(state.delta.staged||[]), ...(state.delta.unstaged||[]), ...(state.delta.untracked||[])] : [],
+            verifyOk: undefined,
+            outputTail: state?.outputTail,
+            error: state?.error,
+          };
+          const summary = compileJobResult(facts as any);
+          await injectResult(conv!.id, summary, session.runId);
+          conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== session.runId);
+          // update facts
+          const bullet = `Job ${session.runId} ${facts.result}: ${facts.changedFiles?.length ?? 0} changed`;
+          if (!conv!.facts.includes(bullet)) conv!.facts.push(bullet);
+          saveConversation(conv!);
+          console.log(chalk.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
+        } catch (err) {
+          console.log(chalk.red(`job ${session.runId} error: ${String(err)}`));
+        }
+      })();
+      waiters.set(session.runId, p);
+    }
+
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     rl.on('line', async (line: string) => {
       const trimmed = line.trim();
       if (!trimmed) return;
       if (trimmed === '/quit' || trimmed === '/exit') { rl.close(); return; }
-      if (trimmed === '/status') { console.log(chalk.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`)); return; }
-      if (trimmed.startsWith('/run ')) {
-        const task = trimmed.slice(5).trim();
-        await appendMessage(conv!.id, { role: 'user', content: task });
-        const { Orchestrator } = await import('../src/orchestrator/orchestrator');
-        const orch = new (Orchestrator as any)({ config, mcpMode: false });
-        const session = await orch.start(task, cwd, { mode: 'ask' });
-        await appendMessage(conv!.id, { role: 'assistant', content: `Started job ${session.runId}.` });
-        console.log(chalk.green(`Started job ${session.runId}`));
+      if (trimmed === '/help') {
+        console.log(chalk.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel <id>, /last, /stats, /tasks, /quit'));
         return;
       }
+      if (trimmed === '/status') { console.log(chalk.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`)); return; }
+      if (trimmed === '/jobs' || trimmed === '/tasks') {
+        console.log(chalk.gray(`active: ${conv!.activeWorkIds.join(',') || '(none)'}`));
+        return;
+      }
+      if (trimmed === '/stats') {
+        console.log(chalk.gray(`messages=${conv!.messages.length} tasks=${conv!.activeWorkIds.length} facts=${conv!.facts.length}`));
+        return;
+      }
+      if (trimmed === '/last') {
+        const last = [...conv!.messages].reverse().find((m) => m.role === 'tool');
+        console.log(chalk.gray(last ? last.content : '(no result yet)'));
+        return;
+      }
+      if (trimmed.startsWith('/cancel ')) {
+        const id = trimmed.slice(8).trim();
+        console.log(chalk.yellow(`Cancel requested for ${id}`));
+        return;
+      }
+      if (trimmed.startsWith('/run ') || trimmed.startsWith('/plan ')) {
+        const task = trimmed.replace(/^\/(run|plan) /, '').trim();
+        await appendMessage(conv!.id, { role: 'user', content: task });
+        void runJob(task);
+        return;
+      }
+      // Decision loop.
       await appendMessage(conv!.id, { role: 'user', content: trimmed });
-      await appendMessage(conv!.id, { role: 'assistant', content: 'Acknowledged.' });
-      console.log(chalk.gray('air: acknowledged'));
+      const actions = decide(trimmed, conv!);
+      for (const a of actions) {
+        if (a.type === 'spawn_job') {
+          void runJob(a.goal, undefined);
+        } else if (a.type === 'answer') {
+          await appendMessage(conv!.id, { role: 'assistant', content: 'Acknowledged.' });
+          console.log(chalk.gray('air: acknowledged'));
+        } else if (a.type === 'clarify') {
+          await appendMessage(conv!.id, { role: 'assistant', content: a.question });
+          console.log(chalk.gray(`air: ${a.question}`));
+        } else if (a.type === 'status') {
+          console.log(chalk.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`));
+        } else if (a.type === 'cancel_job') {
+          console.log(chalk.yellow(`Cancel requested for ${a.jobId}`));
+        }
+      }
     });
-    rl.on('close', () => { saveConversation(conv!); process.exit(0); });
+    rl.on('close', async () => { try { await Promise.all([...waiters.values()]); } catch {} saveConversation(conv!); process.exit(0); });
+  });
+
+program
+  .command('merge')
+  .description('Apply a completed job worktree into the current branch')
+  .argument('<jobId>', 'Job run id')
+  .action(async (jobId: string) => {
+    const { readTaskState } = await import('../src/execution/task-state');
+    const st: any = await readTaskState(jobId);
+    if (!st || !st.worktreePath || !st.sourceCwd) {
+      console.log(chalk.red('No worktree info for job.'));
+      process.exit(1);
+    }
+    const { applyWorktree } = await import('../src/workspace');
+    const info = { jobId, sourceCwd: st.sourceCwd, worktreePath: st.worktreePath, branch: st.worktreeBranch, sourceHead: '' };
+    const res = applyWorktree(info as any);
+    console.log(res.ok ? chalk.green(res.message) : chalk.red(res.message));
+    process.exit(res.ok ? 0 : 1);
   });
 
 program.parse();

@@ -8,6 +8,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { paths } from '../config/paths';
 import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
@@ -23,7 +24,7 @@ import { trace } from '../observability/trace';
 import { redact } from '../security/redact';
 import { buildHandoffPack } from '../context/handoff';
 import { defaultAllowList, checkHandoffAllowlist } from '../security/allowlist';
-import { selectCandidateFrom, formatRouteDecision } from '../router/router';
+import { selectCandidateFrom, formatRouteDecision, costTier } from '../router/router';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../types/errors';
 import type { ResultState } from '../types/result';
 import type { TaskInput } from '../types';
@@ -140,11 +141,12 @@ export class Orchestrator {
    *   6. On failover-triggering category: propose switch (ask) or auto-switch
    *   7. Repeat until success, abort, hop cap, or no eligible candidate
    */
-  async start(task: string, cwd: string, options: { readOnly?: boolean; mode?: 'ask' | 'auto'; files?: string[]; maxHops?: number; allowDirty?: boolean; allowProviders?: string[] } = {}): Promise<OrchestratorSession> {
+  async start(task: string, cwd: string, options: { runId?: string; controller?: AbortController; freeOnly?: boolean; readOnly?: boolean; mode?: 'ask' | 'auto'; files?: string[]; maxHops?: number; allowDirty?: boolean; allowProviders?: string[] } = {}): Promise<OrchestratorSession> {
     const readOnly = !!options.readOnly;
     const mode = options.mode ?? 'ask';
     const maxHops = options.maxHops ?? 3;
     const allowDirty = !!options.allowDirty;
+    const controller = options.controller ?? new AbortController();
 
     this.log('request_received', task);
 
@@ -161,29 +163,41 @@ export class Orchestrator {
     const tracker = createHealthTracker();
     await tracker.load();
 
-    const adapters = this.deps.adapters ?? availableAdapters(config);
-    const runId = makeRunId();
+    const adaptersRaw = this.deps.adapters ?? availableAdapters(config);
+    let adapters = adaptersRaw;
+    if (options.freeOnly) {
+      adapters = adaptersRaw.filter((a: any) => costTier({ id: a.id, tool: a.id, provider: a.provider, model: a.model, capabilities: a.capabilities } as any) === 0);
+      if (adapters.length === 0) throw new Error('No free-capable adapter available. Use --allow-paid to enable paid fallback.');
+    }
+    const runId = options.runId ?? makeRunId();
     await appendTaskIndex(runId);
+
+    const { createWorktree } = await import('../workspace');
+    let worktreeInfo: any = null;
+    if (isWriteTask) {
+      try { worktreeInfo = createWorktree(runId, cwd); } catch { worktreeInfo = null; }
+    }
+    const execCwd = worktreeInfo ? worktreeInfo.worktreePath : cwd;
 
     const taskInput: TaskInput = {
       id: runId,
       prompt: task,
-      cwd,
+      cwd: execCwd,
       files: options.files,
       mode,
       readOnly,
     };
 
-    const controller = new AbortController();
     const onSig = () => controller.abort();
     process.on('SIGINT', onSig);
     process.on('SIGTERM', onSig);
 
+    try {
     const allow = defaultAllowList(adapters);
     const visited = new Set<string>();
     let hops = 0;
     // Immutable baseline for the whole work item (T-019).
-    const baselineSnap = snapshotGit(cwd);
+    const baselineSnap = snapshotGit(execCwd);
 
     // Failover loop: try candidates until success, abort, or hop cap.
     while (hops < maxHops) {
@@ -218,11 +232,11 @@ export class Orchestrator {
       }
 
       const spec = adapter.buildCommand(taskInput);
-      const beforeSnap = snapshotGit(cwd);
+      const beforeSnap = snapshotGit(execCwd);
       const state: any = {
         runId,
         task,
-        cwd,
+        cwd: execCwd,
         adapter: chosen.id,
         provider: chosen.provider,
         model: chosen.model,
@@ -230,6 +244,9 @@ export class Orchestrator {
         startedAt: new Date().toISOString(),
         hops,
         maxHops,
+        worktreePath: worktreeInfo?.worktreePath,
+        worktreeBranch: worktreeInfo?.branch,
+        sourceCwd: worktreeInfo ? cwd : undefined,
       };
       await writeTaskState(state);
       trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips, hops });
@@ -246,8 +263,8 @@ export class Orchestrator {
           signal: controller.signal,
           stdoutTailBytes: 2048,
           stderrTailBytes: 2048,
-          onStdout: (c: string) => process.stdout.write(c),
-          onStderr: (c: string) => process.stderr.write(c),
+          onStdout: (c: string) => { if (!this.deps.mcpMode) process.stdout.write(c); },
+          onStderr: (c: string) => { if (!this.deps.mcpMode) process.stderr.write(c); },
         });
         outcome = r.outcome;
       } finally {
@@ -281,7 +298,7 @@ export class Orchestrator {
 
       // Determine result from the agent-produced delta relative to the initial
       // snapshot, not from whether the tree is dirty at all (R5-07).
-      const afterSnap = snapshotGit(cwd);
+      const afterSnap = snapshotGit(execCwd);
       const delta = snapshotDelta(baselineSnap, afterSnap);
       const changed = delta.dirty;
       let result: ResultState;
@@ -325,7 +342,7 @@ export class Orchestrator {
       const session: OrchestratorSession = {
         runId,
         task,
-        cwd,
+        cwd: execCwd,
         adapterId: chosen.id,
         provider: chosen.provider,
         model: chosen.model,
@@ -381,6 +398,12 @@ export class Orchestrator {
               before: beforeSnap,
               after: afterSnap,
             }),
+            hash: createHash('sha256').update(JSON.stringify({
+              from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
+              to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
+              category,
+              task: taskInput.prompt,
+            })).digest('hex'),
           };
 
           if (!allowCheck.ok) {
@@ -448,7 +471,11 @@ export class Orchestrator {
     const s = this.sessions.get(runId);
     if (s) return s;
     throw new Error(`Hop cap reached (${maxHops}).`);
+  } finally {
+    process.removeListener('SIGINT', onSig);
+    process.removeListener('SIGTERM', onSig);
   }
+}
 
   /**
    * Resume a paused failover loop after failover approval (MCP mode).

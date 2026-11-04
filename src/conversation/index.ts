@@ -4,10 +4,11 @@
 // disposable; the conversation persists across runs, restarts and adapter
 // failovers. Neutral provider-agnostic message format.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { resolvePaths } from '../config/paths';
+import { redact } from '../security/redact';
 
 function airPaths() {
   return resolvePaths({ env: process.env });
@@ -41,6 +42,14 @@ export interface Conversation {
   frontAgentModel?: { provider: string; model: string };
 }
 
+const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertId(id: string): void {
+  if (typeof id !== 'string' || !ID_RE.test(id)) {
+    throw new Error(`Invalid conversation id: ${id}`);
+  }
+}
+
 function dir(): string {
   const d = join(airPaths().cacheDir, 'conversations');
   mkdirSync(d, { recursive: true });
@@ -48,6 +57,7 @@ function dir(): string {
 }
 
 function file(id: string): string {
+  assertId(id);
   return join(dir(), `${id}.json`);
 }
 
@@ -78,8 +88,12 @@ export function loadConversation(id: string): Conversation | null {
 }
 
 export function saveConversation(conv: Conversation): void {
+  assertId(conv.id);
   conv.updatedAt = new Date().toISOString();
-  writeFileSync(file(conv.id), JSON.stringify(conv, null, 2));
+  const f = file(conv.id);
+  const tmp = f + '.tmp';
+  writeFileSync(tmp, JSON.stringify(conv, null, 2));
+  renameSync(tmp, f);
 }
 
 export async function appendMessage(id: string, msg: Omit<ConversationMessage, 'id' | 'ts'> & { id?: string; ts?: string }): Promise<Conversation | null> {
@@ -107,6 +121,23 @@ export async function injectResult(convId: string, summary: string, workId?: str
   await appendMessage(convId, { role: 'tool', content: summary, workId });
 }
 
+export function compactConversation(conv: Conversation, maxMessages = 50): Conversation {
+  if (conv.messages.length <= maxMessages) return conv;
+  const keep = conv.messages.slice(-Math.floor(maxMessages / 2));
+  const older = conv.messages.slice(0, conv.messages.length - keep.length);
+  // Preserve tool messages referenced by activeWorkIds.
+  const active = new Set(conv.activeWorkIds);
+  const preserved = older.filter((m) => m.role === 'tool' && m.workId && active.has(m.workId));
+  const summaryLines = older
+    .filter((m) => !preserved.includes(m))
+    .map((m) => `${m.role}: ${m.content.slice(0, 120)}`)
+    .slice(0, 20);
+  const summary = redact(summaryLines.join('\n'));
+  conv.summary = conv.summary ? conv.summary + '\n' + summary : summary;
+  conv.messages = [...preserved, { id: randomUUID(), role: 'system', content: `Compacted ${older.length - preserved.length} older turns.`, ts: new Date().toISOString() }, ...keep];
+  conv.updatedAt = new Date().toISOString();
+  return conv;
+}
 export function listConversations(): string[] {
   const d = dir();
   try {

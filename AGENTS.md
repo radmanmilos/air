@@ -22,8 +22,8 @@ These rules govern every task in this repository. They are mandatory and apply t
 - Committed and pushed
 
 ## Source of truth
-- Task list: `docs/reviews/archive/tasks_air_6.md`
-- Reviews: `docs/reviews/{chatGPT,claude,deepseek,grok}_plan_review_6.md`
+- Task list: `docs/reviews/tasks_air_7.md`
+- Reviews: `docs/reviews/{chatGPT,deepseek,grok}_review_7.md`
 - Canonical plan: `PLAN.md`
 - All work in `E:\GitHub\air` only.
 

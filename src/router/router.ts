@@ -146,7 +146,7 @@ export function isBlockedByAllowlist(adapter: AgentAdapter, allow: AllowList | n
 }
 
 /** Compute a coarse cost tier for free-first ranking. */
-function costTier(c: ExecutionCandidate): number {
+export function costTier(c: ExecutionCandidate): number {
   if (c.provider === 'ollama' || c.provider === 'lm-studio') return 0;
   if (c.provider === 'openrouter' && /free/i.test(c.model)) return 0;
   if (/mini|small|lite/i.test(c.model)) return 1;

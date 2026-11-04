@@ -143,10 +143,13 @@ export function listAdapters(config?: Config): AdapterInfo[] {
   return results;
 }
 
-/** Adapters that are verified, enabled, and have their binary on PATH. */
+function versionCompatible(a: AdapterInfo): boolean {
+  if (!a.version || !a.meta.verificationVersion) return true;
+  return a.version === a.meta.verificationVersion;
+}
 export function availableAdapters(config?: Config): AgentAdapter[] {
   return listAdapters(config)
-    .filter((a) => a.meta.verified && a.meta.enabled && a.available)
+    .filter((a) => a.meta.verified && a.meta.enabled && a.available && versionCompatible(a))
     .map((a) => a.adapter);
 }
 

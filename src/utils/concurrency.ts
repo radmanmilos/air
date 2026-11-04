@@ -82,7 +82,11 @@ export async function acquireSeat(
           continue;
         }
         if (!(await isPidAlive(data.pid))) {
-          await fs.unlink(p).catch(() => {});
+          // Re-check token before unlink to avoid clobbering a new seat.
+          const recheck = await readSeat(p);
+          if (recheck && recheck.token === data.token) {
+            await fs.unlink(p).catch(() => {});
+          }
         }
       } catch { /* noop */ }
     }

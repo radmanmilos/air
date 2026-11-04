@@ -186,6 +186,8 @@ export async function resolveNextCandidate(job: any): Promise<{ adapter: any; ta
 async function runTaskInBackground(orch: Orchestrator, job: Job): Promise<void> {
   try {
     const session = await orch.start(job.state.task, job.cwd, {
+      runId: job.runId,
+      controller: job.controller,
       readOnly: !!job.state.readOnly,
       mode: job.state.mode === 'auto' ? 'auto' : 'ask',
        maxHops: job.state.maxHops ?? 3,
@@ -396,15 +398,17 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       if (!proposal) {
         return { content: [{ type: 'text', text: 'No pending failover proposal for this task.' }] };
       }
-      // Bind the approval to the exact pending proposal (R5-04).
-      if (args.provider !== undefined && args.provider !== proposal.provider) {
-        return { content: [{ type: 'text', text: `Consent provider ${args.provider} does not match proposal provider ${proposal.provider}.` }] };
+      // Bind the approval to the exact pending proposal (R5-04, R6-05).
+      const expectedProvider = proposal.to?.provider ?? proposal.provider;
+      const expectedModel = proposal.to?.model ?? proposal.model;
+      if (args.provider !== undefined && args.provider !== expectedProvider) {
+        return { content: [{ type: 'text', text: `Consent provider ${args.provider} does not match proposal provider ${expectedProvider}.` }] };
       }
-      if (args.model !== undefined && args.model !== proposal.model) {
-        return { content: [{ type: 'text', text: `Consent model ${args.model} does not match proposal model ${proposal.model}.` }] };
+      if (args.model !== undefined && args.model !== expectedModel) {
+        return { content: [{ type: 'text', text: `Consent model ${args.model} does not match proposal model ${expectedModel}.` }] };
       }
       const suppliedHash = args.proposalHash ?? args.hash;
-      if (suppliedHash !== undefined && proposal.hash && suppliedHash !== proposal.hash) {
+      if (!suppliedHash || !proposal.hash || suppliedHash !== proposal.hash) {
         return { content: [{ type: 'text', text: 'Consent proposal hash does not match the pending proposal.' }] };
       }
 
@@ -432,8 +436,11 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       const job = jobs.get(args.runId);
       if (!job) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
       job.controller.abort();
-      job.state.state = 'CANCELLED';
-      await writeTaskState(job.state);
+      try { await job.promise; } catch { /* noop */ }
+      const fresh = await readTaskState(args.runId);
+      if (fresh) job.state = fresh;
+      if (job.state.state !== 'CANCELLED') job.state.state = 'CANCELLED';
+      await writeTaskState(job.state).catch(() => {});
       return { content: [{ type: 'text', text: `Cancelled ${args.runId}.` }] };
     },
   );
@@ -586,13 +593,70 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       },
     },
     async (args: any) => {
-      const { createConversation, loadConversation, saveConversation, appendMessage } = await import('../conversation');
+      const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../conversation');
+      const { decide } = await import('../conversation/decide');
+      const { planFromRequest } = await import('../planner');
       let conv = args.conversationId ? loadConversation(args.conversationId) : null;
       if (!conv) conv = createConversation();
       saveConversation(conv);
       await appendMessage(conv.id, { role: 'user', content: args.message });
-      await appendMessage(conv.id, { role: 'assistant', content: 'Acknowledged.' });
-      return { content: [{ type: 'text', text: `conversation=${conv.id}` }] };
+      const actions = decide(args.message, conv);
+      const replies: string[] = [];
+      for (const a of actions) {
+        if (a.type === 'spawn_job') {
+          // Start job in background via orchestrator; link to conversation.
+          const { loadConfig } = await import('../config/loader');
+          const { config } = await loadConfig({ cwd: process.cwd() });
+          const { Orchestrator } = await import('../orchestrator/orchestrator');
+          const orch = new Orchestrator({ config, mcpMode: true });
+          const plan = planFromRequest(a.goal, a.hints ?? {});
+          const item = plan.workItems[0];
+          const session = await orch.start(item.objective, process.cwd(), { mode: 'auto', freeOnly: conv.userPreferences.freeOnly });
+          conv.activeWorkIds.push(session.runId);
+          saveConversation(conv);
+          replies.push(`Started job ${session.runId}.`);
+          // Background completion inject.
+          (async () => {
+            try {
+              const { readTaskState } = await import('../execution/task-state');
+              let state: any = null;
+              while (true) {
+                state = await readTaskState(session.runId);
+                if (state && (state.state === 'COMPLETED' || state.state === 'FAILED' || state.state === 'CANCELLED')) break;
+                await new Promise((r) => setTimeout(r, 500));
+              }
+              const { compileJobResult } = await import('../result-compiler');
+              const facts = {
+                runId: session.runId,
+                result: state?.result ?? state?.state ?? 'FAILED',
+                adapterId: state?.adapter ?? session.adapterId,
+                provider: state?.provider ?? session.provider,
+                model: state?.model ?? session.model,
+                changedFiles: state?.delta ? [...(state.delta.staged||[]), ...(state.delta.unstaged||[]), ...(state.delta.untracked||[])] : [],
+                outputTail: state?.outputTail,
+                error: state?.error,
+              };
+              const summary = compileJobResult(facts as any);
+              await injectResult(conv!.id, summary, session.runId);
+              conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== session.runId);
+              saveConversation(conv!);
+            } catch { /* noop */ }
+          })();
+        } else if (a.type === 'answer') {
+          await appendMessage(conv.id, { role: 'assistant', content: 'Acknowledged.' });
+          replies.push('Acknowledged.');
+        } else if (a.type === 'clarify') {
+          await appendMessage(conv.id, { role: 'assistant', content: a.question });
+          replies.push(a.question);
+        } else if (a.type === 'status') {
+          replies.push(`messages=${conv.messages.length} active=${conv.activeWorkIds.join(',')}`);
+        } else if (a.type === 'cancel_job') {
+          replies.push(`Cancel requested for ${a.jobId}.`);
+        }
+      }
+      if (replies.length === 0) replies.push('Acknowledged.');
+      await appendMessage(conv.id, { role: 'assistant', content: replies.join(' ') });
+      return { content: [{ type: 'text', text: `conversation=${conv.id}\n${replies.join(' ')}` }] };
     },
   );
 
@@ -608,6 +672,50 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       const conv = loadConversation(args.conversationId);
       if (!conv) return { content: [{ type: 'text', text: 'not found' }] };
       return { content: [{ type: 'text', text: JSON.stringify(conv) }] };
+    },
+  );
+
+  server.registerTool(
+    'list_conversations',
+    {
+      title: 'List conversations',
+      description: 'List conversation ids with updatedAt and title.',
+      inputSchema: {},
+    },
+    async () => {
+      const { listConversations, loadConversation } = await import('../conversation');
+      const ids = listConversations();
+      const rows = ids.map((id) => {
+        const c = loadConversation(id);
+        return { id, updatedAt: c?.updatedAt, title: c?.title };
+      });
+      return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
+    },
+  );
+
+  server.registerTool(
+    'list_jobs',
+    {
+      title: 'List jobs',
+      description: 'List jobs filtered by conversation activeWorkIds (or all known).',
+      inputSchema: { conversationId: z.string().optional().describe('Optional conversation id') },
+    },
+    async (args: any) => {
+      const { loadConversation } = await import('../conversation');
+      const { readTaskState } = await import('../execution/task-state');
+      let ids: string[] = [];
+      if (args?.conversationId) {
+        const conv = loadConversation(args.conversationId);
+        ids = conv?.activeWorkIds ?? [];
+      } else {
+        // all jobs in memory
+        ids = [...jobs.keys()];
+      }
+      const rows = await Promise.all(ids.map(async (id) => {
+        const st = jobs.get(id)?.state ?? (await readTaskState(id));
+        return { runId: id, state: st?.state, result: st?.result };
+      }));
+      return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
     },
   );
 
