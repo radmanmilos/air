@@ -504,7 +504,7 @@
   - Until real isolation exists, refuse parallel write sessions against one checkout even if `isolated:true`.
 - **Acceptance:** two parallel write jobs on different files succeed; apply conflict reported without data loss; flag-only isolation rejected.
 
-### T-031 — Mechanical handoff from git state (not model summary)
+### T-031 [DONE] — Mechanical handoff from git state (not model summary)
 - **Priority:** P1
 - **Review refs:** chatGPT (handoff), claude (handoff); deepseek (handoff); grok (handoff)
 - **Area:** context / handoff
@@ -520,7 +520,7 @@
 
 ## P1-E. Observability and monitoring
 
-### T-032 — First-class typed event log / monitoring
+### T-032 [DONE] — First-class typed event log / monitoring
 - **Priority:** P1
 - **Review refs:** chatGPT P2-25, P1-11; claude (monitor); deepseek (events); grok G6-10
 - **Area:** observability / events
@@ -555,7 +555,7 @@
 
 ## P1-F. Adapters and catalog integrity
 
-### T-034 — Adapter conformance and registry honesty
+### T-034 [DONE] — Adapter conformance and registry honesty
 - **Priority:** P1
 - **Review refs:** chatGPT P1-23, P1-24; claude J-02, J-11; deepseek (adapter contract); grok G6-06, G6-12
 - **Area:** adapters / catalog
@@ -571,7 +571,7 @@
   - Catalog capability honesty: no fuzzy mapping (streaming→reasoning); explicit fields only.
 - **Acceptance:** conformance suite passes for all registered adapters; metadata alignment test passes.
 
-### T-035 — Free adapter install UX polish
+### T-035 [DONE] — Free adapter install UX polish
 - **Priority:** P1
 - **Review refs:** grok G6-09; claude (installer); deepseek (installer)
 - **Area:** installer / CLI / MCP
