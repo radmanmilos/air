@@ -1,5 +1,12 @@
 // Runtime discovery of a free OpenRouter model (avoids hardcoding dead models).
 
+const PREFERRED = [
+  'google/gemma-4-31b-it:free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'qwen/qwen-2.5-72b-instruct:free',
+  'mistralai/mistral-small-3.1-24b-instruct:free',
+];
+
 let cached: { model: string; ts: number } | null = null;
 const TTL = 60 * 60 * 1000;
 
@@ -10,15 +17,19 @@ export async function pickFreeOpenRouterModel(): Promise<string | undefined> {
     if (!res.ok) return undefined;
     const data: any = await res.json();
     const models: any[] = data?.data ?? [];
-    const free = models.filter((m) => {
-      const p = m?.pricing?.prompt;
-      return p === '0' || p === 0 || (typeof p === 'string' && parseFloat(p) === 0);
-    });
-    // Prefer models whose id contains :free, then any free.
-    const pick = free.find((m) => /:free$/i.test(m?.id ?? '')) ?? free[0];
-    if (pick?.id) {
-      cached = { model: pick.id, ts: Date.now() };
-      return pick.id;
+    const ids = new Set(models.map((m) => m?.id));
+    // Prefer known-good free models that are currently available.
+    for (const p of PREFERRED) {
+      if (ids.has(p)) {
+        cached = { model: p, ts: Date.now() };
+        return p;
+      }
+    }
+    // Fall back to any :free model.
+    const free = models.filter((m) => /:free$/i.test(m?.id ?? ''));
+    if (free[0]?.id) {
+      cached = { model: free[0].id, ts: Date.now() };
+      return free[0].id;
     }
   } catch { /* noop */ }
   return undefined;
