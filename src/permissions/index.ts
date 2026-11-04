@@ -56,6 +56,12 @@ export function allowsShell(policy: PermissionPolicy): boolean {
   return policy.mode === 'edit_and_shell' && policy.allowShell;
 }
 
+export function conforms(policy: PermissionPolicy, adapterCaps: { fileEditing?: boolean; shellAccess?: boolean }): { ok: boolean; reason?: string } {
+  if (allowsWrite(policy) && !adapterCaps.fileEditing) return { ok: false, reason: 'adapter lacks fileEditing' };
+  if (allowsShell(policy) && !adapterCaps.shellAccess) return { ok: false, reason: 'adapter lacks shellAccess' };
+  return { ok: true };
+}
+
 export function enforce(policy: PermissionPolicy, required: { write?: boolean; shell?: boolean; network?: boolean }): { ok: boolean; reason?: string } {
   if (required.write && !allowsWrite(policy)) return { ok: false, reason: 'write not permitted by permission mode' };
   if (required.shell && !allowsShell(policy)) return { ok: false, reason: 'shell not permitted' };
