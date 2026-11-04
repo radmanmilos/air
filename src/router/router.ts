@@ -90,9 +90,21 @@ export function selectCandidateFrom(
       continue;
     }
 
-    // Capability checks (informational; canHandle already covers the hard ones).
+    // Capability checks.
     if (task.mode === 'ask' && !adapter.capabilities.headlessExecution) {
       skips.push({ candidate: candidate.id, reason: 'capability_mismatch', detail: 'headlessExecution' });
+      continue;
+    }
+    if (task.requiresWrite && !adapter.capabilities.fileEditing) {
+      skips.push({ candidate: candidate.id, reason: 'capability_mismatch', detail: 'fileEditing' });
+      continue;
+    }
+    if (task.requiresCode && !adapter.capabilities.fileEditing && !adapter.capabilities.headlessExecution) {
+      skips.push({ candidate: candidate.id, reason: 'capability_mismatch', detail: 'code' });
+      continue;
+    }
+    if (task.readOnly === false && !adapter.capabilities.fileEditing) {
+      skips.push({ candidate: candidate.id, reason: 'capability_mismatch', detail: 'write' });
       continue;
     }
 

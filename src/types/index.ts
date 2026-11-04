@@ -20,6 +20,8 @@ export interface CommandSpec {
   env?: Record<string, string>;
 }
 
+export type TaskType = 'code_edit' | 'code_review' | 'explain' | 'research' | 'summarize' | 'plan' | 'test' | 'other';
+
 export interface TaskInput {
   id: string;
   prompt: string;
@@ -30,6 +32,10 @@ export interface TaskInput {
   preferredModel?: string;
   mode: 'ask' | 'auto';
   readOnly?: boolean;
+  taskType?: TaskType;
+  requiresWrite?: boolean;
+  requiresCode?: boolean;
+  requiresLongContext?: boolean;
 }
 
 export interface ExecutionCandidate {
