@@ -10,7 +10,8 @@ $ErrorActionPreference = "Continue"
 # Try the convenient GitHub shortcut first.
 npm install -g github:radmanmilos/air
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "GitHub shortcut failed (likely long-path or temp-clone issue). Falling back to tarball install..."
+  Write-Host "GitHub shortcut failed. Cleaning up and falling back to tarball install..."
+  npm uninstall -g air
   npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
 }
 #>
