@@ -30,9 +30,16 @@ import type { ResultState } from '../types/result';
 import type { TaskInput } from '../types';
 
 export interface OrchestratorEvent {
+  id: string;
+  sequence: number;
   ts: string;
   type: string;
   detail: string;
+  conversationId?: string;
+  workId?: string;
+  workItemId?: string;
+  executionId?: string;
+  actor?: string;
 }
 
 export interface OrchestratorSession {
@@ -111,8 +118,16 @@ export class Orchestrator {
   }
 
   private log(type: string, detail: string): void {
-    this.events.push({ ts: new Date().toISOString(), type, detail });
-    this.persist();
+    const ev: OrchestratorEvent = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      sequence: this.events.length + 1,
+      ts: new Date().toISOString(),
+      type,
+      detail,
+    };
+    this.events.push(ev);
+    // keep events bounded
+    if (this.events.length > 1000) this.events.shift();
   }
 
   get eventsLog(): OrchestratorEvent[] {

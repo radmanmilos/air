@@ -152,7 +152,7 @@
 - **Details:** task completion writes TaskState with durable `injectedAt: null`; injection appends tool message and sets injectedAt in single atomic write; on resume any task state completed & injectedAt null re-injected before front agent invoked. Idempotent via `taskEventsProcessed` list in conversation.
 - **Acceptance:** crash test (kill between two writes) passes; no duplicated/missing task messages.
 
-## T7-013 [TODO] — Stress/idempotency/causal order for injection
+## T7-013 [DONE] — Stress/idempotency/causal order for injection
 - **Priority:** P0
 - **Review refs:** deepseek M2-01
 - **Area:** conversation / tests
@@ -309,7 +309,7 @@
 - **Details:** add `list_conversations`, `list_jobs` (filter by conversation activeWorkIds), `get_job_result`, `get_events(afterSequence)`, progress notifications. Reuse ConversationSession store.
 - **Acceptance:** MCP parity tests.
 
-## T7-030 [TODO] — Typed event model strengthening
+## T7-030 [DONE] — Typed event model strengthening
 - **Priority:** P1
 - **Review refs:** chatGPT R6-24
 - **Area:** orchestrator / events
