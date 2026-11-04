@@ -169,6 +169,8 @@ export class Orchestrator {
     const allow = defaultAllowList(adapters);
     const visited = new Set<string>();
     let hops = 0;
+    // Immutable baseline for the whole work item (T-019).
+    const baselineSnap = snapshotGit(cwd);
 
     // Failover loop: try candidates until success, abort, or hop cap.
     while (hops < maxHops) {
@@ -257,7 +259,7 @@ export class Orchestrator {
       // Determine result from the agent-produced delta relative to the initial
       // snapshot, not from whether the tree is dirty at all (R5-07).
       const afterSnap = snapshotGit(cwd);
-      const delta = snapshotDelta(beforeSnap, afterSnap);
+      const delta = snapshotDelta(baselineSnap, afterSnap);
       const changed = delta.dirty;
       let result: ResultState;
       if (outcome.cancelled) {
