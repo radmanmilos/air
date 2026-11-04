@@ -6,7 +6,13 @@ by running this in an elevated PowerShell, then re-run the installer:
 
   Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1
   git config --system core.longpaths true
-npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
+$ErrorActionPreference = "Continue"
+# Try the convenient GitHub shortcut first.
+npm install -g github:radmanmilos/air
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "GitHub shortcut failed (likely long-path or temp-clone issue). Falling back to tarball install..."
+  npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
+}
 #>
 param()
 $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem"
