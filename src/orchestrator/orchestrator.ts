@@ -198,7 +198,7 @@ export class Orchestrator {
     const adaptersRaw = this.deps.adapters ?? availableAdapters(config);
     let adapters = adaptersRaw;
     if (options.freeOnly) {
-      adapters = adaptersRaw.filter((a: any) => costTier({ id: a.id, tool: a.id, provider: a.provider, model: a.model, capabilities: a.capabilities } as any) === 0);
+      adapters = adaptersRaw.filter((a: any) => costTier({ id: a.id, tool: a.id, provider: a.provider, model: a.model, capabilities: a.capabilities } as any) <= 0);
       if (adapters.length === 0) throw new Error('No free-capable adapter available. Use --allow-paid to enable paid fallback.');
     }
     const runId = options.runId ?? makeRunId();
