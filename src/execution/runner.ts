@@ -119,11 +119,13 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
     }
 
     const pushStdout = (text: string) => {
-      // Byte-accurate accumulation (UTF-8 safe).
       const buf = Buffer.from(text, 'utf8');
       if (stdoutBytes < maxBuffer) {
         const remaining = maxBuffer - stdoutBytes;
-        const sliceBuf = buf.subarray(0, remaining);
+        let len = Math.min(buf.length, remaining);
+        // Do not split a multi-byte UTF-8 sequence at the cap boundary.
+        while (len > 0 && len < buf.length && (buf[len] & 0xc0) === 0x80) len--;
+        const sliceBuf = buf.subarray(0, len);
         stdout += sliceBuf.toString('utf8');
         stdoutBytes += sliceBuf.length;
         if (buf.length > remaining) stdoutTruncated = true;
@@ -145,7 +147,9 @@ export async function runProcess(spec: CommandSpec, options: RunOptions = {}): P
       const buf = Buffer.from(text, 'utf8');
       if (stderrBytes < maxBuffer) {
         const remaining = maxBuffer - stderrBytes;
-        const sliceBuf = buf.subarray(0, remaining);
+        let len = Math.min(buf.length, remaining);
+        while (len > 0 && len < buf.length && (buf[len] & 0xc0) === 0x80) len--;
+        const sliceBuf = buf.subarray(0, len);
         stderr += sliceBuf.toString('utf8');
         stderrBytes += sliceBuf.length;
         if (buf.length > remaining) stderrTruncated = true;
