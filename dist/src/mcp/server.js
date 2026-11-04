@@ -200,7 +200,7 @@ async function runTaskInBackground(orch, job) {
     }
 }
 export async function startMcp(transport) {
-    const server = new McpServer({ name: 'air', version: '0.1.0' });
+    const server = new McpServer({ name: 'air', version: '0.2.0' });
     server.registerTool('run_task', {
         title: 'Run a task',
         description: 'Route and run a task through an AI coding tool.',

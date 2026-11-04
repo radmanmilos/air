@@ -215,7 +215,7 @@ async function runTaskInBackground(orch: Orchestrator, job: Job): Promise<void> 
 }
 
 export async function startMcp(transport?: Transport): Promise<{ server: McpServer; transport: Transport }> {
-  const server = new McpServer({ name: 'air', version: '0.1.0' });
+  const server = new McpServer({ name: 'air', version: '0.2.0' });
 
   server.registerTool(
     'run_task',

@@ -18,7 +18,7 @@ const program = new Command();
 program
     .name('air')
     .description('Unified AI tool orchestrator')
-    .version('0.1.0')
+    .version('0.2.0')
     .option('--dev', 'Developer mode: verbose diagnostics and full logs');
 async function listAdapters(config) {
     // Production registry: real adapters only, discovered from PATH.
