@@ -1,0 +1,38 @@
+// Result compiler (T-027): turns a task result into a single coherent
+// user-facing reply. Never trusts worker prose; uses facts (delta, verify,
+// output). Redacts before returning.
+
+import { redact } from '../security/redact';
+
+export interface JobFacts {
+  runId: string;
+  result: string;
+  adapterId: string;
+  provider: string;
+  model: string;
+  durationMs?: number;
+  changedFiles?: string[];
+  verifyOk?: boolean;
+  outputTail?: string;
+  error?: { category: string; message: string };
+}
+
+export function compileJobResult(facts: JobFacts): string {
+  const lines: string[] = [];
+  const ok = facts.result === 'SUCCEEDED_WITH_CHANGES' || facts.result === 'SUCCEEDED_READ_ONLY' || facts.result === 'NO_CHANGES';
+  lines.push(ok ? 'Done.' : `Failed (${facts.result}).`);
+  if (facts.changedFiles && facts.changedFiles.length > 0) {
+    lines.push(`Changed: ${facts.changedFiles.join(', ')}.`);
+  }
+  if (facts.verifyOk !== undefined) {
+    lines.push(`Verification: ${facts.verifyOk ? 'PASS' : 'FAIL'}.`);
+  }
+  if (facts.error) {
+    lines.push(`Error: ${facts.error.category} — ${facts.error.message.slice(0, 200)}`);
+  }
+  if (facts.outputTail) {
+    const tail = redact(facts.outputTail).slice(-300);
+    if (tail.trim()) lines.push(`Output: ${tail}`);
+  }
+  return lines.join(' ');
+}
