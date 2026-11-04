@@ -188,8 +188,9 @@ async function runTaskInBackground(orch: Orchestrator, job: Job): Promise<void> 
     const session = await orch.start(job.state.task, job.cwd, {
       readOnly: !!job.state.readOnly,
       mode: job.state.mode === 'auto' ? 'auto' : 'ask',
-      maxHops: job.state.maxHops ?? 3,
-    });
+       maxHops: job.state.maxHops ?? 3,
+       allowProviders: job.state.allowProviders,
+     });
     // Read the full task state from disk (includes outputTail, error, etc.)
     // which orch.start() wrote via writeTaskState.
     const fullState = await readTaskState(session.runId);
@@ -279,8 +280,11 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
         hops: 0,
         maxHops: config.failover.maxHops,
         readOnly: !!args.readOnly,
-        mode: args.auto ? 'auto' : 'ask',
-      };
+      mode: args.auto ? 'auto' : 'ask',
+      allowProviders: Array.isArray(args.allowProvider)
+        ? args.allowProvider
+        : (typeof args.allowProvider === 'string' ? args.allowProvider.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined),
+    };
 
       const job: Job = {
         state: fallbackState,

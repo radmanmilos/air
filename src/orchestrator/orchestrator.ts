@@ -127,7 +127,7 @@ export class Orchestrator {
    *   6. On failover-triggering category: propose switch (ask) or auto-switch
    *   7. Repeat until success, abort, hop cap, or no eligible candidate
    */
-  async start(task: string, cwd: string, options: { readOnly?: boolean; mode?: 'ask' | 'auto'; files?: string[]; maxHops?: number; allowDirty?: boolean } = {}): Promise<OrchestratorSession> {
+  async start(task: string, cwd: string, options: { readOnly?: boolean; mode?: 'ask' | 'auto'; files?: string[]; maxHops?: number; allowDirty?: boolean; allowProviders?: string[] } = {}): Promise<OrchestratorSession> {
     const readOnly = !!options.readOnly;
     const mode = options.mode ?? 'ask';
     const maxHops = options.maxHops ?? 3;
@@ -198,7 +198,7 @@ export class Orchestrator {
       // Build the task's provider-destination policy from the actual first
       // selected candidate (R5-04).
       if (hops === 1) {
-        allow.providers = [chosen.provider];
+        allow.providers = [chosen.provider, ...(options.allowProviders ?? [])];
         allow.models = [chosen.model];
       }
 

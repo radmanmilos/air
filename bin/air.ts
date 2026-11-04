@@ -103,6 +103,7 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       files: options.files,
       maxHops: config.failover.maxHops,
       allowDirty: !!options.allowDirty,
+      allowProviders: options.allowProvider ? options.allowProvider.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
     });
     // Wait for the async result propagation (session_completed event).
     // The session object is updated when the run completes.
