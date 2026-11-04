@@ -473,7 +473,7 @@
   - `air status --json` surfaces quota state; `route-test --explain` shows inputs.
 - **Acceptance:** A4/A5 scenarios pass; ranking deterministic given ledger snapshot.
 
-### T-029 — Permission policy enforcement (shared, real)
+### T-029 [DONE] — Permission policy enforcement (shared, real)
 - **Priority:** P1
 - **Review refs:** chatGPT P1-17; claude (permissions); deepseek (permissions); grok (permissions)
 - **Area:** permissions / adapters
