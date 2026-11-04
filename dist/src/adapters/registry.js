@@ -17,6 +17,7 @@ import { OpenCodeAdapter } from './opencode.js';
 import { KilocodeAdapter } from './kilocode.js';
 import { CodexAdapter } from './codex.js';
 import { GitHubCopilotAdapter } from './github-copilot.js';
+import { OllamaAdapter } from './ollama.js';
 /** Cache of dynamically loaded adapters (factoryModule entries from catalog). */
 const DYNAMIC_ADAPTERS = new Map();
 function isOnPath(exe) {
@@ -41,7 +42,7 @@ const META = {
     opencode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '2.2.5' },
     kilocode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
     codex: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '0.166.0' },
-    'github-copilot': { verified: false, enabled: true, headlessSupported: true, verificationVersion: '2.102.0' },
+    ollama: { verified: true, enabled: true, headlessSupported: true, verificationVersion: 'runtime' },
 };
 const FACTORY = {
     aider: () => new AiderAdapter(),
@@ -50,6 +51,7 @@ const FACTORY = {
     kilocode: () => new KilocodeAdapter(),
     codex: () => new CodexAdapter(),
     'github-copilot': () => new GitHubCopilotAdapter(),
+    ollama: () => new OllamaAdapter(),
 };
 const EXE = {
     aider: 'aider',
@@ -58,6 +60,7 @@ const EXE = {
     kilocode: 'kilocode',
     codex: 'codex',
     'github-copilot': 'gh',
+    ollama: 'ollama',
 };
 /** Apply configured tool overrides to an adapter instance and its meta. */
 function applyConfig(adapter, tool) {

@@ -20,6 +20,7 @@ import { OpenCodeAdapter } from './opencode';
 import { KilocodeAdapter } from './kilocode';
 import { CodexAdapter } from './codex';
 import { GitHubCopilotAdapter } from './github-copilot';
+import { OllamaAdapter } from './ollama';
 
 export interface AdapterInfo {
   adapter: AgentAdapter;
@@ -56,7 +57,7 @@ const META: Record<string, AdapterMeta> = {
   opencode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '2.2.5' },
   kilocode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
   codex: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '0.166.0' },
-  'github-copilot': { verified: false, enabled: true, headlessSupported: true, verificationVersion: '2.102.0' },
+  ollama: { verified: true, enabled: true, headlessSupported: true, verificationVersion: 'runtime' },
 };
 
 const FACTORY: Record<string, () => AgentAdapter> = {
@@ -66,6 +67,7 @@ const FACTORY: Record<string, () => AgentAdapter> = {
   kilocode: () => new KilocodeAdapter(),
   codex: () => new CodexAdapter(),
   'github-copilot': () => new GitHubCopilotAdapter(),
+  ollama: () => new OllamaAdapter(),
 };
 
 const EXE: Record<string, string> = {
@@ -75,6 +77,7 @@ const EXE: Record<string, string> = {
   kilocode: 'kilocode',
   codex: 'codex',
   'github-copilot': 'gh',
+  ollama: 'ollama',
 };
 
 /** Apply configured tool overrides to an adapter instance and its meta. */

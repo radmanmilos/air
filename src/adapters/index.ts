@@ -4,5 +4,5 @@ export { GooseAdapter } from './goose';
 export { OpenCodeAdapter } from './opencode';
 export { KilocodeAdapter } from './kilocode';
 export { CodexAdapter } from './codex';
-export { GitHubCopilotAdapter } from './github-copilot';
+export { OllamaAdapter } from './ollama';
 export { classifyError, getErrorAction } from './conformance';

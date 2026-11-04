@@ -23,6 +23,7 @@
     "scripts":  {
     "build": "tsc",
     "check:dist": "node scripts/check-dist-imports.mjs",
+    "check:deadcode": "node scripts/check-dead-code.mjs",
     "postbuild": "node scripts/fix-imports.mjs",
                     "prebuild":  "node -e \"require(\u0027fs\u0027).rmSync(\u0027dist\u0027, {recursive:true, force:true})\"",
                     "typecheck":  "tsc --noEmit",
