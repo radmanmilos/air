@@ -1,0 +1,1 @@
+export { startMcp } from './server';
