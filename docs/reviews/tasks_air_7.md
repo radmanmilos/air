@@ -340,7 +340,7 @@
 
 # P2 — Quality and consistency
 
-## T7-033 [BLOCKED] — Conversation summary compaction (already T7-022) placeholder
+## T7-033 [DONE] — Conversation summary compaction (already T7-022) placeholder
 - **Priority:** P2
 - **Review refs:** grok G7-11
 - **Area:** conversation
@@ -382,7 +382,7 @@
 - **Details:** use pinned checksums in trusted metadata or verify publisher signatures with trusted key; keep install explicit user action.
 - **Acceptance:** tampered hash fails install.
 
-## T7-038 [BLOCKED] — Second front-agent provider deferred (document seam)
+## T7-038 [DONE] — Second front-agent provider deferred (document seam)
 - **Priority:** P2
 - **Review refs:** deepseek M2-10
 - **Area:** docs
