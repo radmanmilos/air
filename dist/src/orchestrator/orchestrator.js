@@ -195,6 +195,15 @@ export class Orchestrator {
                     allow.providers = [chosen.provider, ...(options.allowProviders ?? [])];
                     allow.models = [chosen.model];
                 }
+                if (chosen.id === 'aider' && !taskInput.preferredModel) {
+                    try {
+                        const { pickFreeOpenRouterModel } = await import('../router/free-models.js');
+                        const m = await pickFreeOpenRouterModel();
+                        if (m)
+                            taskInput.preferredModel = m;
+                    }
+                    catch { /* noop */ }
+                }
                 const spec = adapter.buildCommand(taskInput);
                 const beforeSnap = snapshotGit(execCwd);
                 const state = {
