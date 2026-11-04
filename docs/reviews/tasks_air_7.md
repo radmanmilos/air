@@ -80,7 +80,7 @@
 - **Details:** separate candidate filtering from destination authorization; remove implicit `allow.models=[firstModel]` unless documented; build immutable proposal with source/dest adapter/provider/model, data classification, context digest, cost class, reason, nonce/hash; verify against `proposal.to.*`; mandatory digest for cross-provider/paid egress; persist approval; prevent replay.
 - **Acceptance:** A→B failover success/decline/altered consent tests work through MCP.
 
-## T7-005 [TODO] — Permission enforcement in real execution path
+## T7-005 [BLOCKED] — Permission enforcement in real execution path
 - **Priority:** P0
 - **Review refs:** chatGPT R6-04/R6-14; grok G7-03
 - **Area:** permissions / adapters
@@ -161,7 +161,7 @@
 - **Details:** stress test completing 10 tasks in rapid succession: all 10 results appear exactly once; conversation file valid; front agent reply references correct taskId. Idempotency on double injection. Causal order: task start before completion; completions ordered by completedAt.
 - **Acceptance:** stress test green.
 
-## T7-014 [TODO] — Transactional job store (replace snapshot) + crash recovery
+## T7-014 [BLOCKED] — Transactional job store (replace snapshot) + crash recovery
 - **Priority:** P0
 - **Review refs:** chatGPT R6-15; deepseek M2 (durability)
 - **Area:** persistence / orchestrator
@@ -215,7 +215,7 @@
 - **Details:** at discovery execute safe version check, normalize/compare against supported ranges, store result; gate routing on measured version + required feature probes; separate exists/version compatible/headless verified/task smoke verified states.
 - **Acceptance:** arbitrary binary on PATH not routed unless version compatible.
 
-## T7-020 [TODO] — Adapter permission conformance table + refuse non-conforming
+## T7-020 [BLOCKED] — Adapter permission conformance table + refuse non-conforming
 - **Priority:** P0
 - **Review refs:** chatGPT R6-14; grok G7-03
 - **Area:** adapters / permissions
@@ -246,7 +246,7 @@
 - **Details:** when messages exceed size/token threshold, replace older turns with single system message containing redacted summary, preserving last N turns verbatim and all tool messages referenced by activeTaskIds. Never drop task result messages until taskId removed from activeWorkIds. Persist compactedAt marker; keep raw log (append-only) for --verbose. Cap conversation file size configurable (default 5MB) with warning.
 - **Acceptance:** 500-turn synthetic conversation compacts correctly; front agent still answers follow-up referencing fact from turn 10 via summary.
 
-## T7-023 [TODO] — Runtime-configurable free tiers + provider rate-limit ingestion
+## T7-023 [BLOCKED] — Runtime-configurable free tiers + provider rate-limit ingestion
 - **Priority:** P1
 - **Review refs:** deepseek M2-04
 - **Area:** config / router / health
@@ -318,7 +318,7 @@
 - **Details:** events with stable event ID, sequence, conversation/work/work-item/execution reference, payload schema, actor, cursor semantics. Typed events not ad-hoc strings.
 - **Acceptance:** event cursor polling works across processes.
 
-## T7-031 [TODO] — Multi-session CLI path uses central scheduler
+## T7-031 [BLOCKED] — Multi-session CLI path uses central scheduler
 - **Priority:** P1 (P2 review)
 - **Review refs:** chatGPT R6-27
 - **Area:** CLI / orchestrator
@@ -340,7 +340,7 @@
 
 # P2 — Quality and consistency
 
-## T7-033 [TODO] — Conversation summary compaction (already T7-022) placeholder
+## T7-033 [BLOCKED] — Conversation summary compaction (already T7-022) placeholder
 - **Priority:** P2
 - **Review refs:** grok G7-11
 - **Area:** conversation
@@ -355,7 +355,7 @@
 - **Details:** show conversation id, active jobs, last message ts in `air dashboard`.
 - **Acceptance:** dashboard displays them.
 
-## T7-035 [TODO] — E2E smoke path for conversation loop
+## T7-035 [BLOCKED] — E2E smoke path for conversation loop
 - **Priority:** P2
 - **Review refs:** grok G7-14; deepseek M2-A
 - **Area:** tests
@@ -373,7 +373,7 @@
 - **Details:** document ChatProvider interface with worked example; test swaps mock ChatProvider proving seam. Do not implement second provider in M2.
 - **Acceptance:** interface documented; mock provider test passes.
 
-## T7-037 [TODO] — Remote catalog integrity (signed/pinned)
+## T7-037 [BLOCKED] — Remote catalog integrity (signed/pinned)
 - **Priority:** P2
 - **Review refs:** chatGPT R6-25
 - **Area:** installer / catalog
@@ -382,13 +382,13 @@
 - **Details:** use pinned checksums in trusted metadata or verify publisher signatures with trusted key; keep install explicit user action.
 - **Acceptance:** tampered hash fails install.
 
-## T7-038 [TODO] — Second front-agent provider deferred (document seam)
+## T7-038 [BLOCKED] — Second front-agent provider deferred (document seam)
 - **Priority:** P2
 - **Review refs:** deepseek M2-10
 - **Area:** docs
 - **Details:** absorbed into T7-036.
 
-## T7-039 [TODO] — Verification gate V-01..V-15 automated
+## T7-039 [BLOCKED] — Verification gate V-01..V-15 automated
 - **Priority:** P0 (gate)
 - **Review refs:** deepseek §1
 - **Area:** tests / docs
