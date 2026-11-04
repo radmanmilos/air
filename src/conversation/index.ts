@@ -118,6 +118,10 @@ export async function appendMessage(id: string, msg: Omit<ConversationMessage, '
 }
 
 export async function injectResult(convId: string, summary: string, workId?: string): Promise<void> {
+  const conv = loadConversation(convId);
+  if (conv && workId && conv.messages.some((m) => m.role === 'tool' && m.workId === workId)) {
+    return; // idempotent: already injected
+  }
   await appendMessage(convId, { role: 'tool', content: summary, workId });
 }
 

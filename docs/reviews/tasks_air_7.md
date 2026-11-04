@@ -116,7 +116,7 @@
 - **Details:** background waiter per job or shared poller: when orchestrator session terminal → compileJobResult(facts) → injectResult(convId, summary, runId); remove runId from activeWorkIds; print one line in REPL `job <id> finished: <one-line summary>`. Idempotent inject (same runId no double-append). Crash-recoverable: task completed with injectedAt null → re-inject on resume.
 - **Acceptance:** integration test /run mock job → conversation gains tool/job message with compiled text; restart-safe.
 
-## T7-009 [TODO] — Worker prompt from conversation context
+## T7-009 [DONE] — Worker prompt from conversation context
 - **Priority:** P0
 - **Review refs:** grok G7-04; chatGPT R6-10
 - **Area:** orchestrator / conversation
@@ -143,7 +143,7 @@
 - **Details:** accept only generated UUID/ULID identifiers; schema validator on load; write with lock+atomic rename; never let caller-supplied IDs become paths without validation; `saveConversation` use locked read-modify-write; add concurrent append/save tests and corrupted-file recovery.
 - **Acceptance:** path traversal rejected; concurrent save+append no overwrite; corrupted file recovery behavior documented/tested.
 
-## T7-012 [TODO] — Crash recovery in injection path (atomic + replayable)
+## T7-012 [DONE] — Crash recovery in injection path (atomic + replayable)
 - **Priority:** P0
 - **Review refs:** deepseek M2-06; grok G7-02
 - **Area:** conversation / task-state
@@ -255,7 +255,7 @@
 - **Details:** make freeTier values runtime-configurable via user-editable `free-tier-overrides.yaml` (precedence CLI > env > repo > global > defaults). Add `air models --refresh-free` fetching maintainer-hosted file (pinned version, --offline fallback). Handle provider-reported rate limits (Retry-After, X-RateLimit-*) by updating local counter. Document best-effort drift.
 - **Acceptance:** overriding free-tier limit in config changes router behavior without code change; provider-reported rate limits update local counters.
 
-## T7-024 [TODO] — Tool opacity decision (tool-level vs provider-level)
+## T7-024 [DONE] — Tool opacity decision (tool-level vs provider-level)
 - **Priority:** P1
 - **Review refs:** deepseek M2-05
 - **Area:** adapters / docs
@@ -273,7 +273,7 @@
 - **Details:** include change summary in injected tool message: files added/modified/deleted + commits created (if auto-commit). Front agent surfaces change summaries in natural language. Require explicit `--allow-commits` for tools that auto-commit; without it disable or run no-commit mode. Refuse to run in dirty tree by default (verify applies to background tasks). Result compiler include delta file list, verify PASS/FAIL, duration, adapter id (optional/verbose); default user-facing text short; always redact.
 - **Acceptance:** injecting task that modified 3 files produces message with change summary; front-agent prose mentions change count.
 
-## T7-026 [TODO] — Planner quality (light)
+## T7-026 [DONE] — Planner quality (light)
 - **Priority:** P1
 - **Review refs:** grok G7-07; chatGPT R6-07
 - **Area:** planner
@@ -327,7 +327,7 @@
 - **Details:** replace `air run --sessions` round-robin with multiple work items submitted to central scheduler; retain SessionManager as low-level executor utility.
 - **Acceptance:** sessions tests updated; central policy applied.
 
-## T7-032 [TODO] — README/PLAN/docs honesty update for review-7 state
+## T7-032 [DONE] — README/PLAN/docs honesty update for review-7 state
 - **Priority:** P1
 - **Review refs:** chatGPT R6-19; deepseek M2-08; grok G7-13
 - **Area:** docs
@@ -346,7 +346,7 @@
 - **Area:** conversation
 - **Details:** absorbed into T7-022.
 
-## T7-034 [TODO] — Dashboard links conversations
+## T7-034 [DONE] — Dashboard links conversations
 - **Priority:** P2
 - **Review refs:** grok G7-12
 - **Area:** CLI
@@ -364,7 +364,7 @@
 - **Details:** automated scenario test (not manual): temp git repo → scripted air chat lines → mock/real aider if present → assert conversation file contains compiled result. Include kill-and-resume mid-task.
 - **Acceptance:** scenario test exists and green in CI.
 
-## T7-036 [TODO] — ChatProvider interface documented + mock swap test
+## T7-036 [DONE] — ChatProvider interface documented + mock swap test
 - **Priority:** P2
 - **Review refs:** deepseek M2-10
 - **Area:** docs / conversation

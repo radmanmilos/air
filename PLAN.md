@@ -375,7 +375,9 @@ applied. Conflicts were resolved as follows:
 - **README honesty (G3-15):** README lists only implemented adapters (aider,
   goose, mock-for-tests) and documents known limitations.
 
-## Current state (2026-11-03)
+## Current state (2026-11-04, review 7)
+- Conversation decision loop (`src/conversation/decide.ts`), job completion→inject, free-only gate, MCP parity, storage hardening, worktree create/apply, health/concurrency/version/verify hardening, compaction, voice spec, result-compiler richness shipped.
+- Many modules still experimental scaffolding; README/PLAN reflect implemented vs planned.
 
 - 39 test files, 217 tests passing.
 - `npm run typecheck`, `npm run typecheck:test`, `npm run build`,

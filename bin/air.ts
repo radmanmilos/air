@@ -343,6 +343,13 @@ program
       console.log(`- ${s.runId}: ${s.adapterId} (${s.provider}/${s.model}) ${s.state} ${s.result ?? ''}`);
     }
     console.log(`Events: ${raw.events?.length ?? 0}`);
+    // Conversations (T7-034)
+    const { listConversations } = await import('../src/conversation');
+    const convIds = listConversations();
+    console.log(`Conversations: ${convIds.length}`);
+    for (const cid of convIds.slice(-10)) {
+      console.log(`- ${cid}`);
+    }
     for (const e of (raw.events ?? []).slice(-10)) {
       console.log(`  ${e.ts} ${e.type}: ${e.detail}`);
     }
@@ -645,9 +652,14 @@ program
     const waiters = new Map<string, Promise<void>>();
 
     async function runJob(task: string, _workId?: string): Promise<void> {
+      // Build worker prompt from conversation context (T7-009).
+      const contextParts = [task];
+      if (conv!.summary) contextParts.push(`Context summary: ${conv!.summary}`);
+      if (conv!.facts.length > 0) contextParts.push(`Facts: ${conv!.facts.join('; ')}`);
+      const enriched = contextParts.join('\n');
       const { Orchestrator } = await import('../src/orchestrator/orchestrator');
       const orch = new (Orchestrator as any)({ config, mcpMode: false });
-      const plan = planFromRequest(task, { requiresWrite: true, requiresCode: true });
+      const plan = planFromRequest(enriched, { requiresWrite: true, requiresCode: true });
       const item = plan.workItems[0];
       const session = await orch.start(item.objective, cwd, { mode: 'ask', freeOnly: conv!.userPreferences.freeOnly });
       await appendMessage(conv!.id, { role: 'assistant', content: `Started job ${session.runId}.` });

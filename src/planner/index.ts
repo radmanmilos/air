@@ -1,4 +1,21 @@
-// Lightweight delegation planner (T-026).
+import { z } from 'zod';
+
+export const WorkItemSchema = z.object({
+  id: z.string(),
+  objective: z.string(),
+  taskType: z.enum(['code_edit','code_review','explain','research','summarize','plan','test','other']),
+  readOnly: z.boolean(),
+  requiresWrite: z.boolean(),
+  requiresCode: z.boolean(),
+  dependsOn: z.array(z.string()),
+  acceptanceCriteria: z.array(z.string()),
+});
+
+export const PlanSchema = z.object({ workItems: z.array(WorkItemSchema) });
+
+export function validatePlan(plan: Plan): Plan {
+  return PlanSchema.parse(plan) as Plan;
+}
 // Turns a user request into a small typed work graph using front-agent
 // hints + light heuristics. No heavy LLM classifier.
 

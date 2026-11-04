@@ -609,7 +609,11 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
           const { config } = await loadConfig({ cwd: process.cwd() });
           const { Orchestrator } = await import('../orchestrator/orchestrator');
           const orch = new Orchestrator({ config, mcpMode: true });
-          const plan = planFromRequest(a.goal, a.hints ?? {});
+          const contextParts = [a.goal];
+          if (conv.summary) contextParts.push(`Context summary: ${conv.summary}`);
+          if (conv.facts && conv.facts.length > 0) contextParts.push(`Facts: ${conv.facts.join('; ')}`);
+          const enriched = contextParts.join('\n');
+          const plan = planFromRequest(enriched, a.hints ?? {});
           const item = plan.workItems[0];
           const session = await orch.start(item.objective, process.cwd(), { mode: 'auto', freeOnly: conv.userPreferences.freeOnly });
           conv.activeWorkIds.push(session.runId);

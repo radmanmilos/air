@@ -124,3 +124,7 @@ CLI but not documented here, the conformance test in
 | 4 | CONFIG_OR_DIRTY | Config invalid, dirty-tree refused, or verify failed |
 | 5 | TIMEOUT | Timed out |
 | 6 | TASK_FAILURE | Failed; tool exited non-zero with no failover category |
+## Free-tier semantics
+
+Tool-level free-ness is used: each adapter is marked free or paid based on its expected default configuration (aider-with-Ollama is free; aider-with-GPT-4o is paid). Where an adapter can report its underlying provider/model via a eportsProvider() method, that value is used instead for finer-grained free-tier tracking; otherwise the tool-level default applies. Unknown cost is never treated as free.
+
