@@ -65,6 +65,9 @@ export function selectCandidateFrom(
     });
   }
 
+  // Free-first ranking: prefer lower cost tier, then larger context window.
+  candidates.sort((a, b) => costTier(a) - costTier(b));
+
   for (const candidate of candidates) {
     const adapter = adapters.find((a) => a.id === candidate.id);
     if (!adapter) {
@@ -130,7 +133,14 @@ export function isBlockedByAllowlist(adapter: AgentAdapter, allow: AllowList | n
   return null;
 }
 
-/** Format a RouteDecision for --explain / JSON output. */
+/** Compute a coarse cost tier for free-first ranking. */
+function costTier(c: ExecutionCandidate): number {
+  if (c.provider === 'ollama' || c.provider === 'lm-studio') return 0;
+  if (c.provider === 'openrouter' && /free/i.test(c.model)) return 0;
+  if (/mini|small|lite/i.test(c.model)) return 1;
+  if (/pro|opus|sonnet|large/i.test(c.model)) return 3;
+  return 2;
+}
 export function formatRouteDecision(decision: RouteDecision): string {
   const lines: string[] = [];
   lines.push(`Task: ${decision.task.prompt}`);

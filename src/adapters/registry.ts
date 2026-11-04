@@ -53,10 +53,10 @@ function isOnPath(exe: string): boolean {
 const META: Record<string, AdapterMeta> = {
   aider: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '0.86.2' },
   goose: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '1.57.0' },
-  opencode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '2.2.5' },
-  kilocode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
-  codex: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '0.166.0' },
-  'github-copilot': { verified: true, enabled: true, headlessSupported: true, verificationVersion: '2.102.0' },
+  opencode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '2.2.5' },
+  kilocode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
+  codex: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '0.166.0' },
+  'github-copilot': { verified: false, enabled: true, headlessSupported: true, verificationVersion: '2.102.0' },
 };
 
 const FACTORY: Record<string, () => AgentAdapter> = {

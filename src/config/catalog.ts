@@ -22,6 +22,14 @@ export interface InstallEntry {
   capabilities: Record<string, boolean>;
   description: string;
   tags: string[];
+  /** Cost classification: free/freemium/paid/unknown. Defaults to unknown. */
+  cost?: 'free' | 'freemium' | 'paid' | 'unknown';
+  /** Auth requirement. */
+  auth?: 'none' | 'api_key' | 'oauth' | 'subscription';
+  /** Free-tier limits. */
+  limits?: { rpm?: number; rpd?: number; tpm?: number; tpd?: number; resetsAt?: string };
+  /** Context window in tokens. */
+  contextWindow?: number;
   install: {
     method: 'package-manager' | 'direct-download';
     commands?: Record<string, string>;
