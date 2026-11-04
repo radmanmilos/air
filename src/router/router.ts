@@ -152,7 +152,7 @@ export function costTier(c: ExecutionCandidate): number {
   const ov = isFreeOverride(c.provider, c.model);
   if (ov === true) return 0;
   if (ov === false) return 2;
-  if (c.provider === 'ollama' || c.provider === 'lm-studio') return 0;
+  if (c.provider === 'ollama' || c.provider === 'lm-studio' || c.provider === 'local' || c.provider === 'github') return 0;
   if (c.provider === 'openrouter' && /free/i.test(c.model)) return 0;
   if (/mini|small|lite/i.test(c.model)) return 1;
   if (/pro|opus|sonnet|large/i.test(c.model)) return 3;
