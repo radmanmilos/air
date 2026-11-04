@@ -12,7 +12,7 @@ import { paths } from '../config/paths';
 import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
 import { buildModelCatalog, bestModelFor } from '../router/catalog';
-import { availableAdapters, listAdapters } from '../adapters/registry';
+import { availableAdapters } from '../adapters/registry';
 import { type SessionHandle } from '../execution/sessions';
 import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
@@ -26,8 +26,6 @@ import { selectCandidateFrom, formatRouteDecision } from '../router/router';
 import { getErrorAction, triggersFailover, type ErrorCategory } from '../types/errors';
 import type { ResultState } from '../types/result';
 import type { TaskInput } from '../types';
-import { autoInstallMissing } from '../installer/installer';
-import { ensureDynamicAdaptersLoaded } from '../adapters/registry';
 
 export interface OrchestratorEvent {
   ts: string;
@@ -147,16 +145,10 @@ export class Orchestrator {
     this.log('session_started', task);
 
     const { config } = await loadConfig({ cwd });
-    // Auto-install missing adapters when catalog.autoInstall is enabled.
-    // Fire-and-forget: does not block the current task; newly installed
-    // adapters become available on subsequent routing decisions.
-    autoInstallMissing(config).catch(() => { /* best-effort */ });
-    // Load dynamic adapters from catalog factoryModule entries.
-    await ensureDynamicAdaptersLoaded(config);
     const tracker = createHealthTracker();
     await tracker.load();
 
-    const adapters = this.deps.adapters ?? listAdapters(config);
+    const adapters = this.deps.adapters ?? availableAdapters(config);
     const runId = makeRunId();
     await appendTaskIndex(runId);
 
@@ -451,7 +443,7 @@ export class Orchestrator {
     const tracker = createHealthTracker();
     await tracker.load();
 
-    const adapters = this.deps.adapters ?? listAdapters(config);
+    const adapters = this.deps.adapters ?? availableAdapters(config);
     const nextAdapter = adapters.find((a) => a.id === proposal.to.id);
     if (!nextAdapter) throw new Error(`Proposed adapter ${proposal.to.id} not available`);
 
