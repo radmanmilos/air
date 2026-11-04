@@ -93,7 +93,7 @@
   - Represent local vs CI vs runtime version compatibility separately; mark unverified adapters experimental and out of routing.
 - **Acceptance:** `catalog-lint` passes in CI; mismatched entry fails a test.
 
-### T-004 — Fix verify trust provenance (global-only trust store)
+### T-004 [DONE] — Fix verify trust provenance (global-only trust store)
 - **Priority:** P0
 - **Review refs:** chatGPT P0-06, P1-21; claude J-03; grok (security)
 - **Area:** config / security
@@ -123,7 +123,7 @@
   - Remove "CLI verified: air run" claim from PLAN.md until e2e passes.
 - **Acceptance:** built-binary e2e (CLI + MCP, fake executables) success/edit/rate-limit/crash/timeout/SIGINT; exception yields FAILED within 1s; no adapter injection in these tests.
 
-### T-006 — MCP run ID consistency and stdout protocol purity
+### T-006 [DONE] — MCP run ID consistency and stdout protocol purity
 - **Priority:** P0
 - **Review refs:** chatGPT P0-02, P0-04; claude J-01; deepseek (MCP); grok (MCP)
 - **Area:** MCP / orchestrator
@@ -136,7 +136,7 @@
   - MCP `run_task` returns runId immediately (async job), poll via status/output.
 - **Acceptance:** MCP e2e test launches stdio process and verifies protocol purity + run ID linkage.
 
-### T-007 — MCP cancellation aborts the real worker process
+### T-007 [DONE] — MCP cancellation aborts the real worker process
 - **Priority:** P0
 - **Review refs:** chatGPT P0-03; claude (cancellation); deepseek (MCP); grok (safety)
 - **Area:** MCP / execution
@@ -151,7 +151,7 @@
 
 ## P0-C. Concurrency and locking
 
-### T-008 — Enforce configured global concurrency cap (not literal 1)
+### T-008 [DONE] — Enforce configured global concurrency cap (not literal 1)
 - **Priority:** P0
 - **Review refs:** chatGPT P1-12; claude J-08; deepseek SA-00a; grok (seats)
 - **Area:** concurrency / orchestrator
