@@ -624,7 +624,7 @@
 
 ## P2-A. Docs and claims
 
-### T-038 — Rewrite PLAN.md and README to reflect reality
+### T-038 [DONE] — Rewrite PLAN.md and README to reflect reality
 - **Priority:** P2
 - **Review refs:** chatGPT P2-28; claude J-11; deepseek (docs); grok G6-06
 - **Area:** docs
