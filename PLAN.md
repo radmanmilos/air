@@ -400,3 +400,12 @@ applied. Conflicts were resolved as follows:
 | github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | 2.102.0 |
 
 Only aider and goose are CI-smoke-test verified and eligible for routing. opencode, kilocode, codex, and github-copilot are unverified spikes visible in `air status` but never routed.
+## New modules (Reviews 6)
+- src/conversation/ (ConversationSession store, actions schema, injectResult)
+- src/planner/ (lightweight delegation planner)
+- src/result-compiler/ (coherent reply compiler)
+- src/permissions/ (shared permission policy)
+- src/workspace/ (real git worktree isolation)
+- MCP: chat_send, get_conversation tools
+- CLI: air chat
+
