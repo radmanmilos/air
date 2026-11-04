@@ -9,8 +9,9 @@ by running this in an elevated PowerShell, then re-run the installer:
 $ErrorActionPreference = "Continue"
 # Try the convenient GitHub shortcut first.
 npm install -g github:radmanmilos/air
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "GitHub shortcut failed. Cleaning up and falling back to tarball install..."
+# github: installs often succeed but leave a dangling symlink on Windows.
+if ($LASTEXITCODE -ne 0 -or -not (Get-Command air -ErrorAction SilentlyContinue)) {
+  Write-Host "GitHub shortcut did not produce a working 'air' command. Cleaning up and using tarball install..."
   npm uninstall -g air
   npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
 }
