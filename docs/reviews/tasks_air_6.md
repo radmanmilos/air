@@ -284,7 +284,7 @@
 
 ## P0-F. Persistence and state durability
 
-### T-017 — Durable job/event store (replace single JSON snapshot)
+### T-017 [DONE] — Durable job/event store (replace single JSON snapshot)
 - **Priority:** P0
 - **Review refs:** chatGPT P0-05 (state), P1-14; claude J-05; deepseek (task-state); grok (state)
 - **Area:** persistence / orchestrator
@@ -299,7 +299,7 @@
   - Events have hard size limits + truncation metadata; output buffers bounded.
 - **Acceptance:** two orchestrator instances on one cache dir → no data loss; crash mid-write recoverable.
 
-### T-018 — Crash recovery and reconciliation of running jobs
+### T-018 [DONE] — Crash recovery and reconciliation of running jobs
 - **Priority:** P0
 - **Review refs:** chatGPT P1-11, P1-14; claude (recovery); deepseek (task-state); grok (recovery)
 - **Area:** persistence / orchestrator / execution
