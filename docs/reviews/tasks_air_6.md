@@ -407,7 +407,7 @@
   - Graceful degradation: if all front models rate-limited, accept message, say what's queued + reset time; built-in command grammar works with no model.
 - **Acceptance:** forced rate-limit → transparent switch, coherent reply; history preserved; docs state limitation.
 
-### T-025 — Front agent action schema (Zod) + fallback
+### T-025 [DONE] — Front agent action schema (Zod) + fallback
 - **Priority:** P1
 - **Review refs:** deepseek SA-02; claude (planner); chatGPT (supervisor)
 - **Area:** front agent
@@ -425,7 +425,7 @@
 
 ## P1-B. Planner and delegation
 
-### T-026 — Lightweight delegation planner
+### T-026 [DONE] — Lightweight delegation planner
 - **Priority:** P1
 - **Review refs:** chatGPT P1-08; claude (planner); deepseek (hints); grok G6-08
 - **Area:** planner
@@ -440,7 +440,7 @@
   - Each work item measurable result state.
 - **Acceptance:** simple task → one work item; compound → decomposed; tests.
 
-### T-027 — Result compiler (one coherent user-facing reply)
+### T-027 [DONE] — Result compiler (one coherent user-facing reply)
 - **Priority:** P1
 - **Review refs:** chatGPT P1-10, P2-25; claude (compiler); deepseek (injection); grok G6-04
 - **Area:** result compilation
