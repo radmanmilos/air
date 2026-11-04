@@ -145,8 +145,13 @@ export function isBlockedByAllowlist(adapter: AgentAdapter, allow: AllowList | n
   return null;
 }
 
+import { isFreeOverride } from './free-tiers';
+
 /** Compute a coarse cost tier for free-first ranking. */
 export function costTier(c: ExecutionCandidate): number {
+  const ov = isFreeOverride(c.provider, c.model);
+  if (ov === true) return 0;
+  if (ov === false) return 2;
   if (c.provider === 'ollama' || c.provider === 'lm-studio') return 0;
   if (c.provider === 'openrouter' && /free/i.test(c.model)) return 0;
   if (/mini|small|lite/i.test(c.model)) return 1;

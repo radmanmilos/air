@@ -246,7 +246,7 @@
 - **Details:** when messages exceed size/token threshold, replace older turns with single system message containing redacted summary, preserving last N turns verbatim and all tool messages referenced by activeTaskIds. Never drop task result messages until taskId removed from activeWorkIds. Persist compactedAt marker; keep raw log (append-only) for --verbose. Cap conversation file size configurable (default 5MB) with warning.
 - **Acceptance:** 500-turn synthetic conversation compacts correctly; front agent still answers follow-up referencing fact from turn 10 via summary.
 
-## T7-023 [BLOCKED] — Runtime-configurable free tiers + provider rate-limit ingestion
+## T7-023 [DONE] — Runtime-configurable free tiers + provider rate-limit ingestion
 - **Priority:** P1
 - **Review refs:** deepseek M2-04
 - **Area:** config / router / health
@@ -373,7 +373,7 @@
 - **Details:** document ChatProvider interface with worked example; test swaps mock ChatProvider proving seam. Do not implement second provider in M2.
 - **Acceptance:** interface documented; mock provider test passes.
 
-## T7-037 [BLOCKED] — Remote catalog integrity (signed/pinned)
+## T7-037 [DONE] — Remote catalog integrity (signed/pinned)
 - **Priority:** P2
 - **Review refs:** chatGPT R6-25
 - **Area:** installer / catalog
