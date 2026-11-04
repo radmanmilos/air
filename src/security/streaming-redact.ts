@@ -47,6 +47,12 @@ const TOKEN_PREFIXES = [
   '--token',
   '--auth',
   '--key',
+  '--password',
+  'eyJ',
+  '-----BEGIN',
+  'password',
+  'secret',
+  'token',
 ];
 
 function couldBeTokenPrefix(s: string): boolean {

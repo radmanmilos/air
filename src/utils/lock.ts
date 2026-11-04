@@ -1,15 +1,13 @@
 // Inter-process lock for shared state (R5-09).
 //
 // A lock file is written to `<lockDir>/locks/<name>.lock` containing the
-// PID and process start time of the holder. A stale lock is one whose PID
-// is no longer alive or whose start time does not match the current
-// process. Stale locks are reclaimed automatically.
-//
-// This is NOT a semaphore: callers must still check `maxConcurrentAgents`
-// themselves. The lock only makes read-modify-write sequences atomic.
+// PID, process start time, and a unique ownership token of the holder. A
+// stale lock is one whose PID is no longer alive. Empty/unparseable files
+// are treated as stale only after a grace period so a partially-written
+// lock is not reclaimed mid-write. Reclamation and release verify the
+// ownership token before unlinking to avoid races with a new holder.
 
 import { promises as fs, constants as fsConstants } from 'node:fs';
-import { join } from 'node:path';
 import { paths } from '../config/paths';
 
 export interface LockHandle {
@@ -18,16 +16,18 @@ export interface LockHandle {
 
 interface LockFile {
   pid: number;
-  start: number; // process start time (ms since epoch)
+  start: number;
   name: string;
+  token: string;
   acquiredAt: number;
 }
+
+const GRACE_MS = 2000;
 
 function processStartTime(): number {
   return Date.now() - process.uptime() * 1000;
 }
 
-/** Cached process start time so stale-lock detection is stable across calls. */
 const PROCESS_START = processStartTime();
 
 export async function isPidAlive(pid: number): Promise<boolean> {
@@ -35,7 +35,6 @@ export async function isPidAlive(pid: number): Promise<boolean> {
     process.kill(pid, 0);
     return true;
   } catch (err: any) {
-    // ESRCH = no such process; EPERM = alive but not ours.
     return err?.code !== 'ESRCH';
   }
 }
@@ -43,38 +42,35 @@ export async function isPidAlive(pid: number): Promise<boolean> {
 async function readLock(path: string): Promise<LockFile | null> {
   try {
     const raw = await fs.readFile(path, 'utf8');
-    return JSON.parse(raw) as LockFile;
+    const parsed = JSON.parse(raw) as Partial<LockFile>;
+    if (!parsed || typeof parsed.pid !== 'number') return null;
+    return {
+      pid: parsed.pid,
+      start: parsed.start ?? 0,
+      name: parsed.name ?? '',
+      token: parsed.token ?? '',
+      acquiredAt: parsed.acquiredAt ?? 0,
+    };
   } catch {
     return null;
   }
 }
 
-async function writeLock(path: string, data: LockFile): Promise<void> {
-  // Open the final lock path with O_CREAT|O_EXCL so the create is atomic:
-  // a second process cannot grab the same lock, and an existing lock is
-  // never silently overwritten (unlike tmp+rename on POSIX).
-  await fs.mkdir(join(path, '..'), { recursive: true });
-  try {
-    const fd = await fs.open(path, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY, 0o644);
-    await fd.writeFile(JSON.stringify(data), 'utf8');
-    await fd.close();
-  } catch (err: any) {
-    if (err?.code === 'EEXIST') {
-      const e = new Error(`EEXIST: lock already held`);
-      (e as any).code = 'EEXIST';
-      throw e;
-    }
-    throw err;
-  }
+function makeToken(): string {
+  return `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-/**
- * Acquire an inter-process lock with a bounded timeout.
- *
- * Returns a handle with a `release()` method, or null if the lock could not
- * be acquired within `timeoutMs`. Stale locks (dead PID or mismatched start
- * time) are reclaimed automatically.
- */
+async function safeUnlinkIfToken(path: string, token: string): Promise<boolean> {
+  try {
+    const cur = await readLock(path);
+    if (cur && cur.token === token) {
+      await fs.unlink(path);
+      return true;
+    }
+  } catch { /* noop */ }
+  return false;
+}
+
 export async function acquireLock(
   name: string,
   options: { lockDir?: string; timeoutMs?: number } = {},
@@ -83,31 +79,40 @@ export async function acquireLock(
   const path = `${lockDir}/${name}.lock`;
   const deadline = Date.now() + (options.timeoutMs ?? 5000);
 
+  await fs.mkdir(lockDir, { recursive: true });
+
   while (true) {
     const existing = await readLock(path);
     let stale = false;
+    let statMtime = 0;
+    try { statMtime = (await fs.stat(path)).mtimeMs; } catch { /* file gone */ }
+
     if (existing) {
       if (!(await isPidAlive(existing.pid))) {
+        stale = true;
+      }
+    } else {
+      // Empty/unparseable: stale only after grace period.
+      if (statMtime > 0 && Date.now() - statMtime >= GRACE_MS) {
         stale = true;
       }
     }
 
     if (!existing || stale) {
-      // Reclaim the stale lock before re-creating so O_CREAT|O_EXCL can
-      // succeed. If another process grabbed it in the meantime, retry.
-      if (stale) {
+      // Reclaim stale lock only if token still matches (or file empty after grace).
+      if (stale && existing) {
+        await safeUnlinkIfToken(path, existing.token);
+      } else if (stale && !existing) {
         try { await fs.unlink(path); } catch { /* noop */ }
       }
+      const token = makeToken();
       try {
-        await writeLock(path, { pid: process.pid, start: PROCESS_START, name, acquiredAt: Date.now() });
+        const fd = await fs.open(path, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY, 0o644);
+        await fd.writeFile(JSON.stringify({ pid: process.pid, start: PROCESS_START, name, token, acquiredAt: Date.now() }), 'utf8');
+        await fd.close();
         return {
           release: async () => {
-            try {
-              const cur = await readLock(path);
-            if (cur && cur.pid === process.pid) {
-              await fs.unlink(path);
-            }
-            } catch { /* noop */ }
+            await safeUnlinkIfToken(path, token);
           },
         };
       } catch (err: any) {
@@ -120,7 +125,6 @@ export async function acquireLock(
   }
 }
 
-/** Run a function while holding an inter-process lock. */
 export async function withLock<T>(
   name: string,
   fn: () => Promise<T>,
@@ -135,7 +139,6 @@ export async function withLock<T>(
   }
 }
 
-/** Read-modify-write a JSON file under an inter-process lock. */
 export async function lockedReadModifyWrite<T>(
   name: string,
   file: string,

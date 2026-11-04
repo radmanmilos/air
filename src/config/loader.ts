@@ -8,6 +8,14 @@ import { paths } from './paths';
 import { safeParseConfig, formatConfigError, type Config } from './schema';
 import { redact } from '../security/redact';
 
+// Keys that may only be set in the global (user) config, never in a repo
+// `.airrc.yaml`. Repo values for these are ignored (with a warning).
+const GLOBAL_ONLY_KEYS = [
+  'failover', 'permission', 'redaction', 'trustedRepos', 'tools',
+  'concurrency', 'verify', 'catalog', 'costOverrides', 'timeouts',
+  'buffers', 'logging',
+];
+
 export interface LoadOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
@@ -42,8 +50,10 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
     const parsed = safeParseConfig(parseYamlLike(raw), { strict: false });
     if (parsed.success) config = merge(config, parsed.data);
     else errors.push(formatConfigError(parsed.error, paths.globalConfigFile));
-  } catch {
-    // missing global config is fine
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') {
+      errors.push(`Could not read/parse ${paths.globalConfigFile}: ${String(err?.message || err)}`);
+    }
   }
 
   // 3. Repo config (untrusted)
@@ -51,10 +61,27 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
   try {
     const raw = await readFile(repoFile, 'utf8');
     const parsed = safeParseConfig(parseYamlLike(raw), { strict: options.strict !== false });
-    if (parsed.success) config = merge(config, parsed.data);
-    else errors.push(formatConfigError(parsed.error, repoFile));
-  } catch {
-    // missing repo config is fine
+    if (parsed.success) {
+      // Strip global-only keys from repo config (security: repo cannot set them).
+      const repoData = { ...parsed.data } as Record<string, unknown>;
+      const stripped: string[] = [];
+      for (const key of GLOBAL_ONLY_KEYS) {
+        if (key in repoData) {
+          delete repoData[key];
+          stripped.push(key);
+        }
+      }
+      if (stripped.length > 0) {
+        errors.push(`Warning: repo config ${repoFile} cannot set global-only keys (${stripped.join(', ')}); ignored.`);
+      }
+      config = merge(config, repoData as Partial<Config>);
+    } else {
+      errors.push(formatConfigError(parsed.error, repoFile));
+    }
+  } catch (err: any) {
+    if (err?.code !== 'ENOENT') {
+      errors.push(`Could not read/parse ${repoFile}: ${String(err?.message || err)}`);
+    }
   }
 
   // 4. Env overrides

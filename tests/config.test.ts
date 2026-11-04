@@ -15,13 +15,15 @@ describe('config loader (G2-03)', () => {
     expect(errors).toEqual([]);
   });
 
-  it('loads and validates a repo config', async () => {
+  it('ignores global-only keys from repo config (security)', async () => {
     const repo = join(dir, 'repo');
     await mkdir(repo, { recursive: true });
     await writeFile(join(repo, '.airrc.yaml'), 'version: 1\nfailover:\n  mode: auto\n  maxHops: 2\n');
-    const { config } = await loadConfig({ cwd: repo });
-    expect(config.failover.mode).toBe('auto');
-    expect(config.failover.maxHops).toBe(2);
+    const { config, errors } = await loadConfig({ cwd: repo });
+    // Repo cannot set global-only keys: defaults remain.
+    expect(config.failover.mode).toBe('ask');
+    expect(config.failover.maxHops).toBe(3);
+    expect(errors.some((e) => e.includes('global-only'))).toBe(true);
   });
 
   it('rejects unknown repo keys in strict mode', async () => {

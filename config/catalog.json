@@ -24,7 +24,7 @@
         "commands": {
           "win32": "winget install aider.aider",
           "darwin": "brew install aider",
-          "linux": "npm install -g aider"
+          "linux": "pip install aider-chat"
         },
         "verify": "aider --version",
         "version": "0.86.2"
@@ -76,7 +76,7 @@
         "commands": {
           "win32": "winget install opencode.opencode",
           "darwin": "brew install opencode",
-          "linux": "npm install -g opencode"
+          "linux": "npm install -g opencode-ai"
         },
         "verify": "opencode --version",
         "version": "1.x"
@@ -102,7 +102,7 @@
         "commands": {
           "win32": "winget install kilocode.kilocode",
           "darwin": "brew install kilocode",
-          "linux": "npm install -g kilocode"
+          "linux": "npm install -g @kilocode/cli"
         },
         "verify": "kilocode --version",
         "version": "7.5.16"

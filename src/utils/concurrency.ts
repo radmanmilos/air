@@ -23,13 +23,28 @@ function processStartTime(): number {
 /** Cached process start time so stale-seat detection is stable across calls. */
 const PROCESS_START = processStartTime();
 
-async function readSeat(path: string): Promise<{ pid: number; start: number } | null> {
+interface SeatFile {
+  pid: number;
+  start: number;
+  token: string;
+  acquiredAt: number;
+}
+
+const GRACE_MS = 2000;
+
+async function readSeat(path: string): Promise<SeatFile | null> {
   try {
     const raw = await fs.readFile(path, 'utf8');
-    return JSON.parse(raw) as { pid: number; start: number };
+    const parsed = JSON.parse(raw) as SeatFile;
+    if (!parsed || typeof parsed.pid !== 'number' || typeof parsed.token !== 'string') return null;
+    return parsed;
   } catch {
     return null;
   }
+}
+
+function makeToken(): string {
+  return `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 /**
@@ -57,8 +72,16 @@ export async function acquireSeat(
     for (const i of slots) {
       const p = slotPath(i);
       try {
+        const stat = await fs.stat(p);
         const data = await readSeat(p);
-        if (!data || !(await isPidAlive(data.pid))) {
+        // Empty/unparseable: stale only after grace period.
+        if (!data) {
+          if (Date.now() - stat.mtimeMs >= GRACE_MS) {
+            await fs.unlink(p).catch(() => {});
+          }
+          continue;
+        }
+        if (!(await isPidAlive(data.pid))) {
           await fs.unlink(p).catch(() => {});
         }
       } catch { /* noop */ }
@@ -71,14 +94,15 @@ export async function acquireSeat(
     for (const i of slots) {
       const p = slotPath(i);
       try {
+        const token = makeToken();
         const fd = await fs.open(p, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY, 0o644);
-        await fd.writeFile(JSON.stringify({ pid: process.pid, start: PROCESS_START }), 'utf8');
+        await fd.writeFile(JSON.stringify({ pid: process.pid, start: PROCESS_START, token, acquiredAt: Date.now() }), 'utf8');
         await fd.close();
         return {
           release: async () => {
             try {
               const cur = await readSeat(p);
-              if (cur && cur.pid === process.pid) await fs.unlink(p);
+              if (cur && cur.token === token) await fs.unlink(p);
             } catch { /* noop */ }
           },
         };

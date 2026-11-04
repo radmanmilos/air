@@ -29,10 +29,6 @@ export interface InstallEntry {
     verify: string;
     version: string;
   };
-  /** Optional: dynamic factory module path. When set, AIR dynamically imports
-   *  this module and calls its createAdapter() export to construct the
-   *  adapter, enabling operators to add adapters without code changes. */
-  factoryModule?: string;
 }
 
 /** Download URL with optional signature file for integrity verification. */
@@ -68,10 +64,29 @@ function remoteCatalogPath(): string {
 }
 
 async function fetchRemoteCatalog(url: string): Promise<CatalogData | null> {
+  // Security: only HTTPS remote catalogs are allowed.
+  if (!/^https:\/\//i.test(url)) {
+    process.stderr.write(`air: refusing non-HTTPS remote catalog URL: ${url}\n`);
+    return null;
+  }
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!res.ok) return null;
-    return (await res.json()) as CatalogData;
+    const data = (await res.json()) as unknown;
+    // Basic structural validation.
+    if (!data || typeof data !== 'object') return null;
+    const c = data as Record<string, unknown>;
+    if (typeof c.version !== 'number' || !Array.isArray(c.tools)) return null;
+    const tools: InstallEntry[] = [];
+    for (const t of c.tools) {
+      if (!t || typeof t !== 'object') continue;
+      const e = t as Record<string, unknown>;
+      if (typeof e.id !== 'string' || typeof e.name !== 'string') continue;
+      // Accept only entries that at least identify themselves; executable/install
+      // fields are taken from the bundled catalog when present.
+      tools.push(e as unknown as InstallEntry);
+    }
+    return { version: c.version, description: String(c.description ?? ''), tools };
   } catch {
     return null;
   }
@@ -98,8 +113,27 @@ function saveCachedRemote(data: CatalogData): void {
 
 function mergeCatalogs(bundled: CatalogData, remote: CatalogData): CatalogData {
   const byId = new Map<string, InstallEntry>();
-  for (const t of bundled.tools) byId.set(t.id, t);
-  for (const t of remote.tools) byId.set(t.id, t); // remote overrides bundled
+  for (const t of bundled.tools) byId.set(t.id, { ...t });
+
+  for (const remoteEntry of remote.tools) {
+    const existing = byId.get(remoteEntry.id);
+    if (!existing) {
+      // Remote cannot introduce new installable tools (no executable/install override).
+      continue;
+    }
+    // Only metadata fields may be updated; executable + install stay bundled.
+    byId.set(remoteEntry.id, {
+      ...existing,
+      name: remoteEntry.name || existing.name,
+      provider: remoteEntry.provider || existing.provider,
+      model: remoteEntry.model || existing.model,
+      description: remoteEntry.description || existing.description,
+      tags: Array.isArray(remoteEntry.tags) ? remoteEntry.tags : existing.tags,
+      capabilities: remoteEntry.capabilities && typeof remoteEntry.capabilities === 'object'
+        ? { ...existing.capabilities, ...remoteEntry.capabilities }
+        : existing.capabilities,
+    });
+  }
   return {
     version: remote.version ?? bundled.version,
     description: remote.description ?? bundled.description,
