@@ -14,6 +14,7 @@ import { createHealthTracker } from '../health/tracker';
 import { buildModelCatalog, bestModelFor } from '../router/catalog';
 import { availableAdapters } from '../adapters/registry';
 import { type SessionHandle } from '../execution/sessions';
+import { acquireSeat } from '../utils/concurrency';
 import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
 import { snapshotGit, snapshotDelta, formatDirtyReport, formatDeltaReport } from '../context/checkpoint';
@@ -221,15 +222,25 @@ export class Orchestrator {
       await writeTaskState(state);
       trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips, hops });
 
-      const { outcome } = await runProcess(spec, {
-        timeoutMs: config.timeouts.defaultMs,
-        maxBufferBytes: config.buffers.maxBytes,
-        signal: controller.signal,
-        stdoutTailBytes: 2048,
-        stderrTailBytes: 2048,
-        onStdout: (c: string) => process.stdout.write(c),
-        onStderr: (c: string) => process.stderr.write(c),
-      });
+      const seat = await acquireSeat('agent', config.concurrency?.maxConcurrentAgents ?? 1, { timeoutMs: 30000 });
+      if (!seat) {
+        throw new Error('SEAT_TIMEOUT: could not acquire a concurrency seat');
+      }
+      let outcome: any;
+      try {
+        const r = await runProcess(spec, {
+          timeoutMs: config.timeouts.defaultMs,
+          maxBufferBytes: config.buffers.maxBytes,
+          signal: controller.signal,
+          stdoutTailBytes: 2048,
+          stderrTailBytes: 2048,
+          onStdout: (c: string) => process.stdout.write(c),
+          onStderr: (c: string) => process.stderr.write(c),
+        });
+        outcome = r.outcome;
+      } finally {
+        await seat.release();
+      }
 
       const fact = classifyOutcome(outcome);
       let category: ErrorCategory = (fact.category as ErrorCategory) ?? adapter.classifyError(outcome.exitCode, outcome.stderr, {
