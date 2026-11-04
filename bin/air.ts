@@ -658,7 +658,7 @@ program
       const orch = new (Orchestrator as any)({ config, mcpMode: false });
       const plan = planFromRequest(enriched, { requiresWrite, requiresCode: hints?.requiresCode !== false });
       const item = plan.workItems[0];
-      const session = await orch.start(item.objective, cwd, { mode: 'ask', readOnly: !requiresWrite, freeOnly: conv!.userPreferences.freeOnly });
+      const session = await orch.start(item.objective, cwd, { mode: 'auto', readOnly: !requiresWrite, freeOnly: conv!.userPreferences.freeOnly });
       await appendMessage(conv!.id, { role: 'assistant', content: `Started job ${session.runId}.` });
       console.log(chalk.green(`Started job ${session.runId}`));
       conv!.activeWorkIds.push(session.runId);
