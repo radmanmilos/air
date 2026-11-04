@@ -5,7 +5,8 @@
 // Run via `npm run postbuild`.
 
 import { promises as fs } from 'node:fs';
-import { dirname, extname } from 'node:path';
+import { dirname, extname, join } from 'node:path';
+import { statSync, accessSync } from 'node:fs';
 
 const RELATIVE = /^[./]/;
 
@@ -27,6 +28,14 @@ async function walk(dir, out = []) {
 function fixImport(spec, fileDir) {
   if (!RELATIVE.test(spec)) return spec;
   if (extname(spec)) return spec;
+  try {
+    const st = statSync(join(fileDir, spec));
+    if (st.isDirectory()) return spec + '/index.js';
+  } catch { /* noop */ }
+  try {
+    accessSync(join(fileDir, spec + '.js'));
+    return spec + '.js';
+  } catch { /* noop */ }
   return spec + '.js';
 }
 

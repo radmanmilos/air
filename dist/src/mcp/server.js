@@ -527,9 +527,9 @@ export async function startMcp(transport) {
             message: z.string().describe('User message'),
         },
     }, async (args) => {
-        const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../conversation.js');
+        const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../conversation/index.js');
         const { decide } = await import('../conversation/decide.js');
-        const { planFromRequest } = await import('../planner.js');
+        const { planFromRequest } = await import('../planner/index.js');
         let conv = args.conversationId ? loadConversation(args.conversationId) : null;
         if (!conv)
             conv = createConversation();
@@ -567,7 +567,7 @@ export async function startMcp(transport) {
                                 break;
                             await new Promise((r) => setTimeout(r, 500));
                         }
-                        const { compileJobResult } = await import('../result-compiler.js');
+                        const { compileJobResult } = await import('../result-compiler/index.js');
                         const facts = {
                             runId: session.runId,
                             result: state?.result ?? state?.state ?? 'FAILED',
@@ -611,7 +611,7 @@ export async function startMcp(transport) {
         description: 'Return a conversation thread.',
         inputSchema: { conversationId: z.string().describe('Conversation id') },
     }, async (args) => {
-        const { loadConversation } = await import('../conversation.js');
+        const { loadConversation } = await import('../conversation/index.js');
         const conv = loadConversation(args.conversationId);
         if (!conv)
             return { content: [{ type: 'text', text: 'not found' }] };
@@ -622,7 +622,7 @@ export async function startMcp(transport) {
         description: 'List conversation ids with updatedAt and title.',
         inputSchema: {},
     }, async () => {
-        const { listConversations, loadConversation } = await import('../conversation.js');
+        const { listConversations, loadConversation } = await import('../conversation/index.js');
         const ids = listConversations();
         const rows = ids.map((id) => {
             const c = loadConversation(id);
@@ -635,7 +635,7 @@ export async function startMcp(transport) {
         description: 'List jobs filtered by conversation activeWorkIds (or all known).',
         inputSchema: { conversationId: z.string().optional().describe('Optional conversation id') },
     }, async (args) => {
-        const { loadConversation } = await import('../conversation.js');
+        const { loadConversation } = await import('../conversation/index.js');
         const { readTaskState } = await import('../execution/task-state.js');
         let ids = [];
         if (args?.conversationId) {

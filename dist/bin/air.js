@@ -324,7 +324,7 @@ program
     }
     console.log(`Events: ${raw.events?.length ?? 0}`);
     // Conversations (T7-034)
-    const { listConversations } = await import('../src/conversation.js');
+    const { listConversations } = await import('../src/conversation/index.js');
     const convIds = listConversations();
     console.log(`Conversations: ${convIds.length}`);
     for (const cid of convIds.slice(-10)) {
@@ -609,10 +609,10 @@ program
     .option('--resume <id>', 'Resume a conversation')
     .option('--free-only', 'Prefer free models (default true)')
     .action(async (options) => {
-    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../src/conversation.js');
+    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../src/conversation/index.js');
     const { decide } = await import('../src/conversation/decide.js');
-    const { planFromRequest } = await import('../src/planner.js');
-    const { compileJobResult } = await import('../src/result-compiler.js');
+    const { planFromRequest } = await import('../src/planner/index.js');
+    const { compileJobResult } = await import('../src/result-compiler/index.js');
     const { loadConfig } = await import('../src/config/loader.js');
     const readline = await import('node:readline');
     const cwd = process.cwd();
@@ -761,7 +761,7 @@ program
         console.log(chalk.red('No worktree info for job.'));
         process.exit(1);
     }
-    const { applyWorktree } = await import('../src/workspace.js');
+    const { applyWorktree } = await import('../src/workspace/index.js');
     const info = { jobId, sourceCwd: st.sourceCwd, worktreePath: st.worktreePath, branch: st.worktreeBranch, sourceHead: '' };
     const res = applyWorktree(info);
     console.log(res.ok ? chalk.green(res.message) : chalk.red(res.message));

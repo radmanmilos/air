@@ -130,7 +130,7 @@ export class Orchestrator {
         const { config } = await loadConfig({ cwd });
         const tracker = createHealthTracker();
         await tracker.load();
-        const { fromConfig, enforce } = await import('../permissions.js');
+        const { fromConfig, enforce } = await import('../permissions/index.js');
         const policy = fromConfig(config);
         const permCheck = enforce(policy, { write: !readOnly, shell: false, network: false });
         if (!permCheck.ok)
@@ -144,7 +144,7 @@ export class Orchestrator {
         }
         const runId = options.runId ?? makeRunId();
         await appendTaskIndex(runId);
-        const { createWorktree } = await import('../workspace.js');
+        const { createWorktree } = await import('../workspace/index.js');
         let worktreeInfo = null;
         if (isWriteTask) {
             try {
