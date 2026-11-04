@@ -1,64 +1,73 @@
 {
-  "name": "air",
-  "version": "0.2.0",
-  "description": "Unified AI tool orchestrator with smart routing and failover",
-  "type": "module",
-  "bin": {
-    "air": "./dist/bin/air.js"
-  },
-  "main": "./dist/src/index.js",
-  "exports": {
-    ".": {
-      "import": "./dist/src/index.js"
-    }
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "files": [
-    "dist",
-    "config",
-    "docs"
-  ],
-  "scripts": {
-    "build": "tsc",
-  "prepare": "npm run build",
-    "postbuild": "node scripts/fix-imports.mjs",
-    "prebuild": "node -e \"require('fs').rmSync('dist', {recursive:true, force:true})\"",
-    "typecheck": "tsc --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "lint": "eslint .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "dev": "tsx bin/air.ts",
-    "prepublishOnly": "npm run build && npm run test"
-  },
-  "keywords": ["ai", "orchestrator", "router", "cli", "mcp", "failover", "aider", "goose"],
-  "author": "radmanmilos",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/radmanmilos/air.git"
-  },
-  "bugs": {
-    "url": "https://github.com/radmanmilos/air/issues"
-  },
-  "homepage": "https://github.com/radmanmilos/air",
-  "dependencies": {
-    "commander": "^12.1.0",
-    "yaml": "^2.4.2",
-    "zod": "^4.6.7",
-    "cross-spawn": "^7.0.5",
-    "chalk": "^5.3.0",
-    "@modelcontextprotocol/sdk": "1.32.2"
-  },
-  "devDependencies": {
-    "@types/node": "^20.12.7",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "eslint": "^8.57.0",
-    "typescript": "^5.4.5",
-    "tsx": "^4.7.2",
-    "vitest": "^1.6.0"
-  }
+    "name":  "air",
+    "version":  "0.2.0",
+    "description":  "Unified AI tool orchestrator with smart routing and failover",
+    "type":  "module",
+    "bin":  {
+                "air":  "./dist/bin/air.js"
+            },
+    "main":  "./dist/src/index.js",
+    "exports":  {
+                    ".":  {
+                              "import":  "./dist/src/index.js"
+                          }
+                },
+    "engines":  {
+                    "node":  "\u003e=18.0.0"
+                },
+    "files":  [
+                  "dist",
+                  "config",
+                  "docs"
+              ],
+    "scripts":  {
+                    "build":  "tsc",
+                    "prepare":  "npm run build",
+                    "postbuild":  "node scripts/fix-imports.mjs",
+                    "prebuild":  "node -e \"require(\u0027fs\u0027).rmSync(\u0027dist\u0027, {recursive:true, force:true})\"",
+                    "typecheck":  "tsc --noEmit",
+                    "typecheck:test":  "tsc -p tsconfig.test.json --noEmit",
+                    "lint":  "eslint .",
+                    "test":  "vitest run",
+                    "test:watch":  "vitest",
+                    "dev":  "tsx bin/air.ts",
+                    "prepublishOnly":  "npm run build \u0026\u0026 npm run test"
+                },
+    "keywords":  [
+                     "ai",
+                     "orchestrator",
+                     "router",
+                     "cli",
+                     "mcp",
+                     "failover",
+                     "aider",
+                     "goose"
+                 ],
+    "author":  "radmanmilos",
+    "license":  "MIT",
+    "repository":  {
+                       "type":  "git",
+                       "url":  "https://github.com/radmanmilos/air.git"
+                   },
+    "bugs":  {
+                 "url":  "https://github.com/radmanmilos/air/issues"
+             },
+    "homepage":  "https://github.com/radmanmilos/air",
+    "dependencies":  {
+                         "commander":  "^12.1.0",
+                         "yaml":  "^2.4.2",
+                         "zod":  "^4.6.7",
+                         "cross-spawn":  "^7.0.5",
+                         "chalk":  "^5.3.0",
+                         "@modelcontextprotocol/sdk":  "1.32.2",
+                         "typescript":  "^5.4.5"
+                     },
+    "devDependencies":  {
+                            "@types/node":  "^20.12.7",
+                            "@typescript-eslint/eslint-plugin":  "^7.0.0",
+                            "@typescript-eslint/parser":  "^7.0.0",
+                            "eslint":  "^8.57.0",
+                            "tsx":  "^4.7.2",
+                            "vitest":  "^1.6.0"
+                        }
 }
