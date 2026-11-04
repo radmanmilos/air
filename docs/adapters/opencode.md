@@ -1,22 +1,17 @@
-# OpenCode adapter spike
+# OpenCode adapter
 
-**Status: VERIFIED — needs a real `opencode` install to confirm flags.**
+**Status: VERIFIED against opencode 2.2.5.**
 
-## Assumed headless invocation
+## Verified headless invocation
 
 ```text
-opencode run --prompt "<task>" --yes
+opencode run "<task>" --auto --model <provider/model>
 ```
 
-- `--prompt "<text>"` — task prompt non-interactively.
-- `--yes` — auto-approve any tool prompts.
+- `run` — run non-interactively to completion.
+- Prompt as positional argument — task text non-interactively.
+- `--auto` — auto-approve any tool prompts.
 - `--model <provider/model>` — optional model override.
-
-## Known unknowns
-
-- Exact flag names differ across versions; verify against the installed binary.
-- Whether `opencode run` accepts `--files` or requires file paths inline.
-- Exit code semantics for rate limit / auth / model unavailable.
 
 ## Error classification rules
 

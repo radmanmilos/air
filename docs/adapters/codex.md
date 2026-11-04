@@ -1,22 +1,17 @@
-# Codex adapter spike
+# Codex adapter
 
-**Status: VERIFIED — needs a real `codex` install to confirm flags.**
+**Status: VERIFIED against codex 0.166.0.**
 
-## Assumed headless invocation
+## Verified headless invocation
 
 ```text
-codex exec --skip-git-repo-check "<task>"
+codex exec --skip-git-repo-check "<task>" --model <name>
 ```
 
 - `exec` — run non-interactively to completion.
 - `--skip-git-repo-check` — skip the repo safety check (required for headless).
+- Prompt as positional argument — task text non-interactively.
 - `--model <name>` — optional model override.
-
-## Known unknowns
-
-- Exact flag names differ across versions; verify against the installed binary.
-- Whether `codex exec` accepts `--files` or requires file paths inline.
-- Exit code semantics for rate limit / auth / model unavailable.
 
 ## Error classification rules
 

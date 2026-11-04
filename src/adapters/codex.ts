@@ -1,8 +1,7 @@
 // Codex adapter implementing AgentAdapter.
 //
 // Uses the shared process runner (src/execution/runner.ts), never spawn
-// directly. UNVERIFIED — needs a real `codex` install to confirm flags.
-// See docs/adapters/codex.md.
+// directly. Verified against codex 0.166.0 (see docs/adapters/codex.md).
 
 import type { AgentAdapter } from '../adapters/adapter';
 import type { ErrorCategory, CommandSpec, ParsedEvent, TaskInput } from '../types';

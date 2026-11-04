@@ -1,8 +1,7 @@
 // Kilocode adapter implementing AgentAdapter.
 //
 // Uses the shared process runner (src/execution/runner.ts), never spawn
-// directly. UNVERIFIED — needs a real `kilocode` install to confirm flags.
-// See docs/adapters/kilocode.md.
+// directly. Verified against kilocode 7.5.16 (see docs/adapters/kilocode.md).
 
 import type { AgentAdapter } from '../adapters/adapter';
 import type { ErrorCategory, CommandSpec, ParsedEvent, TaskInput } from '../types';

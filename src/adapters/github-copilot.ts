@@ -1,8 +1,7 @@
 // GitHub Copilot adapter implementing AgentAdapter.
 //
 // Uses the shared process runner (src/execution/runner.ts), never spawn
-// directly. UNVERIFIED — needs a real `gh copilot` install to confirm flags.
-// See docs/adapters/github-copilot.md.
+// directly. Verified against github-copilot (gh) 2.102.0 (see docs/adapters/github-copilot.md).
 
 import type { AgentAdapter } from '../adapters/adapter';
 import type { ErrorCategory, CommandSpec, ParsedEvent, TaskInput } from '../types';

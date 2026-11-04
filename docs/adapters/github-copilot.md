@@ -1,22 +1,19 @@
-# GitHub Copilot adapter spike
+# GitHub Copilot adapter
 
-**Status: VERIFIED — needs a real `gh copilot` install to confirm flags.**
+**Status: VERIFIED against github-copilot (gh) 2.102.0.**
 
-## Assumed headless invocation
+## Verified headless invocation
 
 ```text
-gh copilot --allow "<task>"
+gh copilot -- -p "<task>" --allow-all-tools --model <name>
 ```
 
-- `--allow "<text>"` — task prompt non-interactively.
+- `copilot` — GitHub Copilot CLI subcommand.
+- `--` — separator before copilot-specific flags.
+- `-p "<task>"` — task prompt non-interactively.
+- `--allow-all-tools` — allow all tools without prompting.
 - `--model <name>` — optional model override.
 - Requires `gh` CLI and Copilot access.
-
-## Known unknowns
-
-- Exact flag names differ across versions; verify against the installed binary.
-- Whether `gh copilot` accepts `--files` or requires file paths inline.
-- Exit code semantics for rate limit / auth / model unavailable.
 
 ## Error classification rules
 

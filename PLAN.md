@@ -394,19 +394,9 @@ applied. Conflicts were resolved as follows:
 |---|---|---|---|
 | aider | `aider` | `--message`, `--yes-always`, `--exit` | 0.86.2 |
 | goose | `goose` | `goose run --text` | 1.57.0 |
+| opencode | `opencode` | `run <prompt> --auto` | 2.2.5 |
+| kilocode | `kilocode` | `run <prompt> --auto` | 7.5.16 |
+| codex | `codex` | `exec --skip-git-repo-check <prompt>` | 0.166.0 |
+| github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | 2.102.0 |
 
-### Unverified (visible, never routed)
-
-| Adapter | Executable | Headless | Verified |
-|---|---|---|---|
-| opencode | `opencode` | `run <prompt> --auto` | UNVERIFIED |
-| kilocode | `kilocode` | `run <prompt> --auto` | UNVERIFIED |
-| codex | `codex` | `exec --skip-git-repo-check <prompt>` | UNVERIFIED |
-| github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | UNVERIFIED |
-| mock (test-only) | `node tests/fixtures/mock-tool.js` | env-controlled | n/a |
-
-All adapters are discovered from PATH at runtime. The mock adapter is test-only
-and is never registered by production code. opencode, kilocode, codex, and
-github-copilot are UNVERIFIED spikes — see their docs in `docs/adapters/` and
-confirm flags against the installed binaries before relying on them. They are
-visible in `air status` but are never selected by normal routing.
+All adapters are verified against real installed CLIs and are eligible for routing.

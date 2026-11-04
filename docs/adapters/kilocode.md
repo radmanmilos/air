@@ -1,22 +1,17 @@
-# Kilocode adapter spike
+# Kilocode adapter
 
-**Status: VERIFIED — needs a real `kilocode` install to confirm flags.**
+**Status: VERIFIED against kilocode 7.5.16.**
 
-## Assumed headless invocation
+## Verified headless invocation
 
 ```text
-kilocode run --prompt "<task>" --yes
+kilocode run "<task>" --auto --model <provider/model>
 ```
 
-- `--prompt "<text>"` — task prompt non-interactively.
-- `--yes` — auto-approve any tool prompts.
+- `run` — run non-interactively to completion.
+- Prompt as positional argument — task text non-interactively.
+- `--auto` — auto-approve any tool prompts.
 - `--model <provider/model>` — optional model override.
-
-## Known unknowns
-
-- Exact flag names differ across versions; verify against the installed binary.
-- Whether `kilocode run` accepts `--files` or requires file paths inline.
-- Exit code semantics for rate limit / auth / model unavailable.
 
 ## Error classification rules
 

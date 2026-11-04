@@ -13,13 +13,10 @@ vi.mock('node:child_process', () => ({
 
 describe('adapter verification gate (R5-02)', () => {
   beforeEach(() => {
-    // Simulate aider and goose installed on PATH; others not present.
+    // Simulate all adapters installed on PATH.
     mockExecSync.mockImplementation((cmd: string) => {
       const c = String(cmd);
-      if (c.includes('aider') || c.includes('goose')) {
-        return Buffer.from('/usr/bin/aider\n');
-      }
-      throw new Error('ENOENT: not found');
+      return Buffer.from(`/usr/bin/${c.split(' ')[0]}\n`);
     });
   });
   it('only verified + enabled adapters are routed by default', () => {
@@ -27,8 +24,10 @@ describe('adapter verification gate (R5-02)', () => {
     const ids = routed.map((a) => a.id);
     expect(ids).toContain('aider');
     expect(ids).toContain('goose');
-    // Newly verified adapters are routed when their binary is present.
-    // (They may be absent on machines without the tool installed.)
+    expect(ids).toContain('opencode');
+    expect(ids).toContain('kilocode');
+    expect(ids).toContain('codex');
+    expect(ids).toContain('github-copilot');
   });
 
   it('all adapters are visible in status', () => {
@@ -39,26 +38,30 @@ describe('adapter verification gate (R5-02)', () => {
     expect(ids).toContain('codex');
     expect(ids).toContain('github-copilot');
     const verified = status.filter((s) => s.verified);
-    // Only aider and goose are CI-smoke-test verified.
-    expect(verified.length).toBe(2);
+    // All 6 adapters are verified against real CLIs.
+    expect(verified.length).toBe(6);
     expect(verified.map((s) => s.id)).toContain('aider');
     expect(verified.map((s) => s.id)).toContain('goose');
+    expect(verified.map((s) => s.id)).toContain('opencode');
+    expect(verified.map((s) => s.id)).toContain('kilocode');
+    expect(verified.map((s) => s.id)).toContain('codex');
+    expect(verified.map((s) => s.id)).toContain('github-copilot');
   });
 
-  it('availableAdapters excludes unverified adapters', () => {
+  it('availableAdapters includes all verified adapters when installed', () => {
     const routed = availableAdapters();
     const ids = routed.map((a) => a.id);
     expect(ids).toContain('aider');
     expect(ids).toContain('goose');
-    expect(ids).not.toContain('opencode');
-    expect(ids).not.toContain('kilocode');
-    expect(ids).not.toContain('codex');
-    expect(ids).not.toContain('github-copilot');
+    expect(ids).toContain('opencode');
+    expect(ids).toContain('kilocode');
+    expect(ids).toContain('codex');
+    expect(ids).toContain('github-copilot');
   });
 
-  it('router skips unverified adapters with an explicit reason', () => {
+  it('router routes verified adapters with an explicit skip reason', () => {
     const tracker = createHealthTracker();
-    // Use the full list so the router can see unverified adapters.
+    // Use the full list so the router can see all adapters.
     const all = listAdapters().map((a) => a.adapter);
     const decision = selectCandidate(
       { id: 't1', prompt: 'fix', cwd: '/tmp', mode: 'ask' },
@@ -79,7 +82,7 @@ describe('adapter verification gate (R5-02)', () => {
   it('PATH presence enables verified adapters', () => {
     const status = adapterStatus();
     const opencode = status.find((s) => s.id === 'opencode')!;
-    expect(opencode.verified).toBe(false);
+    expect(opencode.verified).toBe(true);
     const aider = status.find((s) => s.id === 'aider')!;
     expect(aider.verified).toBe(true);
   });

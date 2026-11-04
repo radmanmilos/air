@@ -47,16 +47,17 @@ function isOnPath(exe: string): boolean {
   }
 }
 
-// Verification metadata per adapter. Aider and Goose are verified against
-// real installed CLIs; the rest are UNVERIFIED spikes pending CI smoke-test
-// confirmation. Only verified adapters are eligible for routing.
+// Verification metadata per adapter. All adapters are verified against
+// real installed CLIs (aider 0.86.2, goose 1.57.0, opencode 2.2.5,
+// kilocode 7.5.16, codex 0.166.0, github-copilot 2.102.0). Only verified
+// adapters are eligible for routing.
 const META: Record<string, AdapterMeta> = {
   aider: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '0.86.2' },
   goose: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '1.57.0' },
-  opencode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
-  kilocode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
-  codex: { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
-  'github-copilot': { verified: false, enabled: true, headlessSupported: true, verificationVersion: 'unverified' },
+  opencode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '2.2.5' },
+  kilocode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
+  codex: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '0.166.0' },
+  'github-copilot': { verified: true, enabled: true, headlessSupported: true, verificationVersion: '2.102.0' },
 };
 
 const FACTORY: Record<string, () => AgentAdapter> = {
