@@ -20,7 +20,7 @@ describe('M-01: Soak - repeated status calls', () => {
     const sandbox = createSandbox(fixture);
     try {
       for (let i = 0; i < 10; i++) {
-        const result = await airOnce(['status'], sandbox.env, sandbox.dir);
+        const result = await airOnce(['status'], sandbox.env, sandbox.repoDir);
         expect(result.exitCode).toBe(0);
       }
     } finally {
@@ -36,7 +36,7 @@ describe('M-02: Soak - repeated models calls', () => {
     const sandbox = createSandbox(fixture);
     try {
       for (let i = 0; i < 5; i++) {
-        const result = await airOnce(['models'], sandbox.env, sandbox.dir);
+        const result = await airOnce(['models'], sandbox.env, sandbox.repoDir);
         expect(result.exitCode).toBe(0);
       }
     } finally {
@@ -52,7 +52,7 @@ describe('M-03: Soak - repeated dashboard calls', () => {
     const sandbox = createSandbox(fixture);
     try {
       for (let i = 0; i < 5; i++) {
-        const result = await airOnce(['dashboard'], sandbox.env, sandbox.dir);
+        const result = await airOnce(['dashboard'], sandbox.env, sandbox.repoDir);
         expect(result.exitCode).toBe(0);
       }
     } finally {

@@ -28,10 +28,10 @@ describe('H-01: Shell metacharacters in chat text', () => {
       ensureFixture(fixture);
       const sandbox = createSandbox(fixture);
       try {
-        await airOnce(['chat'], sandbox.env, sandbox.dir, 5000);
+        await airOnce(['chat'], sandbox.env, sandbox.repoDir, 5000);
         // Check sentinel doesn't exist
         for (const s of sentinels) {
-          expect(existsSync(join(sandbox.dir, s))).toBe(false);
+          expect(existsSync(join(sandbox.repoDir, s))).toBe(false);
         }
       } finally {
         sandbox.cleanup();
@@ -46,7 +46,7 @@ describe('J-01: Free-only default', () => {
     ensureFixture(fixture);
     const sandbox = createSandbox(fixture);
     try {
-      const result = await airOnce(['models'], sandbox.env, sandbox.dir);
+      const result = await airOnce(['models'], sandbox.env, sandbox.repoDir);
       expect(result.exitCode).toBe(0);
       // At least one adapter should be listed
       expect(result.stdout.length).toBeGreaterThan(0);

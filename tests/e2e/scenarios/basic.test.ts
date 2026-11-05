@@ -21,7 +21,7 @@ describe('Basic E2E', () => {
     ensureFixture(fixture);
     const sandbox = createSandbox(fixture);
     try {
-      const result = await airOnce(['status'], sandbox.env, sandbox.dir);
+      const result = await airOnce(['status'], sandbox.env, sandbox.repoDir);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('Tools:');
     } finally {
@@ -34,7 +34,7 @@ describe('Basic E2E', () => {
     ensureFixture(fixture);
     const sandbox = createSandbox(fixture);
     try {
-      const result = await airOnce(['models'], sandbox.env, sandbox.dir);
+      const result = await airOnce(['models'], sandbox.env, sandbox.repoDir);
       expect(result.exitCode).toBe(0);
     } finally {
       sandbox.cleanup();
@@ -46,6 +46,6 @@ describe('Basic E2E', () => {
     ensureFixture(fixture);
     const sandbox = createSandbox(fixture);
     sandbox.cleanup();
-    expect(existsSync(sandbox.dir)).toBe(false);
+    expect(existsSync(sandbox.repoDir)).toBe(false);
   });
 });

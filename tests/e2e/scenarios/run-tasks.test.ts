@@ -21,7 +21,7 @@ describe('B-02: Simple edit task', () => {
     const sandbox = createSandbox(fixture);
     sandbox.env.FAKE_BEHAVIOR = 'edit';
     try {
-      const result = await airOnce(['run', 'add a comment to Program.cs'], sandbox.env, sandbox.dir, 15000);
+      const result = await airOnce(['run', 'add a comment to Program.cs'], sandbox.env, sandbox.repoDir, 15000);
       // air run should produce output (success or failure), not hang
       expect(result.stdout.length + result.stderr.length).toBeGreaterThan(0);
     } finally {
@@ -37,7 +37,7 @@ describe('C-01: Fix a bug', () => {
     const sandbox = createSandbox(fixture);
     sandbox.env.FAKE_BEHAVIOR = 'edit';
     try {
-      const result = await airOnce(['run', 'fix the null reference in Program.cs'], sandbox.env, sandbox.dir, 15000);
+      const result = await airOnce(['run', 'fix the null reference in Program.cs'], sandbox.env, sandbox.repoDir, 15000);
       expect(result.stdout.length + result.stderr.length).toBeGreaterThan(0);
     } finally {
       sandbox.cleanup();
@@ -52,7 +52,7 @@ describe('F-02: Redaction in result', () => {
     const sandbox = createSandbox(fixture);
     sandbox.env.FAKE_BEHAVIOR = 'secret';
     try {
-      const result = await airOnce(['run', 'do something'], sandbox.env, sandbox.dir, 10000);
+      const result = await airOnce(['run', 'do something'], sandbox.env, sandbox.repoDir, 10000);
       expect(result.stdout).not.toContain('sk-ant-api03');
     } finally {
       sandbox.cleanup();

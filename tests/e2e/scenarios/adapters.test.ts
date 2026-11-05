@@ -20,7 +20,7 @@ describe('B-01: Brainstorm uses brain, no job', () => {
     ensureFixture(fixture);
     const sandbox = createSandbox(fixture);
     try {
-      const result = await airOnce(['chat'], sandbox.env, sandbox.dir, 10000);
+      const result = await airOnce(['chat'], sandbox.env, sandbox.repoDir, 10000);
       // Chat starts without crashing
       expect(result.stdout).toContain('air chat');
     } finally {
@@ -37,7 +37,7 @@ describe('F-01: Secret redaction', () => {
     // Set fake behavior to secret
     sandbox.env.FAKE_BEHAVIOR = 'secret';
     try {
-      const result = await airOnce(['chat'], sandbox.env, sandbox.dir, 5000);
+      const result = await airOnce(['chat'], sandbox.env, sandbox.repoDir, 5000);
       // The secret should not appear in stdout
       expect(result.stdout).not.toContain('sk-ant-api03');
     } finally {
@@ -53,7 +53,7 @@ describe('E-01: Rate limit failover', () => {
     const sandbox = createSandbox(fixture);
     sandbox.env.FAKE_BEHAVIOR = 'rate-limit';
     try {
-      const result = await airOnce(['status'], sandbox.env, sandbox.dir);
+      const result = await airOnce(['status'], sandbox.env, sandbox.repoDir);
       expect(result.exitCode).toBe(0);
     } finally {
       sandbox.cleanup();

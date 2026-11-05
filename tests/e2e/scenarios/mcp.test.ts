@@ -23,7 +23,7 @@ describe('K-01: MCP server responds to initialize', () => {
       const node = process.execPath;
       const airJs = join(process.cwd(), 'dist', 'bin', 'air.js');
       const child = spawn(node, [airJs, 'mcp'], {
-        cwd: sandbox.dir,
+        cwd: sandbox.repoDir,
         env: { ...process.env, ...sandbox.env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -55,7 +55,7 @@ describe('K-02: MCP stdout purity', () => {
       const node = process.execPath;
       const airJs = join(process.cwd(), 'dist', 'bin', 'air.js');
       const child = spawn(node, [airJs, 'mcp'], {
-        cwd: sandbox.dir,
+        cwd: sandbox.repoDir,
         env: { ...process.env, ...sandbox.env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });

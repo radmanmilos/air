@@ -4,6 +4,20 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 
+function killTree(pid: number | null): void {
+  if (!pid) return;
+  if (process.platform === 'win32') {
+    try {
+      const { spawn: sp } = require('node:child_process');
+      sp('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch { /* noop */ }
+    try { process.kill(pid, 'SIGKILL'); } catch { /* noop */ }
+  } else {
+    try { process.kill(-pid, 'SIGKILL'); } catch { /* noop */ }
+    try { process.kill(pid, 'SIGKILL'); } catch { /* noop */ }
+  }
+}
+
 export interface AirRunResult {
   stdout: string;
   stderr: string;
@@ -36,18 +50,14 @@ export async function airOnce(
       cwd,
       env: { ...process.env, ...env },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (d) => { stdout += d.toString(); });
     child.stderr.on('data', (d) => { stderr += d.toString(); });
     const timer = setTimeout(() => {
-      try {
-        if (process.platform === 'win32' && child.pid) {
-          const { spawn: sp } = require('node:child_process');
-          sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-        }
-      } catch { /* noop */ }
+      killTree(child.pid ?? null);
       resolve({ stdout, stderr, exitCode: null, durationMs: Date.now() - start });
     }, timeoutMs);
     child.on('close', (code) => {
@@ -66,6 +76,7 @@ export function airSpawn(
     cwd,
     env: { ...process.env, ...env },
     stdio: ['pipe', 'pipe', 'pipe'],
+    detached: process.platform !== 'win32',
   });
   const lines: string[] = [];
   let stdout = '';
@@ -107,14 +118,10 @@ export function airSpawn(
       });
     },
     close() { try { child.stdin.write('/quit\n'); } catch { /* noop */ } },
-    kill() {
-      try {
-        if (process.platform === 'win32' && child.pid) {
-          const { spawn: sp } = require('node:child_process');
-          sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-        }
-      } catch { /* noop */ }
-    },
+     kill() {
+       killTree(child.pid ?? null);
+       try { child.kill('SIGKILL'); } catch { /* noop */ }
+     },
     alive() { return !child.killed && child.exitCode === null; },
   };
 }

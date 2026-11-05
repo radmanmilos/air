@@ -1,13 +1,15 @@
 // tests/e2e/harness/sandbox.ts
 // Isolated sandbox for E2E scenarios.
 
-import { mkdtempSync, rmSync, cpSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, cpSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 
 export interface Sandbox {
   dir: string;
+  repoDir: string;
+  stateDir: string;
   cacheDir: string;
   configDir: string;
   eventLog: string;
@@ -20,11 +22,15 @@ export interface Sandbox {
 export function createSandbox(fixturePath: string, marker?: string): Sandbox {
   const runMarker = marker ?? `air-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const dir = mkdtempSync(join(tmpdir(), 'air-e2e-'));
-  const cacheDir = join(dir, 'cache');
-  const configDir = join(dir, 'config');
-  const eventLog = join(dir, 'events.jsonl');
-  // Copy fixture
-  cpSync(fixturePath, dir, { recursive: true });
+  const repoDir = join(dir, 'repo');
+  const stateDir = join(dir, 'state');
+  const cacheDir = join(stateDir, 'cache');
+  const configDir = join(stateDir, 'config');
+  const eventLog = join(stateDir, 'events.jsonl');
+  mkdirSync(repoDir, { recursive: true });
+  mkdirSync(stateDir, { recursive: true });
+  // Copy fixture into repo/
+  cpSync(fixturePath, repoDir, { recursive: true });
   const fakeExecDir = join(process.cwd(), 'tests', 'e2e', 'harness', 'fake-executors');
   const env: Record<string, string> = {
     AIR_CACHE_DIR: cacheDir,
@@ -36,6 +42,8 @@ export function createSandbox(fixturePath: string, marker?: string): Sandbox {
   };
   const sandbox: Sandbox = {
     dir,
+    repoDir,
+    stateDir,
     cacheDir,
     configDir,
     eventLog,
@@ -44,8 +52,9 @@ export function createSandbox(fixturePath: string, marker?: string): Sandbox {
     reset() {
       for (let i = 0; i < 5; i++) {
         try {
-          rmSync(dir, { recursive: true, force: true });
-          cpSync(fixturePath, dir, { recursive: true });
+          rmSync(repoDir, { recursive: true, force: true });
+          mkdirSync(repoDir, { recursive: true });
+          cpSync(fixturePath, repoDir, { recursive: true });
           return;
         } catch {
           const start = Date.now();
@@ -54,13 +63,11 @@ export function createSandbox(fixturePath: string, marker?: string): Sandbox {
       }
     },
     cleanup() {
-      // Retry cleanup on Windows (files may be locked by child processes)
       for (let i = 0; i < 5; i++) {
         try {
           rmSync(dir, { recursive: true, force: true });
           return;
         } catch {
-          // Wait and retry
           const start = Date.now();
           while (Date.now() - start < 500) { /* busy wait */ }
         }

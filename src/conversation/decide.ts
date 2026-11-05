@@ -29,16 +29,17 @@ export function decide(message: string, _conv: Conversation): any[] {
   }
 
   // Pure Q&A / explain / research with no workspace need.
-  const isQuestion = /\?\s*$/.test(trimmed) || /^(what|how|why|explain|describe|tell)\b/.test(lower);
-  const wantsCodeWork = /\b(fix|edit|modify|refactor|implement|add|create|change|write|bug|test)\b/.test(lower);
-  const wantsRepo = /\b(repo|repository|codebase|files|project|directory)\b/.test(lower);
-  if (isQuestion && wantsRepo && !wantsCodeWork) {
+  const isQuestion = /\?\s*$/.test(trimmed) || /^(what|how|why|explain|describe|tell|should|would|can|could)\b/.test(lower);
+  const wantsCodeWork = /\b(fix|edit|modify|refactor|implement|add|create|change|write|bug|test|update|remove|delete)\b/.test(lower);
+  const wantsRepo = /\b(repo|repository|codebase|files|project|directory|app)\b/.test(lower);
+  const isBrainstorm = /\b(would you|should we|trade-?offs|options|ideas)\b/.test(lower) || /^how (would|could|should)\b/.test(lower);
+  if (isQuestion && wantsRepo && !wantsCodeWork && !isBrainstorm) {
     return [{ type: 'spawn_job', goal: trimmed, hints: { requiresWrite: false, requiresCode: true } }];
   }
-  if (isQuestion && !wantsCodeWork) {
+  if (isQuestion) {
     return [{ type: 'answer', text: '' }]; // placeholder; caller fills
   }
-  if (wantsCodeWork) {
+  if (wantsCodeWork && !isBrainstorm) {
     return [{ type: 'spawn_job', goal: trimmed, hints: { requiresWrite: true, requiresCode: true } }];
   }
   // Default: answer directly (front agent handles text).

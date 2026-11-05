@@ -26,8 +26,26 @@ export const oracles = {
     } catch { return false; }
   },
   noOrphans(marker: string): boolean {
-    // Check no process has the marker in env/argv (simplified).
-    return true; // TODO: implement platform-specific check
+    try {
+      if (process.platform === 'win32') {
+        const out = execFileSync('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+        return !out.split(/\r?\n/).some((line) => line.includes(marker));
+      }
+      // Unix: scan /proc for marker in cmdline or environ.
+      const { readdirSync, readFileSync } = require('node:fs');
+      for (const pid of readdirSync('/proc').filter((x: string) => /^\d+$/.test(x))) {
+        for (const file of ['cmdline', 'environ']) {
+          try {
+            const buf = readFileSync(`/proc/${pid}/${file}`);
+            const text = buf.toString('utf8').replace(/\0/g, ' ');
+            if (text.includes(marker)) return false;
+          } catch { /* noop */ }
+        }
+      }
+      return true;
+    } catch {
+      return true;
+    }
   },
   voiceCheck(transcript: string): string[] {
     const banned = ['aider', 'goose', 'opencode', 'kilo', 'ollama', 'codex', 'copilot', 'gemma', 'qwen', 'exit code', 'stdout'];

@@ -15,7 +15,10 @@ import { loadConfig } from '../config/loader';
 import { createHealthTracker } from '../health/tracker';
 import { buildModelCatalog, bestModelFor } from '../router/catalog';
 import { availableAdapters } from '../adapters/registry';
-import { type SessionHandle } from '../execution/sessions';
+export interface OrchestratorHandle {
+  cancel: () => void;
+  promise: Promise<OrchestratorSession>;
+}
 import { acquireSeat } from '../utils/concurrency';
 import { runProcess } from '../execution/runner';
 import { classifyOutcome } from '../types/outcome';
@@ -79,7 +82,7 @@ export interface OrchestratorDeps {
 
 export class Orchestrator {
   private sessions = new Map<string, OrchestratorSession>();
-  private handles = new Map<string, SessionHandle>();
+  private handles = new Map<string, OrchestratorHandle>();
   private events: OrchestratorEvent[] = [];
   private logFile: string;
 
@@ -231,7 +234,22 @@ export class Orchestrator {
     process.on('SIGINT', onSig);
     process.on('SIGTERM', onSig);
 
-    try {
+    const initialSession: OrchestratorSession = {
+      runId,
+      task,
+      cwd: execCwd,
+      adapterId: '',
+      provider: '',
+      model: '',
+      readOnly,
+      state: 'RUNNING',
+      startedAt: new Date().toISOString(),
+    };
+    this.sessions.set(runId, initialSession);
+    this.persist();
+
+    const runPromise = (async () => {
+      try {
     const allow = defaultAllowList(adapters);
     const visited = new Set<string>();
     let hops = 0;
@@ -522,7 +540,10 @@ export class Orchestrator {
     process.removeListener('SIGINT', onSig);
     process.removeListener('SIGTERM', onSig);
   }
-}
+    })();
+    this.handles.set(runId, { cancel: () => controller.abort(), promise: runPromise });
+    return initialSession;
+  }
 
   /**
    * Resume a paused failover loop after failover approval (MCP mode).
@@ -745,6 +766,16 @@ export class Orchestrator {
 
   get(runId: string): OrchestratorSession | undefined {
     return this.sessions.get(runId);
+  }
+
+  async waitFor(runId: string): Promise<OrchestratorSession> {
+    const h = this.handles.get(runId);
+    if (h?.promise) {
+      try { await h.promise; } catch { /* noop */ }
+    }
+    const s = this.sessions.get(runId);
+    if (!s) throw new Error(`Unknown session: ${runId}`);
+    return s;
   }
 
   async resume(runId: string, taskOverride?: string): Promise<OrchestratorSession> {

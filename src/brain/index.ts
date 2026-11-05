@@ -86,12 +86,25 @@ async function tryOllama(prompt: string): Promise<BrainResult | null> {
   return null;
 }
 
-export async function brainAnswer(prompt: string): Promise<BrainResult> {
-  const kilo = await tryKilo(prompt);
+export interface BrainContext {
+  history?: { role: string; content: string }[];
+  jobs?: string[];
+}
+
+export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<BrainResult> {
+  const parts: string[] = [];
+  if (ctx?.history && ctx.history.length > 0) {
+    parts.push('Conversation history:\n' + ctx.history.slice(-10).map((m) => `${m.role}: ${m.content}`).join('\n'));
+  }
+  if (ctx?.jobs && ctx.jobs.length > 0) {
+    parts.push('Active jobs: ' + ctx.jobs.join(', '));
+  }
+  const fullPrompt = parts.length > 0 ? parts.join('\n\n') + '\n\nUser: ' + prompt : prompt;
+  const kilo = await tryKilo(fullPrompt);
   if (kilo) return kilo;
-  const opencode = await tryOpencode(prompt);
+  const opencode = await tryOpencode(fullPrompt);
   if (opencode) return opencode;
-  const ollama = await tryOllama(prompt);
+  const ollama = await tryOllama(fullPrompt);
   if (ollama) return ollama;
   return { text: 'Acknowledged.', model: 'none', provider: 'none' };
 }

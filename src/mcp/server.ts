@@ -193,6 +193,7 @@ async function runTaskInBackground(orch: Orchestrator, job: Job): Promise<void> 
        maxHops: job.state.maxHops ?? 3,
        allowProviders: job.state.allowProviders,
      });
+    await orch.waitFor(session.runId);
     // Read the full task state from disk (includes outputTail, error, etc.)
     // which orch.start() wrote via writeTaskState.
     const fullState = await readTaskState(session.runId);

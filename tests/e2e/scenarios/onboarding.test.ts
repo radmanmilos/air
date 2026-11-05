@@ -20,7 +20,7 @@ describe('A-01: New developer asks what the project is', () => {
     }
     const sandbox = createSandbox(fixture);
     try {
-      const result = await airOnce(['chat'], sandbox.env, sandbox.dir, 30000);
+      const result = await airOnce(['chat'], sandbox.env, sandbox.repoDir, 30000);
       // The process should have started (may timeout since chat waits for input)
       expect(result.exitCode === null || result.exitCode === 0).toBe(true);
     } finally {
