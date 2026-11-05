@@ -157,8 +157,9 @@ Run-Test "T5.1 MCP server starts" "Tier5" {
     $msg = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
     $p.StandardInput.WriteLine($msg)
     Start-Sleep -Seconds 2
-    $out = $p.StandardOutput.ReadToEnd()
     $p.Kill()
+    Start-Sleep -Seconds 1
+    $out = $p.StandardOutput.ReadToEnd()
     if ($out -match "jsonrpc.*result|protocolVersion") { "OK - MCP responded" } else { "Output: $($out.Substring(0,[Math]::Min(200,$out.Length)))" }
 }
 
