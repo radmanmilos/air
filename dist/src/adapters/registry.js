@@ -39,8 +39,8 @@ function isOnPath(exe) {
 const META = {
     aider: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '0.86.2' },
     goose: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '1.57.0' },
-    opencode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '2.2.5' },
-    kilocode: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
+    opencode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '2.2.5' },
+    kilocode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
     codex: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '0.166.0' },
     ollama: { verified: true, enabled: true, headlessSupported: true, verificationVersion: 'runtime' },
 };

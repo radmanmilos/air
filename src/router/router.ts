@@ -66,8 +66,8 @@ export function selectCandidateFrom(
   }
 
   // Free-first ranking: prefer lower cost tier, then local providers, then larger context window.
-  const isLocal = (c: any) => c.provider === 'ollama' || c.provider === 'lm-studio' || c.provider === 'local';
-  candidates.sort((a, b) => costTier(a) - costTier(b) || (isLocal(a) ? -1 : isLocal(b) ? 1 : 0));
+  const isPreferred = (c: any) => c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
+  candidates.sort((a, b) => costTier(a) - costTier(b) || (isPreferred(a) ? -1 : isPreferred(b) ? 1 : 0));
 
   for (const candidate of candidates) {
     const adapter = adapters.find((a) => a.id === candidate.id);
@@ -153,7 +153,8 @@ export function costTier(c: ExecutionCandidate): number {
   const ov = isFreeOverride(c.provider, c.model);
   if (ov === true) return 0;
   if (ov === false) return 2;
-  if (c.provider === 'ollama') return -1;
+  const preferred = c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
+  if (preferred) return -1;
   if (c.provider === 'lm-studio') return 0;
   if (c.provider === 'openrouter' && /free/i.test(c.model)) return 0;
   if (/mini|small|lite/i.test(c.model)) return 1;
@@ -174,5 +175,6 @@ export function formatRouteDecision(decision: RouteDecision): string {
   }
   return lines.join('\n');
 }
+
 
 
