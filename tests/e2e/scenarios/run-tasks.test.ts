@@ -15,12 +15,13 @@ function ensureFixture(dir: string) {
 }
 
 describe('B-02: Simple edit task', () => {
-  it('air run with simple task completes', async () => {
+  it('air run starts without crashing', async () => {
     const fixture = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
     ensureFixture(fixture);
     const sandbox = createSandbox(fixture);
+    sandbox.env.FAKE_BEHAVIOR = 'edit';
     try {
-      const result = await airOnce(['run', 'add a comment to Program.cs'], sandbox.env, sandbox.dir, 30000);
+      const result = await airOnce(['run', 'add a comment to Program.cs'], sandbox.env, sandbox.dir, 15000);
       expect(result.exitCode === 0 || result.exitCode === null).toBe(true);
     } finally {
       sandbox.cleanup();
@@ -29,12 +30,13 @@ describe('B-02: Simple edit task', () => {
 });
 
 describe('C-01: Fix a bug', () => {
-  it('air run with bug fix task', async () => {
+  it('air run with bug fix task starts', async () => {
     const fixture = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
     ensureFixture(fixture);
     const sandbox = createSandbox(fixture);
+    sandbox.env.FAKE_BEHAVIOR = 'edit';
     try {
-      const result = await airOnce(['run', 'fix the null reference in Program.cs'], sandbox.env, sandbox.dir, 30000);
+      const result = await airOnce(['run', 'fix the null reference in Program.cs'], sandbox.env, sandbox.dir, 15000);
       expect(result.exitCode === 0 || result.exitCode === null).toBe(true);
     } finally {
       sandbox.cleanup();

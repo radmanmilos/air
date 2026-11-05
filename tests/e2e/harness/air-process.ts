@@ -3,7 +3,6 @@
 
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { existsSync } from 'node:fs';
 
 export interface AirRunResult {
   stdout: string;
@@ -47,15 +46,6 @@ export async function airOnce(
         if (process.platform === 'win32' && child.pid) {
           const { spawn: sp } = require('node:child_process');
           sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-        } else {
-          try {
-            if (process.platform === 'win32' && child.pid) {
-              const { spawn: sp } = require('node:child_process');
-              sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-            } else {
-              try { process.kill(child.pid); } catch { /* noop */ }
-            }
-          } catch { /* noop */ }
         }
       } catch { /* noop */ }
       resolve({ stdout, stderr, exitCode: null, durationMs: Date.now() - start });
@@ -105,7 +95,6 @@ export function airSpawn(
     waitFor(pattern, timeoutMs) {
       const pred = typeof pattern === 'function' ? pattern : (line: string) => pattern.test(line);
       return new Promise((resolve, reject) => {
-        // Check existing lines.
         for (const line of lines) {
           if (pred(line)) { resolve(line); return; }
         }
@@ -117,20 +106,12 @@ export function airSpawn(
         waiters.push({ pred, resolve, reject, timer });
       });
     },
-    close() { child.stdin.write('/quit\n'); },
+    close() { try { child.stdin.write('/quit\n'); } catch { /* noop */ } },
     kill() {
       try {
         if (process.platform === 'win32' && child.pid) {
-          spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-        } else {
-          try {
-            if (process.platform === 'win32' && child.pid) {
-              const { spawn: sp } = require('node:child_process');
-              sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-            } else {
-              try { process.kill(child.pid); } catch { /* noop */ }
-            }
-          } catch { /* noop */ }
+          const { spawn: sp } = require('node:child_process');
+          sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
         }
       } catch { /* noop */ }
     },
