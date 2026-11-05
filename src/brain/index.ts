@@ -1,9 +1,9 @@
-// Brain: front-agent reasoning via kilocode/opencode CLI.
+// Brain: front-agent reasoning via kilocode/opencode/ollama CLI.
 
 import { execFileSync } from 'node:child_process';
 
-const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/openrouter/free';
-const OPENCODE_MODEL = process.env.AIR_BRAIN_MODEL_OPENCODE || 'opencode/beam-free';
+const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/nvidia/nemotron-3-ultra-550b-a55b:free';
+const OPENCODE_MODEL = process.env.AIR_BRAIN_MODEL_OPENCODE || 'opencode/glm-5.3-flash-free';
 
 export interface BrainResult {
   text: string;
@@ -53,45 +53,41 @@ function tryOpencode(prompt: string): BrainResult | null {
   return null;
 }
 
-const OLLAMA_MODEL = process.env.AIR_BRAIN_MODEL_OLLAMA || process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
-
 function tryOllama(prompt: string): BrainResult | null {
+  const model = process.env.AIR_BRAIN_MODEL_OLLAMA;
+  if (!model) return null;
   try {
-    const out = execFileSync('ollama', ['run', OLLAMA_MODEL, prompt], {
+    const out = execFileSync('ollama', ['run', model, prompt], {
       encoding: 'utf8',
       timeout: 120000,
       stdio: ['ignore', 'pipe', 'ignore'],
     });
     const text = out.trim();
-    if (text) return { text, model: OLLAMA_MODEL, provider: 'ollama' };
+    if (text) return { text, model, provider: 'ollama' };
   } catch { /* noop */ }
   return null;
 }
+
 export function brainAnswer(prompt: string): BrainResult {
-  const ollama = tryOllama(prompt);
-  if (ollama) return ollama;
   const kilo = tryKilo(prompt);
   if (kilo) return kilo;
   const opencode = tryOpencode(prompt);
   if (opencode) return opencode;
+  const ollama = tryOllama(prompt);
+  if (ollama) return ollama;
   return { text: 'Acknowledged.', model: 'none', provider: 'none' };
 }
 
 export function isBrainAvailable(): boolean {
   try {
-    execFileSync('ollama', ['--version'], { stdio: 'ignore', timeout: 5000 });
+    execFileSync('kilo', ['--version'], { stdio: 'ignore', timeout: 5000 });
     return true;
   } catch {
     try {
-      execFileSync('kilo', ['--version'], { stdio: 'ignore', timeout: 5000 });
+      execFileSync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000 });
       return true;
     } catch {
-      try {
-        execFileSync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000 });
-        return true;
-      } catch {
-        return false;
-      }
+      return !!process.env.AIR_BRAIN_MODEL_OLLAMA;
     }
   }
 }
