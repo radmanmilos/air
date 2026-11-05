@@ -147,8 +147,10 @@ Run-Test "T4.2 air dashboard (with sessions)" "Tier4" {
 Write-Host "`n========== TIER 5: MCP ==========" -ForegroundColor Yellow
 
 Run-Test "T5.1 MCP server starts" "Tier5" {
+    $node = (Get-Command node).Source
+    $airJs = "C:\Users\Radman Milos\AppData\Roaming\npm\node_modules\air\dist\bin\air.js"
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = "cmd.exe"; $psi.Arguments = "/c air mcp"
+    $psi.FileName = $node; $psi.Arguments = "`"$airJs`" mcp"
     $psi.WorkingDirectory = $ProjectPath
     $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true; $psi.UseShellExecute = $false
