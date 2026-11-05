@@ -137,7 +137,10 @@ Run-Test "T4.1 air run --sessions (multi)" "Tier4" {
 
 Run-Test "T4.2 air dashboard (with sessions)" "Tier4" {
     $out = air dashboard 2>&1 | Out-String
-    if ($out -match "Sessions:") { "OK - $($out -split '\n' | Select-Object -First 3 -join ' | ')" } else { throw "No sessions" }
+    if ($out -match "Sessions:") { 
+        $lines = ($out -split '\n' | Select-Object -First 3) -join ' | '
+        "OK - $lines" 
+    } else { throw "No sessions" }
 }
 
 # ==================== TIER 5: MCP ====================
@@ -151,11 +154,12 @@ Run-Test "T5.1 MCP server starts" "Tier5" {
     $psi.RedirectStandardError = $true; $psi.UseShellExecute = $false
     $p = [System.Diagnostics.Process]::Start($psi)
     Start-Sleep -Seconds 2
-    $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}')
+    $msg = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+    $p.StandardInput.WriteLine($msg)
     Start-Sleep -Seconds 2
     $out = $p.StandardOutput.ReadToEnd()
     $p.Kill()
-    if ($out -match "air|mcp|jsonrpc|result") { "OK - MCP responded" } else { "Output: $($out.Substring(0,[Math]::Min(200,$out.Length)))" }
+    if ($out -match "air|jsonrpc|result|protocolVersion") { "OK - MCP responded" } else { "Output: $($out.Substring(0,[Math]::Min(200,$out.Length)))" }
 }
 
 # ==================== TIER 6: STRESS ====================
