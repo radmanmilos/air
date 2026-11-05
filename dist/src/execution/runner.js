@@ -11,7 +11,7 @@
 // - returns a ProcessOutcome; process facts (timedOut, cancelled, spawnError)
 //   take precedence over adapter stderr matching
 import { execFile } from 'node:child_process';
-import { StreamingRedactor } from '../security/streaming-redact';
+import { StreamingRedactor } from '../security/streaming-redact.js';
 // cross-spawn has no published @types package and ships as ESM-only.
 // We import it lazily so the module graph stays compatible with both
 // CommonJS and ESM consumers.

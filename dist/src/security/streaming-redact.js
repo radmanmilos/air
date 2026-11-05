@@ -18,7 +18,7 @@
 // Normal (secret-free) output streams responsively: small buffers that
 // cannot be the start of a token are emitted immediately. A buffer ending
 // with a partial token prefix is held until more data arrives.
-import { redact, containsSecret } from '../security/redact';
+import { redact, containsSecret } from '../security/redact.js';
 const OVERLAP = 64; // chars retained from the end of each chunk (>= max token length)
 const MAX_WITHHELD = 4096; // cap to prevent unbounded withheld buffers
 // Known token string prefixes. A suffix is a partial token prefix if it is

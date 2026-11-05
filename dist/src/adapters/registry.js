@@ -10,14 +10,14 @@
 // construct the adapter, enabling operators to add adapters without code
 // changes. Call ensureDynamicAdaptersLoaded() to populate them.
 import { execSync } from 'node:child_process';
-import { getInstallStatus } from '../installer/status';
-import { AiderAdapter } from './aider';
-import { GooseAdapter } from './goose';
-import { OpenCodeAdapter } from './opencode';
-import { KilocodeAdapter } from './kilocode';
-import { CodexAdapter } from './codex';
-import { GitHubCopilotAdapter } from './github-copilot';
-import { OllamaAdapter } from './ollama';
+import { getInstallStatus } from '../installer/status.js';
+import { AiderAdapter } from './aider.js';
+import { GooseAdapter } from './goose.js';
+import { OpenCodeAdapter } from './opencode.js';
+import { KilocodeAdapter } from './kilocode.js';
+import { CodexAdapter } from './codex.js';
+import { GitHubCopilotAdapter } from './github-copilot.js';
+import { OllamaAdapter } from './ollama.js';
 /** Cache of dynamically loaded adapters (factoryModule entries from catalog). */
 const DYNAMIC_ADAPTERS = new Map();
 function isOnPath(exe) {

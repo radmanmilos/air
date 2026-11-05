@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadConfig, migrateConfig } from '../src/config/loader';
-import { loadCatalog, catalogTools } from '../src/config/catalog';
-import { createHealthTracker } from '../src/health/tracker';
-import { selectCandidate, formatRouteDecision } from '../src/router/router';
-import { availableAdapters, adapterStatus, refreshAdapterAvailability } from '../src/adapters/registry';
-import { Orchestrator } from '../src/orchestrator/orchestrator';
-import { installAdapter, upgradeAdapter, uninstallAdapter } from '../src/installer/installer';
-import { getInstallStatus } from '../src/installer/status';
-import { checkVerifyTrust, runVerify, formatVerifyReport } from '../src/context/verify';
-import { startMcp } from '../src/mcp/server';
-import { buildModelCatalog, formatModelCatalog, formatBestModel } from '../src/router/catalog';
-import { EXIT_CODES } from '../src/types/exit-codes';
-import { redact } from '../src/security/redact';
+import { loadConfig, migrateConfig } from '../src/config/loader.js';
+import { loadCatalog, catalogTools } from '../src/config/catalog.js';
+import { createHealthTracker } from '../src/health/tracker.js';
+import { selectCandidate, formatRouteDecision } from '../src/router/router.js';
+import { availableAdapters, adapterStatus, refreshAdapterAvailability } from '../src/adapters/registry.js';
+import { Orchestrator } from '../src/orchestrator/orchestrator.js';
+import { installAdapter, upgradeAdapter, uninstallAdapter } from '../src/installer/installer.js';
+import { getInstallStatus } from '../src/installer/status.js';
+import { checkVerifyTrust, runVerify, formatVerifyReport } from '../src/context/verify.js';
+import { startMcp } from '../src/mcp/server.js';
+import { buildModelCatalog, formatModelCatalog, formatBestModel } from '../src/router/catalog.js';
+import { EXIT_CODES } from '../src/types/exit-codes.js';
+import { redact } from '../src/security/redact.js';
 const program = new Command();
 program
     .name('air')
@@ -24,7 +24,7 @@ async function listAdapters(config) {
     // Production registry: real adapters only, discovered from PATH.
     // MockAdapter is test-only and injected explicitly by tests.
     if (process.env.MOCK_MODE) {
-        const { MockAdapter } = await import('../src/adapters/mock');
+        const { MockAdapter } = await import('../src/adapters/mock.js');
         return [new MockAdapter()];
     }
     return availableAdapters(config);
@@ -57,7 +57,7 @@ async function runAction(task, options) {
                 sessions.push(s);
             }
             // Wait for all to finish by polling task state.
-            const { readTaskState } = await import('../src/execution/task-state');
+            const { readTaskState } = await import('../src/execution/task-state.js');
             for (const s of sessions) {
                 while (true) {
                     const st = await readTaskState(s.runId);
@@ -72,7 +72,7 @@ async function runAction(task, options) {
             process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
         }
         const results = await Promise.all(sessions.map(async (s) => {
-            const { readTaskState } = await import('../src/execution/task-state');
+            const { readTaskState } = await import('../src/execution/task-state.js');
             const st = await readTaskState(s.runId);
             return st?.result ?? s.result ?? 'FAILED';
         }));
@@ -310,7 +310,7 @@ program
     .action(async () => {
     const { readFileSync, existsSync } = await import('node:fs');
     const { join } = await import('node:path');
-    const { paths } = await import('../src/config/paths');
+    const { paths } = await import('../src/config/paths.js');
     const file = join(paths.cacheDir, 'orchestrator.json');
     if (!existsSync(file)) {
         console.log('No orchestrator sessions yet.');
@@ -324,7 +324,7 @@ program
     }
     console.log(`Events: ${raw.events?.length ?? 0}`);
     // Conversations (T7-034)
-    const { listConversations } = await import('../src/conversation');
+    const { listConversations } = await import('../src/conversation/index.js');
     const convIds = listConversations();
     console.log(`Conversations: ${convIds.length}`);
     for (const cid of convIds.slice(-10)) {
@@ -349,7 +349,7 @@ program
     .action(async (options) => {
     const { readFileSync, existsSync, writeFileSync } = await import('node:fs');
     const { join } = await import('node:path');
-    const { paths } = await import('../src/config/paths');
+    const { paths } = await import('../src/config/paths.js');
     const file = join(paths.cacheDir, 'orchestrator.json');
     if (!existsSync(file)) {
         console.log('No orchestrator log found.');
@@ -609,11 +609,11 @@ program
     .option('--resume <id>', 'Resume a conversation')
     .option('--free-only', 'Prefer free models (default true)')
     .action(async (options) => {
-    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../src/conversation');
-    const { decide } = await import('../src/conversation/decide');
-    const { planFromRequest } = await import('../src/planner');
-    const { compileJobResult } = await import('../src/result-compiler');
-    const { loadConfig } = await import('../src/config/loader');
+    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../src/conversation/index.js');
+    const { decide } = await import('../src/conversation/decide.js');
+    const { planFromRequest } = await import('../src/planner/index.js');
+    const { compileJobResult } = await import('../src/result-compiler/index.js');
+    const { loadConfig } = await import('../src/config/loader.js');
     const readline = await import('node:readline');
     const cwd = process.cwd();
     const { config } = await loadConfig({ cwd });
@@ -633,7 +633,7 @@ program
         if (conv.facts.length > 0)
             contextParts.push(`Facts: ${conv.facts.join('; ')}`);
         const enriched = contextParts.join('\n');
-        const { Orchestrator } = await import('../src/orchestrator/orchestrator');
+        const { Orchestrator } = await import('../src/orchestrator/orchestrator.js');
         const orch = new Orchestrator({ config, mcpMode: false, onFailoverPropose: async () => true });
         const plan = planFromRequest(enriched, { requiresWrite, requiresCode: hints?.requiresCode !== false });
         const item = plan.workItems[0];
@@ -646,7 +646,7 @@ program
         const p = (async () => {
             try {
                 // poll task state until terminal
-                const { readTaskState } = await import('../src/execution/task-state');
+                const { readTaskState } = await import('../src/execution/task-state.js');
                 let state = null;
                 while (true) {
                     state = await readTaskState(session.runId);
@@ -696,7 +696,7 @@ program
             return;
         }
         if (trimmed === '/status') {
-            const c = (await import('../src/conversation')).loadConversation(conv.id) ?? conv;
+            const c = (await import('../src/conversation/index.js')).loadConversation(conv.id) ?? conv;
             console.log(chalk.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`));
             return;
         }
@@ -732,7 +732,7 @@ program
                 void runJob(a.goal, undefined, a.hints);
             }
             else if (a.type === 'answer') {
-                const { brainAnswer, isBrainAvailable } = await import('../src/brain');
+                const { brainAnswer, isBrainAvailable } = await import('../src/brain/index.js');
                 let reply = 'Acknowledged.';
                 if (isBrainAvailable()) {
                     process.stdout.write(chalk.gray('air: thinking... '));
@@ -765,13 +765,13 @@ program
     .description('Apply a completed job worktree into the current branch')
     .argument('<jobId>', 'Job run id')
     .action(async (jobId) => {
-    const { readTaskState } = await import('../src/execution/task-state');
+    const { readTaskState } = await import('../src/execution/task-state.js');
     const st = await readTaskState(jobId);
     if (!st || !st.worktreePath || !st.sourceCwd) {
         console.log(chalk.red('No worktree info for job.'));
         process.exit(1);
     }
-    const { applyWorktree } = await import('../src/workspace');
+    const { applyWorktree } = await import('../src/workspace/index.js');
     const info = { jobId, sourceCwd: st.sourceCwd, worktreePath: st.worktreePath, branch: st.worktreeBranch, sourceHead: '' };
     const res = applyWorktree(info);
     console.log(res.ok ? chalk.green(res.message) : chalk.red(res.message));

@@ -8,10 +8,10 @@
 //
 // Sessions are coordinated by the MCP server; the CLI runs one session at a
 // time unless --parallel is passed.
-import { createHealthTracker } from '../health/tracker';
-import { acquireSeat } from '../utils/concurrency';
-import { makeRunId, writeTaskState, appendTaskIndex } from '../execution/task-state';
-import { snapshotGit } from '../context/checkpoint';
+import { createHealthTracker } from '../health/tracker.js';
+import { acquireSeat } from '../utils/concurrency.js';
+import { makeRunId, writeTaskState, appendTaskIndex } from '../execution/task-state.js';
+import { snapshotGit } from '../context/checkpoint.js';
 function isIsolated(config) {
     return config.isolated === true
         || config.worktree === true
@@ -93,14 +93,14 @@ export async function runSession(config) {
             };
             await writeTaskState(state);
             await appendTaskIndex(runId);
-            const { runProcess } = await import('../execution/runner');
+            const { runProcess } = await import('../execution/runner.js');
             const { outcome } = await runProcess(adapter.buildCommand(taskInput), {
                 timeoutMs,
                 signal: controller.signal,
                 stdoutTailBytes: 2048,
                 stderrTailBytes: 2048,
             });
-            const { classifyOutcome } = await import('../types/outcome');
+            const { classifyOutcome } = await import('../types/outcome.js');
             const fact = classifyOutcome(outcome);
             const category = fact.category ?? adapter.classifyError(outcome.exitCode, outcome.stderr, {
                 timedOut: outcome.timedOut,
@@ -124,7 +124,7 @@ export async function runSession(config) {
                 }
             }
             await tracker.flush();
-            const { snapshotDelta } = await import('../context/checkpoint');
+            const { snapshotDelta } = await import('../context/checkpoint.js');
             const afterSnap = snapshotGit(cwd);
             const delta = snapshotDelta(beforeSnap, afterSnap);
             const changed = delta.dirty;

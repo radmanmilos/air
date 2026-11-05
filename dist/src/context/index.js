@@ -1,1 +1,1 @@
-export { runVerify, formatVerifyReport } from './verify';
+export { runVerify, formatVerifyReport } from './verify.js';

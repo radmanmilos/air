@@ -6,7 +6,7 @@
 // Never includes model-generated prose as evidence.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { redact } from '../security/redact';
+import { redact } from '../security/redact.js';
 const DIFF_CAP = 4096; // bytes
 const TAIL_CAP = 2048; // bytes
 const UNTRACKED_CONTENT_CAP = 2048; // bytes per untracked file

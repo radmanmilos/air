@@ -3,8 +3,8 @@
 // Lists the registered adapters with their provider/model, and verifies
 // that every adapter's provider/model is allowed by the global allow-list.
 // Never executes a tool — read-only.
-import { availableAdapters, adapterStatus } from '../adapters/registry';
-import { defaultAllowList } from '../security/allowlist';
+import { availableAdapters, adapterStatus } from '../adapters/registry.js';
+import { defaultAllowList } from '../security/allowlist.js';
 export function checkModels() {
     const adapters = availableAdapters();
     const allow = defaultAllowList(adapters);

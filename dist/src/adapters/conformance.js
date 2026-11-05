@@ -5,7 +5,7 @@
 // This helper validates an adapter's output is sane and consistent with the
 // evidence it was given. A failing adapter (e.g. one that returns RATE_LIMIT
 // for an auth error) is rejected.
-import { getErrorAction } from '../types/errors';
+import { getErrorAction } from '../types/errors.js';
 const AUTH_RE = /invalid api key|401|unauthorized|authentication failed|auth failed/i;
 const RATE_LIMIT_RE = /rate limit|429|too many requests/i;
 const TIMEOUT_RE = /timeout|timed out/i;

@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import { paths } from '../config/paths';
+import { paths } from '../config/paths.js';
 const INSTALLS_FILE = join(paths.cacheDir, 'installs.json');
 function isBinaryOnPath(exe) {
     try {

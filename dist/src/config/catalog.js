@@ -10,7 +10,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
-import { paths } from './paths';
+import { paths } from './paths.js';
 const CATALOG_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 function bundledCatalogPath() {
     return join(__dirname, '../../config/catalog.json');

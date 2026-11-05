@@ -8,23 +8,23 @@
 import { existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { lockedReadModifyWrite } from '../utils/lock';
-import { paths } from '../config/paths';
-import { loadConfig } from '../config/loader';
-import { createHealthTracker } from '../health/tracker';
-import { buildModelCatalog, bestModelFor } from '../router/catalog';
-import { availableAdapters } from '../adapters/registry';
-import { acquireSeat } from '../utils/concurrency';
-import { runProcess } from '../execution/runner';
-import { classifyOutcome } from '../types/outcome';
-import { snapshotGit, snapshotDelta, formatDirtyReport, formatDeltaReport } from '../context/checkpoint';
-import { makeRunId, writeTaskState, appendTaskIndex } from '../execution/task-state';
-import { trace } from '../observability/trace';
-import { redact } from '../security/redact';
-import { buildHandoffPack } from '../context/handoff';
-import { defaultAllowList, checkHandoffAllowlist } from '../security/allowlist';
-import { selectCandidateFrom, formatRouteDecision, costTier } from '../router/router';
-import { getErrorAction, triggersFailover } from '../types/errors';
+import { lockedReadModifyWrite } from '../utils/lock.js';
+import { paths } from '../config/paths.js';
+import { loadConfig } from '../config/loader.js';
+import { createHealthTracker } from '../health/tracker.js';
+import { buildModelCatalog, bestModelFor } from '../router/catalog.js';
+import { availableAdapters } from '../adapters/registry.js';
+import { acquireSeat } from '../utils/concurrency.js';
+import { runProcess } from '../execution/runner.js';
+import { classifyOutcome } from '../types/outcome.js';
+import { snapshotGit, snapshotDelta, formatDirtyReport, formatDeltaReport } from '../context/checkpoint.js';
+import { makeRunId, writeTaskState, appendTaskIndex } from '../execution/task-state.js';
+import { trace } from '../observability/trace.js';
+import { redact } from '../security/redact.js';
+import { buildHandoffPack } from '../context/handoff.js';
+import { defaultAllowList, checkHandoffAllowlist } from '../security/allowlist.js';
+import { selectCandidateFrom, formatRouteDecision, costTier } from '../router/router.js';
+import { getErrorAction, triggersFailover } from '../types/errors.js';
 export class Orchestrator {
     deps;
     sessions = new Map();
@@ -130,7 +130,7 @@ export class Orchestrator {
         const { config } = await loadConfig({ cwd });
         const tracker = createHealthTracker();
         await tracker.load();
-        const { fromConfig, enforce } = await import('../permissions');
+        const { fromConfig, enforce } = await import('../permissions/index.js');
         const policy = fromConfig(config);
         const permCheck = enforce(policy, { write: !readOnly, shell: false, network: false });
         if (!permCheck.ok)
@@ -144,7 +144,7 @@ export class Orchestrator {
         }
         const runId = options.runId ?? makeRunId();
         await appendTaskIndex(runId);
-        const { createWorktree } = await import('../workspace');
+        const { createWorktree } = await import('../workspace/index.js');
         let worktreeInfo = null;
         if (isWriteTask) {
             try {
@@ -197,7 +197,7 @@ export class Orchestrator {
                 }
                 if (chosen.id === 'aider' && !taskInput.preferredModel) {
                     try {
-                        const { pickFreeOpenRouterModel } = await import('../router/free-models');
+                        const { pickFreeOpenRouterModel } = await import('../router/free-models.js');
                         const m = await pickFreeOpenRouterModel();
                         if (m)
                             taskInput.preferredModel = m;

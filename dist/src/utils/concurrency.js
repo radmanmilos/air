@@ -8,8 +8,8 @@
 // Stale seats (dead PID or mismatched start time) are reclaimed
 // automatically, so a crashed AIR does not leave an unrecoverable lock.
 import { promises as fs, constants as fsConstants } from 'node:fs';
-import { paths } from '../config/paths';
-import { isPidAlive } from './lock';
+import { paths } from '../config/paths.js';
+import { isPidAlive } from './lock.js';
 function processStartTime() {
     return Date.now() - process.uptime() * 1000;
 }

@@ -8,9 +8,9 @@
 // Task-index updates are guarded by an inter-process lock (R5-09) so two
 // processes reading/modifying/writing the index simultaneously cannot lose
 // task IDs.
-import { paths } from '../config/paths';
-import { atomicWriteJson, readJsonFile } from '../utils/atomic';
-import { lockedReadModifyWrite } from '../utils/lock';
+import { paths } from '../config/paths.js';
+import { atomicWriteJson, readJsonFile } from '../utils/atomic.js';
+import { lockedReadModifyWrite } from '../utils/lock.js';
 function stateFile(runId) {
     return `${paths.tasksDir}/${runId}.json`;
 }

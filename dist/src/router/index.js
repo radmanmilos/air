@@ -1,1 +1,1 @@
-export { selectCandidate, formatRouteDecision } from './router';
+export { selectCandidate, formatRouteDecision } from './router.js';

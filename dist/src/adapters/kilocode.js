@@ -2,7 +2,7 @@
 //
 // Uses the shared process runner (src/execution/runner.ts), never spawn
 // directly. Verified against kilocode 7.5.16 (see docs/adapters/kilocode.md).
-import { runProcess } from '../execution/runner';
+import { runProcess } from '../execution/runner.js';
 const RATE_LIMIT_RE = /rate limit|429|too many requests|quota exceeded/i;
 const AUTH_RE = /invalid api key|401|unauthorized|authentication failed|auth failed|api key incorrect/i;
 const MODEL_UNAVAILABLE_RE = /model .* not found|model not available|unknown model|no such model/i;

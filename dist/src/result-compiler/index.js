@@ -1,7 +1,7 @@
 // Result compiler (T-027, T7-025): turns a task result into a single coherent
 // user-facing reply. Never trusts worker prose; uses facts (delta, verify,
 // output). Redacts before returning.
-import { redact } from '../security/redact';
+import { redact } from '../security/redact.js';
 export function compileJobResult(facts) {
     const lines = [];
     const ok = facts.result === 'SUCCEEDED_WITH_CHANGES' || facts.result === 'SUCCEEDED_READ_ONLY' || facts.result === 'NO_CHANGES';
