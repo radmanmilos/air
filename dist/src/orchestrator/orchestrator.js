@@ -84,7 +84,15 @@ export class Orchestrator {
             detail,
         };
         this.events.push(ev);
-        // keep events bounded
+        // AIR_EVENT_LOG hook: append JSON line for test harness.
+        const eventLog = process.env.AIR_EVENT_LOG;
+        if (eventLog) {
+            try {
+                const fs = require('node:fs');
+                fs.appendFileSync(eventLog, JSON.stringify(ev) + '\n');
+            }
+            catch { /* noop */ }
+        }
         if (this.events.length > 1000)
             this.events.shift();
     }

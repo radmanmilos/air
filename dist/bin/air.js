@@ -623,6 +623,16 @@ program
     saveConversation(conv);
     console.log(chalk.cyan(`air chat (conversation ${conv.id})`));
     console.log(chalk.gray('Type a message, /run <task>, /status, /jobs, /cancel <id>, /last, /help, /quit'));
+    const eventLog = process.env.AIR_EVENT_LOG;
+    const logEvent = (type, detail) => {
+        if (!eventLog)
+            return;
+        try {
+            const fs = require('node:fs');
+            fs.appendFileSync(eventLog, JSON.stringify({ ts: new Date().toISOString(), type, detail }) + '\n');
+        }
+        catch { /* noop */ }
+    };
     const waiters = new Map();
     async function runJob(task, _workId, hints) {
         const requiresWrite = hints?.requiresWrite !== false;
@@ -639,6 +649,7 @@ program
         const item = plan.workItems[0];
         const session = await orch.start(item.objective, cwd, { mode: 'auto', readOnly: !requiresWrite, freeOnly: conv.userPreferences.freeOnly });
         await appendMessage(conv.id, { role: 'assistant', content: `Started job ${session.runId}.` });
+        logEvent('job_started', session.runId);
         console.log(chalk.green(`Started job ${session.runId}`));
         conv.activeWorkIds.push(session.runId);
         saveConversation(conv);
@@ -674,6 +685,7 @@ program
                 if (!conv.facts.includes(bullet))
                     conv.facts.push(bullet);
                 saveConversation(conv);
+                logEvent('job_finished', `${session.runId}: ${summary.split('.')[0]}`);
                 console.log(chalk.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
             }
             catch (err) {
@@ -687,6 +699,7 @@ program
         const trimmed = line.trim();
         if (!trimmed)
             return;
+        logEvent('message_received', trimmed);
         if (trimmed === '/quit' || trimmed === '/exit') {
             rl.close();
             return;
@@ -729,6 +742,7 @@ program
         const actions = decide(trimmed, conv);
         for (const a of actions) {
             if (a.type === 'spawn_job') {
+                logEvent('job_submitted', a.goal);
                 void runJob(a.goal, undefined, a.hints);
             }
             else if (a.type === 'answer') {
@@ -736,8 +750,10 @@ program
                 let reply = 'Acknowledged.';
                 if (isBrainAvailable()) {
                     process.stdout.write(chalk.gray('air: thinking... '));
+                    logEvent('brain_start', trimmed);
                     const r = brainAnswer(trimmed);
                     process.stdout.write('\r' + ' '.repeat(20) + '\r');
+                    logEvent('brain_end', r.text.slice(0, 200));
                     reply = r.text;
                 }
                 await appendMessage(conv.id, { role: 'assistant', content: reply });
