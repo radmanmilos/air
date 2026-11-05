@@ -12,9 +12,8 @@ async function spawnAsync(cmd, args, timeoutMs) {
             timeout: timeoutMs,
         });
         let stdout = '';
-        let stderr = '';
         child.stdout?.on('data', (d) => { stdout += d.toString(); });
-        child.stderr?.on('data', (d) => { stderr += d.toString(); });
+        child.stderr?.on('data', (d) => { });
         const timer = setTimeout(() => {
             try {
                 child.kill();

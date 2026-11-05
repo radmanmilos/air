@@ -21,9 +21,8 @@ async function spawnAsync(cmd: string, args: string[], timeoutMs: number): Promi
       timeout: timeoutMs,
     });
     let stdout = '';
-    let stderr = '';
     child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
+    child.stderr?.on('data', (d: Buffer) => { /* ignore */ });
     const timer = setTimeout(() => {
       try { child.kill(); } catch { /* noop */ }
       resolve({ stdout, status: null, error: new Error('timeout') });
