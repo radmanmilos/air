@@ -25,12 +25,14 @@ export function createSandbox(fixturePath: string, marker?: string): Sandbox {
   const eventLog = join(dir, 'events.jsonl');
   // Copy fixture
   cpSync(fixturePath, dir, { recursive: true });
+  const fakeExecDir = join(process.cwd(), 'tests', 'e2e', 'harness', 'fake-executors');
   const env: Record<string, string> = {
     AIR_CACHE_DIR: cacheDir,
     AIR_CONFIG_DIR: configDir,
     AIR_EVENT_LOG: eventLog,
     AIR_E2E_MARKER: runMarker,
     NO_COLOR: '1',
+    PATH: `${fakeExecDir}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`,
   };
   const sandbox: Sandbox = {
     dir,
