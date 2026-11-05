@@ -23,6 +23,7 @@
     "scripts":  {
     "build": "tsc",
     "check:dist": "node scripts/check-dist-imports.mjs",
+    "mutation:check": "node scripts/mutation-check.mjs",
     "e2e:det": "vitest run tests/e2e",
     "e2e:live": "vitest run tests/e2e",
     "postbuild": "node scripts/fix-imports.mjs",

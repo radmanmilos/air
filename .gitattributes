@@ -1,0 +1,8 @@
+tests/e2e/harness/fake-executors/*.cmd text eol=crlf
+tests/e2e/harness/fake-executors/aider text eol=lf
+tests/e2e/harness/fake-executors/goose text eol=lf
+tests/e2e/harness/fake-executors/opencode text eol=lf
+tests/e2e/harness/fake-executors/kilo text eol=lf
+tests/e2e/harness/fake-executors/ollama text eol=lf
+tests/e2e/harness/fake-executors/codex text eol=lf
+tests/e2e/harness/fake-executors/github-copilot text eol=lf

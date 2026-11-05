@@ -29,7 +29,15 @@ function run(mode: string, opts: MockOpts = {}): Promise<MockResult> {
     child.stdout.on('data', (b: Buffer) => (stdout += b.toString()));
     child.stderr.on('data', (b: Buffer) => (stderr += b.toString()));
     const timer = opts.timeout
-      ? setTimeout(() => { child.kill('SIGKILL'); reject(new Error('timeout')); }, opts.timeout)
+      ? setTimeout(() => {
+          try {
+            if (process.platform === 'win32' && child.pid) {
+              const { spawn: sp } = require('node:child_process');
+              sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+            }
+          } catch { /* noop */ }
+          reject(new Error('timeout'));
+        }, opts.timeout)
       : null;
     child.on('error', reject);
     child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {

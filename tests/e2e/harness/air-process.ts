@@ -43,7 +43,21 @@ export async function airOnce(
     child.stdout.on('data', (d) => { stdout += d.toString(); });
     child.stderr.on('data', (d) => { stderr += d.toString(); });
     const timer = setTimeout(() => {
-      try { child.kill('SIGKILL'); } catch { /* noop */ }
+      try {
+        if (process.platform === 'win32' && child.pid) {
+          const { spawn: sp } = require('node:child_process');
+          sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+        } else {
+          try {
+            if (process.platform === 'win32' && child.pid) {
+              const { spawn: sp } = require('node:child_process');
+              sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+            } else {
+              try { process.kill(child.pid); } catch { /* noop */ }
+            }
+          } catch { /* noop */ }
+        }
+      } catch { /* noop */ }
       resolve({ stdout, stderr, exitCode: null, durationMs: Date.now() - start });
     }, timeoutMs);
     child.on('close', (code) => {
@@ -109,7 +123,14 @@ export function airSpawn(
         if (process.platform === 'win32' && child.pid) {
           spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
         } else {
-          child.kill('SIGKILL');
+          try {
+            if (process.platform === 'win32' && child.pid) {
+              const { spawn: sp } = require('node:child_process');
+              sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+            } else {
+              try { process.kill(child.pid); } catch { /* noop */ }
+            }
+          } catch { /* noop */ }
         }
       } catch { /* noop */ }
     },

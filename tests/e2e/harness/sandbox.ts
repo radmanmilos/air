@@ -42,11 +42,29 @@ export function createSandbox(fixturePath: string, marker?: string): Sandbox {
     marker: runMarker,
     env,
     reset() {
-      rmSync(dir, { recursive: true, force: true });
-      cpSync(fixturePath, dir, { recursive: true });
+      for (let i = 0; i < 5; i++) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+          cpSync(fixturePath, dir, { recursive: true });
+          return;
+        } catch {
+          const start = Date.now();
+          while (Date.now() - start < 500) { /* busy wait */ }
+        }
+      }
     },
     cleanup() {
-      rmSync(dir, { recursive: true, force: true });
+      // Retry cleanup on Windows (files may be locked by child processes)
+      for (let i = 0; i < 5; i++) {
+        try {
+          rmSync(dir, { recursive: true, force: true });
+          return;
+        } catch {
+          // Wait and retry
+          const start = Date.now();
+          while (Date.now() - start < 500) { /* busy wait */ }
+        }
+      }
     },
   };
   return sandbox;

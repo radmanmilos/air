@@ -1,0 +1,2 @@
+#!/bin/sh
+FAKE_TOOL=codex node "$(dirname "")/fake-executor.mjs" "$@"

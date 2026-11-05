@@ -1,0 +1,2 @@
+#!/bin/sh
+FAKE_TOOL=github-copilot node "$(dirname "")/fake-executor.mjs" "$@"
