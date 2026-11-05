@@ -16,7 +16,7 @@ const NOT_FOUND_RE = /not found|not installed|enoent/i;
 export class OpenCodeAdapter implements AgentAdapter {
   id = 'opencode';
   provider = 'openrouter';
-  model = 'gemma-4-31b-it:free';
+  model = 'opencode/glm-5.3-flash-free';
   executable = 'opencode';
 
 capabilities = {
@@ -36,14 +36,15 @@ capabilities = {
 
   buildCommand(task: TaskInput): CommandSpec {
     const args = ['run'];
+    const modelToUse = (task.preferredModel && task.preferredModel.startsWith('opencode/'))
+      ? task.preferredModel
+      : this.model;
+    args.push('--model', modelToUse);
     if (task.files && task.files.length > 0) {
       for (const f of task.files) args.push('--file', f);
     }
     args.push(task.prompt);
     args.push('--auto');
-    if (task.preferredModel) {
-      args.push('--model', task.preferredModel);
-    }
     return {
       executable: this.executable ?? 'opencode',
       args,
