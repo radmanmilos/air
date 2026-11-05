@@ -748,10 +748,10 @@ program
             else if (a.type === 'answer') {
                 const { brainAnswer, isBrainAvailable } = await import('../src/brain/index.js');
                 let reply = 'Acknowledged.';
-                if (isBrainAvailable()) {
+                if (await isBrainAvailable()) {
                     process.stdout.write(chalk.gray('air: thinking... '));
                     logEvent('brain_start', trimmed);
-                    const r = brainAnswer(trimmed);
+                    const r = await brainAnswer(trimmed);
                     process.stdout.write('\r' + ' '.repeat(20) + '\r');
                     logEvent('brain_end', r.text.slice(0, 200));
                     reply = r.text;

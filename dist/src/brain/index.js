@@ -1,18 +1,43 @@
-// Suppress execFileSync shell deprecation warning.
+// Brain: front-agent reasoning via kilocode/opencode/ollama CLI.
+// Uses cross-spawn (no shell) to prevent command injection (P-01).
 process.noDeprecation = true;
-import { execFileSync } from 'node:child_process';
 const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/kilo-auto/free';
 const OPENCODE_MODEL = process.env.AIR_BRAIN_MODEL_OPENCODE || 'opencode/glm-5.3-flash-free';
-function tryKilo(prompt) {
-    try {
-        const out = execFileSync('kilo', ['run', '--model', KILO_MODEL, '--format', 'json', prompt], {
-            encoding: 'utf8',
-            timeout: 120000,
-            stdio: ['ignore', 'pipe', 'ignore'],
-            env: { ...process.env, NODE_NO_WARNINGS: '1' },
-            shell: true,
+async function spawnAsync(cmd, args, timeoutMs) {
+    const crossSpawnMod = await import('cross-spawn');
+    const crossSpawn = crossSpawnMod.default || crossSpawnMod;
+    return new Promise((resolve) => {
+        const child = crossSpawn(cmd, args, {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout: timeoutMs,
         });
-        const lines = out.split('\n').filter(Boolean);
+        let stdout = '';
+        let stderr = '';
+        child.stdout?.on('data', (d) => { stdout += d.toString(); });
+        child.stderr?.on('data', (d) => { stderr += d.toString(); });
+        const timer = setTimeout(() => {
+            try {
+                child.kill();
+            }
+            catch { /* noop */ }
+            resolve({ stdout, status: null, error: new Error('timeout') });
+        }, timeoutMs);
+        child.on('close', (code) => {
+            clearTimeout(timer);
+            resolve({ stdout, status: code, error: child.error || null });
+        });
+        child.on('error', (err) => {
+            clearTimeout(timer);
+            resolve({ stdout, status: null, error: err });
+        });
+    });
+}
+async function tryKilo(prompt) {
+    try {
+        const r = await spawnAsync('kilo', ['run', '--model', KILO_MODEL, '--format', 'json', prompt], 120000);
+        if (r.error || r.status !== 0)
+            return null;
+        const lines = (r.stdout || '').split('\n').filter(Boolean);
         const texts = [];
         for (const line of lines) {
             try {
@@ -29,16 +54,12 @@ function tryKilo(prompt) {
     catch { /* noop */ }
     return null;
 }
-function tryOpencode(prompt) {
+async function tryOpencode(prompt) {
     try {
-        const out = execFileSync('opencode', ['run', '--format', 'json', '--model', OPENCODE_MODEL, prompt], {
-            encoding: 'utf8',
-            timeout: 120000,
-            stdio: ['ignore', 'pipe', 'ignore'],
-            env: { ...process.env, NODE_NO_WARNINGS: '1' },
-            shell: true,
-        });
-        const lines = out.split('\n').filter(Boolean);
+        const r = await spawnAsync('opencode', ['run', '--format', 'json', '--model', OPENCODE_MODEL, prompt], 120000);
+        if (r.error || r.status !== 0)
+            return null;
+        const lines = (r.stdout || '').split('\n').filter(Boolean);
         const texts = [];
         for (const line of lines) {
             try {
@@ -55,50 +76,45 @@ function tryOpencode(prompt) {
     catch { /* noop */ }
     return null;
 }
-function tryOllama(prompt) {
+async function tryOllama(prompt) {
     const model = process.env.AIR_BRAIN_MODEL_OLLAMA;
     if (!model)
         return null;
     try {
-        const out = execFileSync('ollama', ['run', model, prompt], {
-            encoding: 'utf8',
-            timeout: 120000,
-            stdio: ['ignore', 'pipe', 'ignore'],
-            env: { ...process.env, NODE_NO_WARNINGS: '1' },
-            shell: true,
-        });
-        const text = out.trim();
+        const r = await spawnAsync('ollama', ['run', model, prompt], 120000);
+        if (r.error || r.status !== 0)
+            return null;
+        const text = (r.stdout || '').trim();
         if (text)
             return { text, model, provider: 'ollama' };
     }
     catch { /* noop */ }
     return null;
 }
-export function brainAnswer(prompt) {
-    // Try kilocode first (auto-routes to best available model).
-    const kilo = tryKilo(prompt);
+export async function brainAnswer(prompt) {
+    const kilo = await tryKilo(prompt);
     if (kilo)
         return kilo;
-    const opencode = tryOpencode(prompt);
+    const opencode = await tryOpencode(prompt);
     if (opencode)
         return opencode;
-    const ollama = tryOllama(prompt);
+    const ollama = await tryOllama(prompt);
     if (ollama)
         return ollama;
     return { text: 'Acknowledged.', model: 'none', provider: 'none' };
 }
-export function isBrainAvailable() {
+export async function isBrainAvailable() {
     try {
-        execFileSync('kilo', ['--version'], { stdio: 'ignore', timeout: 5000, shell: true, env: { ...process.env, NODE_NO_WARNINGS: '1' } });
-        return true;
-    }
-    catch {
-        try {
-            execFileSync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000, shell: true, env: { ...process.env, NODE_NO_WARNINGS: '1' } });
+        const r = await spawnAsync('kilo', ['--version'], 5000);
+        if (!r.error && r.status === 0)
             return true;
-        }
-        catch {
-            return !!process.env.AIR_BRAIN_MODEL_OLLAMA;
-        }
     }
+    catch { /* noop */ }
+    try {
+        const r = await spawnAsync('opencode', ['--version'], 5000);
+        if (!r.error && r.status === 0)
+            return true;
+    }
+    catch { /* noop */ }
+    return !!process.env.AIR_BRAIN_MODEL_OLLAMA;
 }

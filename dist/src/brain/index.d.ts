@@ -3,5 +3,5 @@ export interface BrainResult {
     model: string;
     provider: string;
 }
-export declare function brainAnswer(prompt: string): BrainResult;
-export declare function isBrainAvailable(): boolean;
+export declare function brainAnswer(prompt: string): Promise<BrainResult>;
+export declare function isBrainAvailable(): Promise<boolean>;
