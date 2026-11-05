@@ -3,7 +3,7 @@ process.noDeprecation = true;
 
 import { execFileSync } from 'node:child_process';
 
-const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/nvidia/nemotron-3-ultra-550b-a55b:free';
+const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/kilo-auto/free';
 const OPENCODE_MODEL = process.env.AIR_BRAIN_MODEL_OPENCODE || 'opencode/glm-5.3-flash-free';
 
 export interface BrainResult {
@@ -75,7 +75,18 @@ function tryOllama(prompt: string): BrainResult | null {
   return null;
 }
 
-export function brainAnswer(prompt: string): BrainResult {
+export type Complexity = 'simple' | 'complex';
+
+function isComplex(prompt: string): boolean {
+  const lower = prompt.toLowerCase();
+  // Complex if long, or contains architecture/design/reasoning keywords.
+  if (prompt.length > 200) return true;
+  const complexKeywords = /\b(architect|design|refactor|optimize|security|performance|concurrent|distributed|scale|tradeoff|compare|analyze|review|debug|investigate|plan)\b/;
+  return complexKeywords.test(lower);
+}
+
+export function brainAnswer(prompt: string, complexity?: Complexity): BrainResult {
+  // Try kilocode first (auto-routes to best available model).
   const kilo = tryKilo(prompt);
   if (kilo) return kilo;
   const opencode = tryOpencode(prompt);

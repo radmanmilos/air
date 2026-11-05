@@ -1,7 +1,7 @@
 // Suppress execFileSync shell deprecation warning.
 process.noDeprecation = true;
 import { execFileSync } from 'node:child_process';
-const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/nvidia/nemotron-3-ultra-550b-a55b:free';
+const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/kilo-auto/free';
 const OPENCODE_MODEL = process.env.AIR_BRAIN_MODEL_OPENCODE || 'opencode/glm-5.3-flash-free';
 function tryKilo(prompt) {
     try {
@@ -74,7 +74,16 @@ function tryOllama(prompt) {
     catch { /* noop */ }
     return null;
 }
-export function brainAnswer(prompt) {
+function isComplex(prompt) {
+    const lower = prompt.toLowerCase();
+    // Complex if long, or contains architecture/design/reasoning keywords.
+    if (prompt.length > 200)
+        return true;
+    const complexKeywords = /\b(architect|design|refactor|optimize|security|performance|concurrent|distributed|scale|tradeoff|compare|analyze|review|debug|investigate|plan)\b/;
+    return complexKeywords.test(lower);
+}
+export function brainAnswer(prompt, complexity) {
+    // Try kilocode first (auto-routes to best available model).
     const kilo = tryKilo(prompt);
     if (kilo)
         return kilo;
