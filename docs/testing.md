@@ -1,41 +1,30 @@
-# Testing AIR in a Production-Like Environment
+# Testing AIR
 
-## Overview
+## Unit Tests
+Run: `npm test` (vitest, 240+ tests)
+Run: `npm run typecheck`, `npm run typecheck:test`, `npm run lint`
 
-AIR includes a structured test suite that exercises real CLI commands against a live project directory, simulating how an end user would interact with AIR.
+## E2E Test Harness (tests/e2e/)
+Structured test system per `docs/reviews/air_e2e_test_redesign.md`.
 
-## Running the Test Suite
+### Structure
+- `tests/e2e/harness/` - sandbox, air-process, oracles, report
+- `tests/e2e/scenarios/` - scenario tests (A-01..M-05)
+- `tests/e2e/fixtures/` - fixture specs and hidden acceptance tests
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/production-test.ps1 -ProjectPath "E:\GitHub\test"
-```
+### Running
+- Deterministic suite (CI): `npm run e2e:det` (fake executors, no real tools)
+- Live suite (local): `npm run e2e:live -- --fixture <path>` (real tools)
 
-Optional parameters:
-- `-LogFile "custom_log.md"` — custom log file name (default: `test_log.md`)
+### AIR_EVENT_LOG
+When `AIR_EVENT_LOG=<path>` is set, AIR appends JSON lines for:
+- message_received, brain_start, brain_end, job_submitted, job_started, job_finished, notice_printed, command_handled
 
-## Test Cases
+Tests use this for latency measurement and ordering assertions.
 
-1. **air status** — Verifies all adapters are detected and health tracking works.
-2. **air models** — Verifies model listing and Ollama detection.
-3. **air dashboard** — Verifies session/event display.
-4. **air chat (read-only)** — Sends a question via chat, verifies job spawning and completion.
-5. **air verify-repo** — Runs the configured verification command.
+## Production-Like Tests
+- `scripts/production-test.ps1` - 16 tests across 6 tiers (Windows)
+- Run: `powershell -ExecutionPolicy Bypass -File scripts/production-test.ps1 -ProjectPath "E:\GitHub\test"`
 
-## Test Project Setup
-
-The test project (`e:\GitHub\test`) is a C# console app connected to GitHub. It is safe to modify, commit, and push. Before testing:
-
-```bash
-git clone https://github.com/radmanmilos/test.git
-cd test
-```
-
-Ensure Ollama is running with a model (e.g., `qwen2.5-coder:7b`) for offline/free testing.
-
-## Re-running Tests
-
-The test suite is idempotent. Run it anytime to verify AIR functionality. Results are logged to `test_log.md` in the target project.
-
-## CI Integration
-
-CI runs unit tests, typecheck, lint, build, and the dist import scan. The production test suite is manual (requires a live project and Ollama).
+## Manual Testing
+See `docs/reviews/air_e2e_test_redesign.md` for the full scenario catalog (A-01..M-05) with acceptance criteria.

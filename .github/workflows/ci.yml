@@ -30,6 +30,8 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Check dist imports
+        run: npm run check:dist
       - name: Lint
         run: npm run lint
       - name: Package dry-run
