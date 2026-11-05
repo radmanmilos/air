@@ -13,7 +13,7 @@ async function spawnAsync(cmd, args, timeoutMs) {
         });
         let stdout = '';
         child.stdout?.on('data', (d) => { stdout += d.toString(); });
-        child.stderr?.on('data', (d) => { });
+        child.stderr?.on('data', () => { });
         const timer = setTimeout(() => {
             try {
                 child.kill();
