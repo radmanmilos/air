@@ -53,7 +53,7 @@ export function applyWorktree(info: WorktreeInfo): { ok: boolean; message: strin
     return { ok: false, message: `Apply failed: ${String(err?.message || err)}` };
   }
 }
-}
+
 export function removeWorktree(info: WorktreeInfo): void {
   try {
     execFileSync('git', ['worktree', 'remove', '--force', info.worktreePath], { cwd: info.sourceCwd, stdio: 'ignore' });

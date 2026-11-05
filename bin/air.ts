@@ -655,7 +655,7 @@ program
       if (conv!.facts.length > 0) contextParts.push(`Facts: ${conv!.facts.join('; ')}`);
       const enriched = contextParts.join('\n');
       const { Orchestrator } = await import('../src/orchestrator/orchestrator');
-      const orch = new (Orchestrator as any)({ config, mcpMode: false, onFailoverPropose: async () => true });
+      const orch = new (Orchestrator as any)({ config, mcpMode: true, onFailoverPropose: async () => true });
       const plan = planFromRequest(enriched, { requiresWrite, requiresCode: hints?.requiresCode !== false });
       const item = plan.workItems[0];
       const session = await orch.start(item.objective, cwd, { mode: 'auto', readOnly: !requiresWrite, freeOnly: conv!.userPreferences.freeOnly });
