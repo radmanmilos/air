@@ -21,7 +21,6 @@ class Program
                 Console.WriteLine($"Added: {title}");
                 break;
             case "list":
-                // BUG-4: crashes on empty list
                 var tasks = service.List();
                 Console.WriteLine(formatter.Format(tasks));
                 break;

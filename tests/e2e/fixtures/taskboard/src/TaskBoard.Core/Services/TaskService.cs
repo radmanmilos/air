@@ -20,13 +20,11 @@ public class TaskService
         if (task != null)
         {
             task.Status = TaskItemStatus.Done;
-            // BUG-1: CompletedAt is never set
         }
     }
 
     public List<TaskItem> FilterByTag(string tag)
     {
-        // BUG-2: case-sensitive comparison
         return _tasks.Where(t => t.Tags.Contains(tag)).ToList();
     }
 

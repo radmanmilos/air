@@ -9,7 +9,7 @@ public class JsonTaskStore
     {
         var json = File.ReadAllText(path);
         if (string.IsNullOrWhiteSpace(json))
-            throw new JsonException("Empty file"); // BUG-3: should return empty list
+            throw new JsonException("Empty file");
         return JsonSerializer.Deserialize<List<TaskItem>>(json) ?? new();
     }
 

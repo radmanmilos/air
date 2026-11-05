@@ -39,4 +39,22 @@ public class TaskServiceTests
         svc.Add("a"); svc.Add("b");
         Assert.Equal(2, svc.List().Count);
     }
+
+    [Fact]
+    public void Add_AssignsIncrementingIds()
+    {
+        var svc = new TaskService();
+        var a = svc.Add("a");
+        var b = svc.Add("b");
+        Assert.Equal(a.Id + 1, b.Id);
+    }
+
+    [Fact]
+    public void Complete_SetsStatusDone()
+    {
+        var svc = new TaskService();
+        var t = svc.Add("test");
+        svc.Complete(t.Id);
+        Assert.Equal(TaskItemStatus.Done, svc.List().First(x => x.Id == t.Id).Status);
+    }
 }
