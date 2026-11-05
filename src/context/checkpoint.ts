@@ -99,9 +99,11 @@ export function snapshotDelta(
   const beforeFp = before.fingerprints ?? {};
   const afterFp = after.fingerprints ?? {};
 
-  const staged = after.staged.filter((f) => !beforeStaged.has(f) || beforeFp[f] !== afterFp[f]);
-  const unstaged = after.unstaged.filter((f) => !beforeUnstaged.has(f) || beforeFp[f] !== afterFp[f]);
-  const untracked = after.untracked.filter((f) => !beforeUntracked.has(f) || beforeFp[f] !== afterFp[f]);
+  const isArtifact = (f: string) => /^\.aider/.test(f);
+
+  const staged = after.staged.filter((f) => (!beforeStaged.has(f) || beforeFp[f] !== afterFp[f]) && !isArtifact(f));
+  const unstaged = after.unstaged.filter((f) => (!beforeUnstaged.has(f) || beforeFp[f] !== afterFp[f]) && !isArtifact(f));
+  const untracked = after.untracked.filter((f) => (!beforeUntracked.has(f) || beforeFp[f] !== afterFp[f]) && !isArtifact(f));
 
   // Deleted: present before but absent after (tracked or untracked).
   const deleted: string[] = [];
