@@ -24,10 +24,8 @@ describe('adapter verification gate (R5-02)', () => {
     const ids = routed.map((a) => a.id);
     expect(ids).toContain('aider');
     expect(ids).toContain('goose');
-    // Unverified adapters (opencode, kilocode, codex, github-copilot) are
-    // visible in status but never routed by default.
-    expect(ids).not.toContain('opencode');
-    expect(ids).not.toContain('kilocode');
+    // opencode, kilocode, ollama are now verified and routed by default.
+    // codex and github-copilot remain unverified (paid keys required).
     expect(ids).not.toContain('codex');
     expect(ids).not.toContain('github-copilot');
   });
@@ -40,10 +38,13 @@ describe('adapter verification gate (R5-02)', () => {
     expect(ids).toContain('codex');
     expect(ids).toContain('github-copilot');
     const verified = status.filter((s) => s.verified);
-    // Only aider and goose are CI-verified.
+    // aider, goose, opencode, kilocode, ollama are verified.
     expect(verified.length).toBe(5);
     expect(verified.map((s) => s.id)).toContain('aider');
     expect(verified.map((s) => s.id)).toContain('goose');
+    expect(verified.map((s) => s.id)).toContain('opencode');
+    expect(verified.map((s) => s.id)).toContain('kilocode');
+    expect(verified.map((s) => s.id)).toContain('ollama');
   });
 
   it('availableAdapters includes all verified adapters when installed', () => {
@@ -51,8 +52,9 @@ describe('adapter verification gate (R5-02)', () => {
     const ids = routed.map((a) => a.id);
     expect(ids).toContain('aider');
     expect(ids).toContain('goose');
-    expect(ids).not.toContain('opencode');
-    expect(ids).not.toContain('kilocode');
+    expect(ids).toContain('opencode');
+    expect(ids).toContain('kilocode');
+    expect(ids).toContain('ollama');
     expect(ids).not.toContain('codex');
     expect(ids).not.toContain('github-copilot');
   });
@@ -80,7 +82,7 @@ describe('adapter verification gate (R5-02)', () => {
   it('PATH presence enables verified adapters', () => {
     const status = adapterStatus();
     const opencode = status.find((s) => s.id === 'opencode')!;
-    expect(opencode.verified).toBe(false);
+    expect(opencode.verified).toBe(true);
     const aider = status.find((s) => s.id === 'aider')!;
     expect(aider.verified).toBe(true);
   });
