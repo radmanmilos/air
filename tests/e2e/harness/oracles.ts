@@ -12,8 +12,9 @@ export const oracles = {
   },
   gitChangedFiles(dir: string, base?: string): string[] {
     try {
-      const out = execFileSync('git', ['diff', '--name-only', base ?? 'HEAD'], { cwd: dir, encoding: 'utf8' });
-      return out.trim().split('\n').filter(Boolean);
+      // Use git status to include untracked files.
+      const out = execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
+      return out.trim().split('\n').filter(Boolean).map(line => line.slice(3).trim());
     } catch { return []; }
   },
   fileExists(dir: string, path: string): boolean {
