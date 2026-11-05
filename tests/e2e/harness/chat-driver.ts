@@ -38,11 +38,13 @@ export function startChat(env: Record<string, string>, cwd: string, args: string
   const lines: { t: number; line: string }[] = [];
   const waiters: Array<{ re: RegExp; afterMs: number; resolve: (v: { t: number; line: string }) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }> = [];
 
+const ANSI = /\x1b\[[0-9;]*[a-zA-Z]/g;
   const handleChunk = (chunk: Buffer | string) => {
     const text = chunk.toString();
     for (const line of text.split(/\r?\n/)) {
-      if (!line) continue;
-      const entry = { t: Date.now() - start, line };
+      const clean = line.replace(ANSI, '').trim();
+      if (!clean) continue;
+      const entry = { t: Date.now() - start, line: clean };
       lines.push(entry);
       for (let i = waiters.length - 1; i >= 0; i--) {
         const w = waiters[i];

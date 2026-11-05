@@ -1,0 +1,8 @@
+# AIR e2e fixture lock (H5)
+# The TaskBoard e2e fixture must match this baseline hash.
+# The harness refuses to run TaskBoard scenarios on a hash mismatch.
+fixture: tests/e2e/fixtures/taskboard
+baseline_commit: 08278933080992ac1997f62b00602334b834784f
+fixture_sha256: 12f7f3741cd88fca3661cf3e7b6bb76dfb7657f0e46e3938ee4211dc05ec5ff6
+xunit_baseline: "14 pass, 3 named failures"
+dotnet_required: true

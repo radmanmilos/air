@@ -1,3 +1,7 @@
+export interface OrchestratorHandle {
+    cancel: () => void;
+    promise: Promise<OrchestratorSession>;
+}
 export interface OrchestratorEvent {
     id: string;
     sequence: number;
@@ -94,6 +98,7 @@ export declare class Orchestrator {
     private promptApproveFailover;
     list(): OrchestratorSession[];
     get(runId: string): OrchestratorSession | undefined;
+    waitFor(runId: string): Promise<OrchestratorSession>;
     resume(runId: string, taskOverride?: string): Promise<OrchestratorSession>;
     waitForAll(): Promise<void>;
     cancel(runId: string): Promise<void>;

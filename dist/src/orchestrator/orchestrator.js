@@ -174,220 +174,264 @@ export class Orchestrator {
         const onSig = () => controller.abort();
         process.on('SIGINT', onSig);
         process.on('SIGTERM', onSig);
-        try {
-            const allow = defaultAllowList(adapters);
-            const visited = new Set();
-            let hops = 0;
-            // Immutable baseline for the whole work item (T-019).
-            const baselineSnap = snapshotGit(execCwd);
-            // Failover loop: try candidates until success, abort, or hop cap.
-            while (hops < maxHops) {
-                const decision = selectCandidateFrom(taskInput, adapters, tracker, visited, null);
-                if (!decision.chosen) {
-                    this.log('no_adapter', task);
-                    throw new Error(formatRouteDecision(decision));
-                }
-                const chosen = decision.chosen;
-                this.log('model_selected', `${chosen.id} (${chosen.provider}/${chosen.model}) for mode=${mode} readOnly=${readOnly}`);
-                const adapter = adapters.find((a) => a.id === chosen.id);
-                const revisitKey = `${chosen.id}|${chosen.provider}|${chosen.model}`;
-                if (visited.has(revisitKey)) {
-                    this.log('already_visited', `${chosen.id} refusing to loop`);
-                    break;
-                }
-                visited.add(revisitKey);
-                hops++;
-                // Build the task's provider-destination policy from the actual first
-                // selected candidate (R5-04).
-                if (hops === 1) {
-                    allow.providers = [chosen.provider, ...(options.allowProviders ?? [])];
-                    allow.models = [chosen.model];
-                }
-                if (chosen.id === 'aider' && !taskInput.preferredModel) {
+        const initialSession = {
+            runId,
+            task,
+            cwd: execCwd,
+            adapterId: '',
+            provider: '',
+            model: '',
+            readOnly,
+            state: 'RUNNING',
+            startedAt: new Date().toISOString(),
+        };
+        this.sessions.set(runId, initialSession);
+        this.persist();
+        const runPromise = (async () => {
+            try {
+                const allow = defaultAllowList(adapters);
+                const visited = new Set();
+                let hops = 0;
+                // Immutable baseline for the whole work item (T-019).
+                const baselineSnap = snapshotGit(execCwd);
+                // Failover loop: try candidates until success, abort, or hop cap.
+                while (hops < maxHops) {
+                    const decision = selectCandidateFrom(taskInput, adapters, tracker, visited, null);
+                    if (!decision.chosen) {
+                        this.log('no_adapter', task);
+                        throw new Error(formatRouteDecision(decision));
+                    }
+                    const chosen = decision.chosen;
+                    this.log('model_selected', `${chosen.id} (${chosen.provider}/${chosen.model}) for mode=${mode} readOnly=${readOnly}`);
+                    const adapter = adapters.find((a) => a.id === chosen.id);
+                    const revisitKey = `${chosen.id}|${chosen.provider}|${chosen.model}`;
+                    if (visited.has(revisitKey)) {
+                        this.log('already_visited', `${chosen.id} refusing to loop`);
+                        break;
+                    }
+                    visited.add(revisitKey);
+                    hops++;
+                    // Build the task's provider-destination policy from the actual first
+                    // selected candidate (R5-04).
+                    if (hops === 1) {
+                        allow.providers = [chosen.provider, ...(options.allowProviders ?? [])];
+                        allow.models = [chosen.model];
+                    }
+                    if (chosen.id === 'aider' && !taskInput.preferredModel) {
+                        try {
+                            const { pickFreeOpenRouterModel } = await import('../router/free-models.js');
+                            const m = await pickFreeOpenRouterModel();
+                            if (m)
+                                taskInput.preferredModel = m;
+                        }
+                        catch { /* noop */ }
+                    }
+                    const spec = adapter.buildCommand(taskInput);
+                    const beforeSnap = snapshotGit(execCwd);
+                    const state = {
+                        runId,
+                        task,
+                        cwd: execCwd,
+                        adapter: chosen.id,
+                        provider: chosen.provider,
+                        model: chosen.model,
+                        state: 'RUNNING',
+                        startedAt: new Date().toISOString(),
+                        hops,
+                        maxHops,
+                        worktreePath: worktreeInfo?.worktreePath,
+                        worktreeBranch: worktreeInfo?.branch,
+                        sourceCwd: worktreeInfo ? cwd : undefined,
+                    };
+                    await writeTaskState(state);
+                    trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips, hops });
+                    const seat = await acquireSeat('agent', config.concurrency?.maxConcurrentAgents ?? 1, { timeoutMs: 30000 });
+                    if (!seat) {
+                        throw new Error('SEAT_TIMEOUT: could not acquire a concurrency seat');
+                    }
+                    let outcome;
                     try {
-                        const { pickFreeOpenRouterModel } = await import('../router/free-models.js');
-                        const m = await pickFreeOpenRouterModel();
-                        if (m)
-                            taskInput.preferredModel = m;
+                        const r = await runProcess(spec, {
+                            timeoutMs: config.timeouts.defaultMs,
+                            maxBufferBytes: config.buffers.maxBytes,
+                            signal: controller.signal,
+                            stdoutTailBytes: 2048,
+                            stderrTailBytes: 2048,
+                            onStdout: (c) => { if (!this.deps.mcpMode)
+                                process.stdout.write(c); },
+                            onStderr: (c) => { if (!this.deps.mcpMode)
+                                process.stderr.write(c); },
+                        });
+                        outcome = r.outcome;
                     }
-                    catch { /* noop */ }
-                }
-                const spec = adapter.buildCommand(taskInput);
-                const beforeSnap = snapshotGit(execCwd);
-                const state = {
-                    runId,
-                    task,
-                    cwd: execCwd,
-                    adapter: chosen.id,
-                    provider: chosen.provider,
-                    model: chosen.model,
-                    state: 'RUNNING',
-                    startedAt: new Date().toISOString(),
-                    hops,
-                    maxHops,
-                    worktreePath: worktreeInfo?.worktreePath,
-                    worktreeBranch: worktreeInfo?.branch,
-                    sourceCwd: worktreeInfo ? cwd : undefined,
-                };
-                await writeTaskState(state);
-                trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips, hops });
-                const seat = await acquireSeat('agent', config.concurrency?.maxConcurrentAgents ?? 1, { timeoutMs: 30000 });
-                if (!seat) {
-                    throw new Error('SEAT_TIMEOUT: could not acquire a concurrency seat');
-                }
-                let outcome;
-                try {
-                    const r = await runProcess(spec, {
-                        timeoutMs: config.timeouts.defaultMs,
-                        maxBufferBytes: config.buffers.maxBytes,
-                        signal: controller.signal,
-                        stdoutTailBytes: 2048,
-                        stderrTailBytes: 2048,
-                        onStdout: (c) => { if (!this.deps.mcpMode)
-                            process.stdout.write(c); },
-                        onStderr: (c) => { if (!this.deps.mcpMode)
-                            process.stderr.write(c); },
+                    finally {
+                        await seat.release();
+                    }
+                    const fact = classifyOutcome(outcome);
+                    let category = fact.category ?? adapter.classifyError(outcome.exitCode, outcome.stderr, {
+                        timedOut: outcome.timedOut,
+                        cancelled: outcome.cancelled,
+                        spawnError: outcome.spawnError,
                     });
-                    outcome = r.outcome;
-                }
-                finally {
-                    await seat.release();
-                }
-                const fact = classifyOutcome(outcome);
-                let category = fact.category ?? adapter.classifyError(outcome.exitCode, outcome.stderr, {
-                    timedOut: outcome.timedOut,
-                    cancelled: outcome.cancelled,
-                    spawnError: outcome.spawnError,
-                });
-                // Update health tracker before the next routing decision.
-                if (outcome.cancelled) {
-                    tracker.recordCancellation(adapter.provider, adapter.model);
-                }
-                else if (outcome.timedOut) {
-                    tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
-                    tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, 'TIMEOUT');
-                }
-                else if (outcome.spawnError) {
-                    tracker.recordFailure(adapter.provider, adapter.model, 'TOOL_NOT_INSTALLED');
-                }
-                else if (outcome.exitCode === 0) {
-                    tracker.recordSuccess(adapter.provider, adapter.model);
-                }
-                else {
-                    tracker.recordFailure(adapter.provider, adapter.model, category);
-                    if (category === 'RATE_LIMIT' || category === 'QUOTA_EXCEEDED') {
-                        tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, category);
+                    // Update health tracker before the next routing decision.
+                    if (outcome.cancelled) {
+                        tracker.recordCancellation(adapter.provider, adapter.model);
                     }
-                }
-                await tracker.flush();
-                // Determine result from the agent-produced delta relative to the initial
-                // snapshot, not from whether the tree is dirty at all (R5-07).
-                const afterSnap = snapshotGit(execCwd);
-                const delta = snapshotDelta(baselineSnap, afterSnap);
-                const changed = delta.dirty;
-                let result;
-                if (outcome.cancelled) {
-                    result = 'CANCELLED';
-                }
-                else if (outcome.timedOut || outcome.spawnError) {
-                    result = 'FAILED';
-                }
-                else if (outcome.exitCode === 0) {
-                    if (isWriteTask) {
-                        result = changed ? 'SUCCEEDED_WITH_CHANGES' : 'NO_CHANGES';
+                    else if (outcome.timedOut) {
+                        tracker.recordFailure(adapter.provider, adapter.model, 'TIMEOUT');
+                        tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, 'TIMEOUT');
+                    }
+                    else if (outcome.spawnError) {
+                        tracker.recordFailure(adapter.provider, adapter.model, 'TOOL_NOT_INSTALLED');
+                    }
+                    else if (outcome.exitCode === 0) {
+                        tracker.recordSuccess(adapter.provider, adapter.model);
                     }
                     else {
-                        result = changed ? 'NEEDS_USER_REVIEW' : 'SUCCEEDED_READ_ONLY';
+                        tracker.recordFailure(adapter.provider, adapter.model, category);
+                        if (category === 'RATE_LIMIT' || category === 'QUOTA_EXCEEDED') {
+                            tracker.setCooldown(adapter.provider, adapter.model, Date.now() + config.failover.cooldownMinutes * 60_000, category);
+                        }
                     }
-                }
-                else {
-                    result = 'FAILED';
-                }
-                const endedAt = new Date().toISOString();
-                await writeTaskState({
-                    ...state,
-                    state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
-                    result,
-                    endedAt,
-                    delta: {
-                        staged: delta.staged,
-                        unstaged: delta.unstaged,
-                        untracked: delta.untracked,
-                        deleted: delta.deleted,
-                    },
-                    outputTail: redact(outcome.stdoutTail ?? outcome.stdout),
-                    stdoutTruncated: outcome.stdoutTruncated,
-                    stderrTruncated: outcome.stderrTruncated,
-                    error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
-                        ? { category, message: outcome.stderr.slice(0, 500) }
-                        : undefined,
-                });
-                trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed, delta: formatDeltaReport(delta) });
-                // Register session for tracking.
-                const session = {
-                    runId,
-                    task,
-                    cwd: execCwd,
-                    adapterId: chosen.id,
-                    provider: chosen.provider,
-                    model: chosen.model,
-                    readOnly,
-                    state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : result === 'CANCELLED' ? 'CANCELLED' : 'FAILED',
-                    startedAt: state.startedAt,
-                    endedAt,
-                    result,
-                };
-                this.sessions.set(runId, session);
-                this.persist();
-                this.log('session_completed', `${runId}: ${session.state}`);
-                if (outcome.cancelled) {
-                    return session;
-                }
-                if (outcome.timedOut || outcome.spawnError || outcome.exitCode !== 0) {
-                    // Non-zero exit: decide failover.
-                    const action = getErrorAction(category);
-                    if (triggersFailover(category) && hops < maxHops) {
-                        const nextDecision = selectCandidateFrom({ ...taskInput, preferredTool: undefined }, adapters, tracker, visited, null);
-                        const next = nextDecision.chosen;
-                        if (!next) {
-                            // No alternative candidate; session stays FAILED.
-                            return session;
+                    await tracker.flush();
+                    // Determine result from the agent-produced delta relative to the initial
+                    // snapshot, not from whether the tree is dirty at all (R5-07).
+                    const afterSnap = snapshotGit(execCwd);
+                    const delta = snapshotDelta(baselineSnap, afterSnap);
+                    const changed = delta.dirty;
+                    let result;
+                    if (outcome.cancelled) {
+                        result = 'CANCELLED';
+                    }
+                    else if (outcome.timedOut || outcome.spawnError) {
+                        result = 'FAILED';
+                    }
+                    else if (outcome.exitCode === 0) {
+                        if (isWriteTask) {
+                            result = changed ? 'SUCCEEDED_WITH_CHANGES' : 'NO_CHANGES';
                         }
-                        const nextAdapter = adapters.find((a) => a.id === next.id);
-                        const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
-                        const proposal = {
-                            runId,
-                            from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
-                            to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
-                            category,
-                            action,
-                            task: taskInput.prompt,
-                            handoff: buildHandoffPack({
-                                cwd,
-                                prompt: task,
+                        else {
+                            result = changed ? 'NEEDS_USER_REVIEW' : 'SUCCEEDED_READ_ONLY';
+                        }
+                    }
+                    else {
+                        result = 'FAILED';
+                    }
+                    const endedAt = new Date().toISOString();
+                    await writeTaskState({
+                        ...state,
+                        state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
+                        result,
+                        endedAt,
+                        delta: {
+                            staged: delta.staged,
+                            unstaged: delta.unstaged,
+                            untracked: delta.untracked,
+                            deleted: delta.deleted,
+                        },
+                        outputTail: redact(outcome.stdoutTail ?? outcome.stdout),
+                        stdoutTruncated: outcome.stdoutTruncated,
+                        stderrTruncated: outcome.stderrTruncated,
+                        error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
+                            ? { category, message: outcome.stderr.slice(0, 500) }
+                            : undefined,
+                    });
+                    trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed, delta: formatDeltaReport(delta) });
+                    // Register session for tracking.
+                    const session = {
+                        runId,
+                        task,
+                        cwd: execCwd,
+                        adapterId: chosen.id,
+                        provider: chosen.provider,
+                        model: chosen.model,
+                        readOnly,
+                        state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : result === 'CANCELLED' ? 'CANCELLED' : 'FAILED',
+                        startedAt: state.startedAt,
+                        endedAt,
+                        result,
+                    };
+                    this.sessions.set(runId, session);
+                    this.persist();
+                    this.log('session_completed', `${runId}: ${session.state}`);
+                    if (outcome.cancelled) {
+                        return session;
+                    }
+                    if (outcome.timedOut || outcome.spawnError || outcome.exitCode !== 0) {
+                        // Non-zero exit: decide failover.
+                        const action = getErrorAction(category);
+                        if (triggersFailover(category) && hops < maxHops) {
+                            const nextDecision = selectCandidateFrom({ ...taskInput, preferredTool: undefined }, adapters, tracker, visited, null);
+                            const next = nextDecision.chosen;
+                            if (!next) {
+                                // No alternative candidate; session stays FAILED.
+                                return session;
+                            }
+                            const nextAdapter = adapters.find((a) => a.id === next.id);
+                            const allowCheck = checkHandoffAllowlist(adapter, nextAdapter, allow);
+                            const proposal = {
+                                runId,
                                 from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
                                 to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
-                                mode,
-                                files: options.files,
                                 category,
-                                summary: outcome.stderr.slice(0, 200),
-                                outputTail: outcome.stderr.slice(-2048),
-                                before: beforeSnap,
-                                after: afterSnap,
-                            }),
-                            hash: createHash('sha256').update(JSON.stringify({
-                                from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
-                                to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
-                                category,
+                                action,
                                 task: taskInput.prompt,
-                            })).digest('hex'),
-                        };
-                        if (!allowCheck.ok) {
-                            this.log('failover_blocked', `${allowCheck.reason}`);
-                            return session;
-                        }
-                        if (mode === 'auto') {
-                            // Auto-switch within the allow-list only. Never bypass provider restrictions.
+                                handoff: buildHandoffPack({
+                                    cwd,
+                                    prompt: task,
+                                    from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
+                                    to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
+                                    mode,
+                                    files: options.files,
+                                    category,
+                                    summary: outcome.stderr.slice(0, 200),
+                                    outputTail: outcome.stderr.slice(-2048),
+                                    before: beforeSnap,
+                                    after: afterSnap,
+                                }),
+                                hash: createHash('sha256').update(JSON.stringify({
+                                    from: { id: adapter.id, provider: adapter.provider, model: adapter.model },
+                                    to: { id: nextAdapter.id, provider: nextAdapter.provider, model: nextAdapter.model },
+                                    category,
+                                    task: taskInput.prompt,
+                                })).digest('hex'),
+                            };
+                            if (!allowCheck.ok) {
+                                this.log('failover_blocked', `${allowCheck.reason}`);
+                                return session;
+                            }
+                            if (mode === 'auto') {
+                                // Auto-switch within the allow-list only. Never bypass provider restrictions.
+                                taskInput.prompt = `${task}\n\n--- handoff ---\n${proposal.handoff}`;
+                                session.state = 'SWITCHING';
+                                session.adapterId = nextAdapter.id;
+                                session.provider = nextAdapter.provider;
+                                session.model = nextAdapter.model;
+                                session.taskInputPrompt = taskInput.prompt;
+                                session.visitedKeys = [...visited];
+                                session.hops = hops;
+                                session.allowProviders = allow.providers;
+                                session.allowModels = allow.models;
+                                this.sessions.set(runId, session);
+                                this.persist();
+                                continue;
+                            }
+                            // ask mode: propose failover and wait for approval.
+                            // Save continuation state so MCP/resumeAfterApproval can continue.
+                            const approved = await this.handleFailoverProposal(proposal);
+                            if (!approved) {
+                                this.log('failover_declined', `${runId}`);
+                                session.state = 'AWAITING_APPROVAL';
+                                session.proposedSwitch = proposal;
+                                session.taskInputPrompt = taskInput.prompt;
+                                session.visitedKeys = [...visited];
+                                session.hops = hops;
+                                session.allowProviders = allow.providers;
+                                session.allowModels = allow.models;
+                                this.sessions.set(runId, session);
+                                this.persist();
+                                return session;
+                            }
                             taskInput.prompt = `${task}\n\n--- handoff ---\n${proposal.handoff}`;
                             session.state = 'SWITCHING';
                             session.adapterId = nextAdapter.id;
@@ -402,52 +446,25 @@ export class Orchestrator {
                             this.persist();
                             continue;
                         }
-                        // ask mode: propose failover and wait for approval.
-                        // Save continuation state so MCP/resumeAfterApproval can continue.
-                        const approved = await this.handleFailoverProposal(proposal);
-                        if (!approved) {
-                            this.log('failover_declined', `${runId}`);
-                            session.state = 'AWAITING_APPROVAL';
-                            session.proposedSwitch = proposal;
-                            session.taskInputPrompt = taskInput.prompt;
-                            session.visitedKeys = [...visited];
-                            session.hops = hops;
-                            session.allowProviders = allow.providers;
-                            session.allowModels = allow.models;
-                            this.sessions.set(runId, session);
-                            this.persist();
-                            return session;
-                        }
-                        taskInput.prompt = `${task}\n\n--- handoff ---\n${proposal.handoff}`;
-                        session.state = 'SWITCHING';
-                        session.adapterId = nextAdapter.id;
-                        session.provider = nextAdapter.provider;
-                        session.model = nextAdapter.model;
-                        session.taskInputPrompt = taskInput.prompt;
-                        session.visitedKeys = [...visited];
-                        session.hops = hops;
-                        session.allowProviders = allow.providers;
-                        session.allowModels = allow.models;
-                        this.sessions.set(runId, session);
-                        this.persist();
-                        continue;
+                        // No failover (category doesn't trigger it, or hop cap reached).
+                        return session;
                     }
-                    // No failover (category doesn't trigger it, or hop cap reached).
+                    // Success (exit 0).
                     return session;
                 }
-                // Success (exit 0).
-                return session;
+                // Hop cap reached.
+                const s = this.sessions.get(runId);
+                if (s)
+                    return s;
+                throw new Error(`Hop cap reached (${maxHops}).`);
             }
-            // Hop cap reached.
-            const s = this.sessions.get(runId);
-            if (s)
-                return s;
-            throw new Error(`Hop cap reached (${maxHops}).`);
-        }
-        finally {
-            process.removeListener('SIGINT', onSig);
-            process.removeListener('SIGTERM', onSig);
-        }
+            finally {
+                process.removeListener('SIGINT', onSig);
+                process.removeListener('SIGTERM', onSig);
+            }
+        })();
+        this.handles.set(runId, { cancel: () => controller.abort(), promise: runPromise });
+        return initialSession;
     }
     /**
      * Resume a paused failover loop after failover approval (MCP mode).
@@ -657,6 +674,19 @@ export class Orchestrator {
     }
     get(runId) {
         return this.sessions.get(runId);
+    }
+    async waitFor(runId) {
+        const h = this.handles.get(runId);
+        if (h?.promise) {
+            try {
+                await h.promise;
+            }
+            catch { /* noop */ }
+        }
+        const s = this.sessions.get(runId);
+        if (!s)
+            throw new Error(`Unknown session: ${runId}`);
+        return s;
     }
     async resume(runId, taskOverride) {
         const prev = this.sessions.get(runId);

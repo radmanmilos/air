@@ -634,8 +634,10 @@ program
         catch { /* noop */ }
     };
     const waiters = new Map();
+    const jobHandles = new Map();
     async function runJob(task, _workId, hints) {
         const requiresWrite = hints?.requiresWrite !== false;
+        const controller = new AbortController();
         // Build worker prompt from conversation context (T7-009).
         const contextParts = [task];
         if (conv.summary)
@@ -647,9 +649,11 @@ program
         const orch = new Orchestrator({ config, mcpMode: true, onFailoverPropose: async () => true });
         const plan = planFromRequest(enriched, { requiresWrite, requiresCode: hints?.requiresCode !== false });
         const item = plan.workItems[0];
-        const session = await orch.start(item.objective, cwd, { mode: 'auto', readOnly: !requiresWrite, freeOnly: conv.userPreferences.freeOnly });
+        const session = await orch.start(item.objective, cwd, { mode: 'auto', readOnly: !requiresWrite, freeOnly: conv.userPreferences.freeOnly, controller });
+        jobHandles.set(session.runId, { orch, controller });
         await appendMessage(conv.id, { role: 'assistant', content: `Started job ${session.runId}.` });
         logEvent('job_started', session.runId);
+        logEvent('notice_printed', `Started job ${session.runId}`);
         console.log(chalk.green(`Started job ${session.runId}`));
         conv.activeWorkIds.push(session.runId);
         saveConversation(conv);
@@ -699,6 +703,7 @@ program
         const trimmed = line.trim();
         if (!trimmed)
             return;
+        logEvent('command_handled', trimmed);
         logEvent('message_received', trimmed);
         if (trimmed === '/quit' || trimmed === '/exit') {
             rl.close();
@@ -728,7 +733,17 @@ program
         }
         if (trimmed.startsWith('/cancel ')) {
             const id = trimmed.slice(8).trim();
-            console.log(chalk.yellow(`Cancel requested for ${id}`));
+            const entry = jobHandles.get(id);
+            if (entry) {
+                try {
+                    await entry.orch.cancel(id);
+                }
+                catch { /* noop */ }
+                entry.controller.abort();
+            }
+            conv.activeWorkIds = conv.activeWorkIds.filter((x) => x !== id);
+            saveConversation(conv);
+            console.log(chalk.yellow(`Cancelled ${id}`));
             return;
         }
         if (trimmed.startsWith('/run ') || trimmed.startsWith('/plan ')) {
@@ -746,18 +761,22 @@ program
                 void runJob(a.goal, undefined, a.hints);
             }
             else if (a.type === 'answer') {
-                const { brainAnswer, isBrainAvailable } = await import('../src/brain/index.js');
-                let reply = 'Acknowledged.';
-                if (await isBrainAvailable()) {
-                    process.stdout.write(chalk.gray('air: thinking... '));
-                    logEvent('brain_start', trimmed);
-                    const r = await brainAnswer(trimmed);
-                    process.stdout.write('\r' + ' '.repeat(20) + '\r');
-                    logEvent('brain_end', r.text.slice(0, 200));
-                    reply = r.text;
-                }
-                await appendMessage(conv.id, { role: 'assistant', content: reply });
-                console.log(chalk.gray(`air: ${reply}`));
+                (async () => {
+                    const { brainAnswer, isBrainAvailable } = await import('../src/brain/index.js');
+                    let reply = 'Acknowledged.';
+                    if (await isBrainAvailable()) {
+                        process.stdout.write(chalk.gray('air: thinking... '));
+                        logEvent('brain_start', trimmed);
+                        const r = await brainAnswer(trimmed, { history: conv.messages, jobs: conv.activeWorkIds });
+                        process.stdout.write('\r' + ' '.repeat(20) + '\r');
+                        logEvent('brain_end', r.text.slice(0, 200));
+                        reply = r.text;
+                    }
+                    await appendMessage(conv.id, { role: 'assistant', content: reply });
+                    console.log(chalk.gray(`air: ${reply}`));
+                })().catch((err) => {
+                    console.log(chalk.red(`brain error: ${String(err)}`));
+                });
             }
             else if (a.type === 'clarify') {
                 await appendMessage(conv.id, { role: 'assistant', content: a.question });
@@ -767,7 +786,17 @@ program
                 console.log(chalk.gray(`messages=${conv.messages.length} active=${conv.activeWorkIds.join(',')}`));
             }
             else if (a.type === 'cancel_job') {
-                console.log(chalk.yellow(`Cancel requested for ${a.jobId}`));
+                const entry = jobHandles.get(a.jobId);
+                if (entry) {
+                    try {
+                        await entry.orch.cancel(a.jobId);
+                    }
+                    catch { /* noop */ }
+                    entry.controller.abort();
+                }
+                conv.activeWorkIds = conv.activeWorkIds.filter((x) => x !== a.jobId);
+                saveConversation(conv);
+                console.log(chalk.yellow(`Cancelled ${a.jobId}`));
             }
         }
     });
