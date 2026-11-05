@@ -732,8 +732,14 @@ program
                 void runJob(a.goal, undefined, a.hints);
             }
             else if (a.type === 'answer') {
-                await appendMessage(conv.id, { role: 'assistant', content: 'Acknowledged.' });
-                console.log(chalk.gray('air: acknowledged'));
+                const { brainAnswer, isBrainAvailable } = await import('../src/brain/index.js');
+                let reply = 'Acknowledged.';
+                if (isBrainAvailable()) {
+                    const r = brainAnswer(trimmed);
+                    reply = r.text;
+                }
+                await appendMessage(conv.id, { role: 'assistant', content: reply });
+                console.log(chalk.gray(`air: ${reply}`));
             }
             else if (a.type === 'clarify') {
                 await appendMessage(conv.id, { role: 'assistant', content: a.question });
