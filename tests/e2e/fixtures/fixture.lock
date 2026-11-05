@@ -2,7 +2,7 @@
 # The TaskBoard e2e fixture must match this baseline hash.
 # The harness refuses to run TaskBoard scenarios on a hash mismatch.
 fixture: tests/e2e/fixtures/taskboard
-baseline_commit: 08278933080992ac1997f62b00602334b834784f
+baseline_commit: d17bcacc0e4c0a67baec502d78093a441bf919cf
 fixture_sha256: debe5f18c7885f122a78935a5d6de2f92bc8891004c1ca47fbd1e623648e1ee4
 xunit_baseline: "14 pass, 3 named failures"
 dotnet_required: true
