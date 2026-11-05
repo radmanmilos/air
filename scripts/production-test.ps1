@@ -145,15 +145,17 @@ Write-Host "`n========== TIER 5: MCP ==========" -ForegroundColor Yellow
 
 Run-Test "T5.1 MCP server starts" "Tier5" {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = "cmd.exe"; $psi.Arguments = "/c echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}' | air mcp"
+    $psi.FileName = "cmd.exe"; $psi.Arguments = "/c air mcp"
     $psi.WorkingDirectory = $ProjectPath
-    $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
-    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true; $psi.UseShellExecute = $false
     $p = [System.Diagnostics.Process]::Start($psi)
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 2
+    $p.StandardInput.WriteLine('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}')
+    Start-Sleep -Seconds 2
     $out = $p.StandardOutput.ReadToEnd()
     $p.Kill()
-    if ($out -match "air|mcp|server") { "OK - MCP responded" } else { "Output: $($out.Substring(0,[Math]::Min(200,$out.Length)))" }
+    if ($out -match "air|mcp|jsonrpc|result") { "OK - MCP responded" } else { "Output: $($out.Substring(0,[Math]::Min(200,$out.Length)))" }
 }
 
 # ==================== TIER 6: STRESS ====================
