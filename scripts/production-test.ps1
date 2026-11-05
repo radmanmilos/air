@@ -159,7 +159,7 @@ Run-Test "T5.1 MCP server starts" "Tier5" {
     Start-Sleep -Seconds 2
     $out = $p.StandardOutput.ReadToEnd()
     $p.Kill()
-    if ($out -match "air|jsonrpc|result|protocolVersion") { "OK - MCP responded" } else { "Output: $($out.Substring(0,[Math]::Min(200,$out.Length)))" }
+    if ($out -match "jsonrpc.*result|protocolVersion") { "OK - MCP responded" } else { "Output: $($out.Substring(0,[Math]::Min(200,$out.Length)))" }
 }
 
 # ==================== TIER 6: STRESS ====================
