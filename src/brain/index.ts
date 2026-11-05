@@ -53,7 +53,23 @@ function tryOpencode(prompt: string): BrainResult | null {
   return null;
 }
 
+const OLLAMA_MODEL = process.env.AIR_BRAIN_MODEL_OLLAMA || process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+
+function tryOllama(prompt: string): BrainResult | null {
+  try {
+    const out = execFileSync('ollama', ['run', OLLAMA_MODEL, prompt], {
+      encoding: 'utf8',
+      timeout: 120000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const text = out.trim();
+    if (text) return { text, model: OLLAMA_MODEL, provider: 'ollama' };
+  } catch { /* noop */ }
+  return null;
+}
 export function brainAnswer(prompt: string): BrainResult {
+  const ollama = tryOllama(prompt);
+  if (ollama) return ollama;
   const kilo = tryKilo(prompt);
   if (kilo) return kilo;
   const opencode = tryOpencode(prompt);
@@ -63,14 +79,19 @@ export function brainAnswer(prompt: string): BrainResult {
 
 export function isBrainAvailable(): boolean {
   try {
-    execFileSync('kilo', ['--version'], { stdio: 'ignore', timeout: 5000 });
+    execFileSync('ollama', ['--version'], { stdio: 'ignore', timeout: 5000 });
     return true;
   } catch {
     try {
-      execFileSync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000 });
+      execFileSync('kilo', ['--version'], { stdio: 'ignore', timeout: 5000 });
       return true;
     } catch {
-      return false;
+      try {
+        execFileSync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000 });
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 }
