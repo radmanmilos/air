@@ -745,7 +745,9 @@ program
           const { brainAnswer, isBrainAvailable } = await import('../src/brain');
           let reply = 'Acknowledged.';
           if (isBrainAvailable()) {
+            process.stdout.write(chalk.gray('air: thinking... '));
             const r = brainAnswer(trimmed);
+            process.stdout.write('\r' + ' '.repeat(20) + '\r');
             reply = r.text;
           }
           await appendMessage(conv!.id, { role: 'assistant', content: reply });
