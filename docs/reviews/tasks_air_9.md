@@ -24,7 +24,7 @@
 ### T9-005 [DONE] — P0 deterministic scenarios (A-01, B-01..B-03, C-01, C-02, E-01..E-03, F-01, G-01s..G-03s, G-07s, H-01..H-04, I-01..I-03, J-01, K-01, K-02, L-01)
 - Files: tests/e2e/scenarios/*.test.ts
 
-### T9-006 [TODO] — Mutation check of tests (deliberately broken AIR builds)
+### T9-006 [IN_PROGRESS] — Mutation check of tests (deliberately broken AIR builds)
 - Details: Run suite against broken builds to verify tests catch regressions.
 
 ### T9-007 [TODO] — Live suite (A-02, B-04/B-05, C-03, D-01..D-05, H-02/H-03)
