@@ -75,17 +75,7 @@ function tryOllama(prompt: string): BrainResult | null {
   return null;
 }
 
-export type Complexity = 'simple' | 'complex';
-
-function isComplex(prompt: string): boolean {
-  const lower = prompt.toLowerCase();
-  // Complex if long, or contains architecture/design/reasoning keywords.
-  if (prompt.length > 200) return true;
-  const complexKeywords = /\b(architect|design|refactor|optimize|security|performance|concurrent|distributed|scale|tradeoff|compare|analyze|review|debug|investigate|plan)\b/;
-  return complexKeywords.test(lower);
-}
-
-export function brainAnswer(prompt: string, complexity?: Complexity): BrainResult {
+export function brainAnswer(prompt: string): BrainResult {
   // Try kilocode first (auto-routes to best available model).
   const kilo = tryKilo(prompt);
   if (kilo) return kilo;
