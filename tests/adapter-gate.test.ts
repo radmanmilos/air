@@ -41,7 +41,7 @@ describe('adapter verification gate (R5-02)', () => {
     expect(ids).toContain('github-copilot');
     const verified = status.filter((s) => s.verified);
     // Only aider and goose are CI-verified.
-    expect(verified.length).toBe(2);
+    expect(verified.length).toBe(3);
     expect(verified.map((s) => s.id)).toContain('aider');
     expect(verified.map((s) => s.id)).toContain('goose');
   });

@@ -39,6 +39,8 @@ export class AiderAdapter implements AgentAdapter {
     const modelToUse = task.preferredModel ?? this.model ?? 'gemma-4-31b-it:free';
     const prefixed = modelToUse.startsWith('openrouter/') ? modelToUse : `openrouter/${modelToUse}`;
     args.push('--model', prefixed);
+    args.push('--no-browser');
+    args.push('--no-gitignore');
     if (task.files && task.files.length > 0) {
       for (const f of task.files) args.push(f);
     }
