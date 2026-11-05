@@ -65,8 +65,9 @@ export function selectCandidateFrom(
     });
   }
 
-  // Free-first ranking: prefer lower cost tier, then larger context window.
-  candidates.sort((a, b) => costTier(a) - costTier(b));
+  // Free-first ranking: prefer lower cost tier, then local providers, then larger context window.
+  const isLocal = (c: any) => c.provider === 'ollama' || c.provider === 'lm-studio' || c.provider === 'local';
+  candidates.sort((a, b) => costTier(a) - costTier(b) || (isLocal(a) ? -1 : isLocal(b) ? 1 : 0));
 
   for (const candidate of candidates) {
     const adapter = adapters.find((a) => a.id === candidate.id);
@@ -173,4 +174,5 @@ export function formatRouteDecision(decision: RouteDecision): string {
   }
   return lines.join('\n');
 }
+
 
