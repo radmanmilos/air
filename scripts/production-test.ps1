@@ -22,10 +22,12 @@ function Run-Test {
     "## [$Tier] $Name" | Add-Content $log
     try {
         $result = & $Action
+        "Command/Action: $Name" | Add-Content $log
         "Result: $result" | Add-Content $log
         "Status: PASS" | Add-Content $log
         Write-Host "PASS" -ForegroundColor Green
     } catch {
+        "Command/Action: $Name" | Add-Content $log
         "Error: $_" | Add-Content $log
         "Status: FAIL" | Add-Content $log
         Write-Host "FAIL: $_" -ForegroundColor Red

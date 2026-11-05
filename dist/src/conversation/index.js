@@ -6,12 +6,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { resolvePaths } from '../config/paths.js';
-import { redact } from '../security/redact.js';
+import { resolvePaths } from '../config/paths';
+import { redact } from '../security/redact';
 function airPaths() {
     return resolvePaths({ env: process.env });
 }
-import { lockedReadModifyWrite } from '../utils/lock.js';
+import { lockedReadModifyWrite } from '../utils/lock';
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function assertId(id) {
     if (typeof id !== 'string' || !ID_RE.test(id)) {

@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { paths } from '../config/paths.js';
+import { paths } from '../config/paths';
 function git(cwd, args) {
     return execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
 }
@@ -30,8 +30,14 @@ export function worktreeDiff(info) {
 }
 export function applyWorktree(info) {
     try {
+        // Commit any uncommitted changes in the worktree first.
+        execFileSync('git', ['add', '-A'], { cwd: info.worktreePath, stdio: 'ignore' });
+        try {
+            execFileSync('git', ['commit', '-m', `air: ${info.jobId}`], { cwd: info.worktreePath, stdio: ['ignore', 'pipe', 'pipe'] });
+        }
+        catch { /* nothing to commit */ }
         // Merge the worktree branch into the current branch of source repo.
-        execFileSync('git', ['merge', '--no-ff', info.branch, '-m', `air: apply ${info.jobId}`], { cwd: info.sourceCwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+        execFileSync('git', ['merge', '--no-ff', info.branch, '-m', `air: apply ${info.jobId}`], { cwd: info.sourceCwd, stdio: ['ignore', 'pipe', 'pipe'] });
         return { ok: true, message: `Applied ${info.branch} into ${info.sourceCwd}.` };
     }
     catch (err) {

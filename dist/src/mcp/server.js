@@ -10,20 +10,20 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { loadConfig } from '../config/loader.js';
-import { loadCatalog, catalogTools } from '../config/catalog.js';
-import { createHealthTracker } from '../health/tracker.js';
-import { adapterStatus, availableAdapters } from '../adapters/registry.js';
-import { Orchestrator } from '../orchestrator/orchestrator.js';
-import { snapshotGit } from '../context/checkpoint.js';
-import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state.js';
-import { runProcess } from '../execution/runner.js';
-import { classifyOutcome } from '../types/outcome.js';
-import { snapshotDelta } from '../context/checkpoint.js';
-import { buildHandoffPack } from '../context/handoff.js';
-import { redact } from '../security/redact.js';
-import { installAdapter, upgradeAdapter, uninstallAdapter } from '../installer/installer.js';
-import { getErrorAction, triggersFailover } from '../types/errors.js';
+import { loadConfig } from '../config/loader';
+import { loadCatalog, catalogTools } from '../config/catalog';
+import { createHealthTracker } from '../health/tracker';
+import { adapterStatus, availableAdapters } from '../adapters/registry';
+import { Orchestrator } from '../orchestrator/orchestrator';
+import { snapshotGit } from '../context/checkpoint';
+import { makeRunId, writeTaskState, appendTaskIndex, readTaskState } from '../execution/task-state';
+import { runProcess } from '../execution/runner';
+import { classifyOutcome } from '../types/outcome';
+import { snapshotDelta } from '../context/checkpoint';
+import { buildHandoffPack } from '../context/handoff';
+import { redact } from '../security/redact';
+import { installAdapter, upgradeAdapter, uninstallAdapter } from '../installer/installer';
+import { getErrorAction, triggersFailover } from '../types/errors';
 export const jobs = new Map();
 // Backward-compatible exports for in-process job lifecycle tests.
 // These operate on Job-compatible objects and are not used by the MCP
@@ -143,7 +143,7 @@ export async function runAttempt(job, adapter, taskInput) {
 export async function resolveNextCandidate(job) {
     const tracker = createHealthTracker();
     await tracker.load();
-    const { selectCandidateFrom } = await import('../router/router.js');
+    const { selectCandidateFrom } = await import('../router/router');
     const adapters = await availableAdapters();
     const decision = selectCandidateFrom(job.taskInput, adapters, tracker, job.visited, job.allow);
     if (!decision.chosen)
@@ -218,7 +218,7 @@ export async function startMcp(transport) {
         const snap = snapshotGit(cwd);
         const isWriteTask = !args.readOnly;
         if (isWriteTask && snap.dirty) {
-            const { formatDirtyReport } = await import('../context/checkpoint.js');
+            const { formatDirtyReport } = await import('../context/checkpoint');
             const report = formatDirtyReport(snap);
             const st = {
                 runId,
@@ -240,7 +240,7 @@ export async function startMcp(transport) {
         const { config } = await loadConfig({ cwd });
         let mcpAdapters;
         if (process.env.AIR_MOCK_ADAPTER) {
-            const { MockAdapter } = await import('../adapters/mock.js');
+            const { MockAdapter } = await import('../adapters/mock');
             mcpAdapters = [new MockAdapter()];
         }
         const orch = new Orchestrator({
@@ -527,9 +527,9 @@ export async function startMcp(transport) {
             message: z.string().describe('User message'),
         },
     }, async (args) => {
-        const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../conversation/index.js');
-        const { decide } = await import('../conversation/decide.js');
-        const { planFromRequest } = await import('../planner/index.js');
+        const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../conversation');
+        const { decide } = await import('../conversation/decide');
+        const { planFromRequest } = await import('../planner');
         let conv = args.conversationId ? loadConversation(args.conversationId) : null;
         if (!conv)
             conv = createConversation();
@@ -540,9 +540,9 @@ export async function startMcp(transport) {
         for (const a of actions) {
             if (a.type === 'spawn_job') {
                 // Start job in background via orchestrator; link to conversation.
-                const { loadConfig } = await import('../config/loader.js');
+                const { loadConfig } = await import('../config/loader');
                 const { config } = await loadConfig({ cwd: process.cwd() });
-                const { Orchestrator } = await import('../orchestrator/orchestrator.js');
+                const { Orchestrator } = await import('../orchestrator/orchestrator');
                 const orch = new Orchestrator({ config, mcpMode: true });
                 const contextParts = [a.goal];
                 if (conv.summary)
@@ -559,7 +559,7 @@ export async function startMcp(transport) {
                 // Background completion inject.
                 (async () => {
                     try {
-                        const { readTaskState } = await import('../execution/task-state.js');
+                        const { readTaskState } = await import('../execution/task-state');
                         let state = null;
                         while (true) {
                             state = await readTaskState(session.runId);
@@ -567,7 +567,7 @@ export async function startMcp(transport) {
                                 break;
                             await new Promise((r) => setTimeout(r, 500));
                         }
-                        const { compileJobResult } = await import('../result-compiler/index.js');
+                        const { compileJobResult } = await import('../result-compiler');
                         const facts = {
                             runId: session.runId,
                             result: state?.result ?? state?.state ?? 'FAILED',
@@ -611,7 +611,7 @@ export async function startMcp(transport) {
         description: 'Return a conversation thread.',
         inputSchema: { conversationId: z.string().describe('Conversation id') },
     }, async (args) => {
-        const { loadConversation } = await import('../conversation/index.js');
+        const { loadConversation } = await import('../conversation');
         const conv = loadConversation(args.conversationId);
         if (!conv)
             return { content: [{ type: 'text', text: 'not found' }] };
@@ -622,7 +622,7 @@ export async function startMcp(transport) {
         description: 'List conversation ids with updatedAt and title.',
         inputSchema: {},
     }, async () => {
-        const { listConversations, loadConversation } = await import('../conversation/index.js');
+        const { listConversations, loadConversation } = await import('../conversation');
         const ids = listConversations();
         const rows = ids.map((id) => {
             const c = loadConversation(id);
@@ -635,8 +635,8 @@ export async function startMcp(transport) {
         description: 'List jobs filtered by conversation activeWorkIds (or all known).',
         inputSchema: { conversationId: z.string().optional().describe('Optional conversation id') },
     }, async (args) => {
-        const { loadConversation } = await import('../conversation/index.js');
-        const { readTaskState } = await import('../execution/task-state.js');
+        const { loadConversation } = await import('../conversation');
+        const { readTaskState } = await import('../execution/task-state');
         let ids = [];
         if (args?.conversationId) {
             const conv = loadConversation(args.conversationId);

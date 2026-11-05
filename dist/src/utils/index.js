@@ -1,1 +1,1 @@
-export { atomicWriteFile, atomicWriteJson, readJsonFile } from './atomic.js';
+export { atomicWriteFile, atomicWriteJson, readJsonFile } from './atomic';

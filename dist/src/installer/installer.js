@@ -5,10 +5,10 @@
 import { createHash } from 'node:crypto';
 import { writeFileSync, mkdirSync, existsSync, rmSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
-import { runProcess } from '../execution/runner.js';
-import { redact } from '../security/redact.js';
-import { recordInstall, clearInstall, getInstallStatus } from './status.js';
-import { paths } from '../config/paths.js';
+import { runProcess } from '../execution/runner';
+import { redact } from '../security/redact';
+import { recordInstall, clearInstall, getInstallStatus } from './status';
+import { paths } from '../config/paths';
 function detectPlatform() {
     const platform = process.platform;
     const arch = (() => {
@@ -224,7 +224,7 @@ export async function uninstallAdapter(entry) {
 export async function autoInstallMissing(config, installFn = installAdapter, getInstallStatusFn = getInstallStatus) {
     if (config.catalog?.autoInstall !== true)
         return;
-    const { loadCatalog, catalogTools } = await import('../config/catalog.js');
+    const { loadCatalog, catalogTools } = await import('../config/catalog');
     const catalog = await loadCatalog(config);
     const tools = catalogTools(catalog);
     for (const entry of tools) {

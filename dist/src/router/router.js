@@ -103,7 +103,7 @@ export function isBlockedByAllowlist(adapter, allow) {
     }
     return null;
 }
-import { isFreeOverride } from './free-tiers.js';
+import { isFreeOverride } from './free-tiers';
 /** Compute a coarse cost tier for free-first ranking. */
 export function costTier(c) {
     const ov = isFreeOverride(c.provider, c.model);

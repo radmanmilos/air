@@ -1,10 +1,10 @@
 // Health tracker with atomic persistence.
 // Cooldowns are keyed by (provider, model) — shared provider limits are
 // respected because two tools on the same provider share one cooldown.
-import { paths } from '../config/paths.js';
-import { readJsonFile } from '../utils/atomic.js';
-import { lockedReadModifyWrite } from '../utils/lock.js';
-import { getErrorAction } from '../types/errors.js';
+import { paths } from '../config/paths';
+import { readJsonFile } from '../utils/atomic';
+import { lockedReadModifyWrite } from '../utils/lock';
+import { getErrorAction } from '../types/errors';
 /** Build a structured health snapshot from a HealthState (R5-18). */
 export function healthSnapshot(state, now = Date.now()) {
     let totalSuccesses = 0;

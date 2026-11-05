@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { redact } from '../security/redact.js';
+import { redact } from '../security/redact';
 export function checkVerifyTrust(command, trustedRepos, cwd, source) {
     if (source === 'cli') {
         return { trusted: true, source: 'cli' };

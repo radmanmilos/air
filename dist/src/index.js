@@ -2,10 +2,10 @@
 // Library entrypoint. CLI lives in bin/air.ts.
 export const name = 'air';
 export const version = '0.1.0';
-export * from './types/index.js';
-export * from './config/index.js';
-export * from './execution/index.js';
-export * from './health/index.js';
-export * from './router/index.js';
-export * from './security/index.js';
-export * from './utils/index.js';
+export * from './types';
+export * from './config';
+export * from './execution';
+export * from './health';
+export * from './router';
+export * from './security';
+export * from './utils';

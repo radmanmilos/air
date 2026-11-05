@@ -3,9 +3,9 @@
 // verify.command never executed from repo config.
 import { readFile } from 'node:fs/promises';
 import { parse } from 'yaml';
-import { paths } from './paths.js';
-import { safeParseConfig, formatConfigError } from './schema.js';
-import { redact } from '../security/redact.js';
+import { paths } from './paths';
+import { safeParseConfig, formatConfigError } from './schema';
+import { redact } from '../security/redact';
 // Keys that may only be set in the global (user) config, never in a repo
 // `.airrc.yaml`. Repo values for these are ignored (with a warning).
 const GLOBAL_ONLY_KEYS = [

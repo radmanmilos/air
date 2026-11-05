@@ -2,7 +2,7 @@
 //
 // Uses the shared process runner (src/execution/runner.ts), never spawn
 // directly. Verified against opencode 2.2.5 (see docs/adapters/opencode.md).
-import { runProcess } from '../execution/runner.js';
+import { runProcess } from '../execution/runner';
 const RATE_LIMIT_RE = /rate limit|429|too many requests|quota exceeded/i;
 const AUTH_RE = /invalid api key|401|unauthorized|authentication failed|auth failed|api key incorrect/i;
 const MODEL_UNAVAILABLE_RE = /model .* not found|model not available|unknown model|no such model/i;

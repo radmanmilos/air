@@ -2,7 +2,7 @@
 //
 // Uses the shared process runner (src/execution/runner.ts), never spawn
 // directly. Verified against aider 0.86.2 (see docs/adapters/aider.md).
-import { runProcess } from '../execution/runner.js';
+import { runProcess } from '../execution/runner';
 const RATE_LIMIT_RE = /rate limit|429|too many requests|quota exceeded/i;
 const AUTH_RE = /invalid api key|401|unauthorized|authentication failed|auth failed|api key incorrect/i;
 const MODEL_UNAVAILABLE_RE = /model .* not found|model not available|unknown model|no such model/i;

@@ -8,9 +8,9 @@
 // rotated to `air.log.N` (N = 1..maxBackups). Redaction still applies after
 // rotation — no secrets in any rotated file.
 import { appendFileSync, renameSync, statSync, unlinkSync, mkdirSync } from 'node:fs';
-import { paths } from '../config/paths.js';
-import { redact } from '../security/redact.js';
-import { DEFAULT_CONFIG } from '../config/schema.js';
+import { paths } from '../config/paths';
+import { redact } from '../security/redact';
+import { DEFAULT_CONFIG } from '../config/schema';
 let ensured = false;
 let maxBytes = DEFAULT_CONFIG.logging.rotation.maxBytes;
 let maxBackups = DEFAULT_CONFIG.logging.rotation.maxBackups;

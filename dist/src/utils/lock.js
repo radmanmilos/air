@@ -7,7 +7,7 @@
 // lock is not reclaimed mid-write. Reclamation and release verify the
 // ownership token before unlinking to avoid races with a new holder.
 import { promises as fs, constants as fsConstants } from 'node:fs';
-import { paths } from '../config/paths.js';
+import { paths } from '../config/paths';
 const GRACE_MS = 2000;
 function processStartTime() {
     return Date.now() - process.uptime() * 1000;
@@ -123,7 +123,7 @@ export async function withLock(name, fn, options = {}) {
 }
 export async function lockedReadModifyWrite(name, file, mutate, options = {}) {
     return withLock(name, async () => {
-        const { readJsonFile, atomicWriteJson } = await import('./atomic.js');
+        const { readJsonFile, atomicWriteJson } = await import('./atomic');
         const current = await readJsonFile(file);
         const next = await mutate(current);
         await atomicWriteJson(file, next);

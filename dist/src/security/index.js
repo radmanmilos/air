@@ -1,1 +1,1 @@
-export { redact, containsSecret, redactEnvContents } from './redact.js';
+export { redact, containsSecret, redactEnvContents } from './redact';
