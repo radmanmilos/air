@@ -1,4 +1,5 @@
-// Brain: front-agent reasoning via kilocode/opencode/ollama CLI.
+// Suppress execFileSync shell deprecation warning.
+process.noDeprecation = true;
 
 import { execFileSync } from 'node:child_process';
 
@@ -17,6 +18,8 @@ function tryKilo(prompt: string): BrainResult | null {
       encoding: 'utf8',
       timeout: 120000,
       stdio: ['ignore', 'pipe', 'ignore'],
+      env: { ...process.env, NODE_NO_WARNINGS: '1' },
+      shell: true,
     });
     const lines = out.split('\n').filter(Boolean);
     const texts: string[] = [];
@@ -38,6 +41,8 @@ function tryOpencode(prompt: string): BrainResult | null {
       encoding: 'utf8',
       timeout: 120000,
       stdio: ['ignore', 'pipe', 'ignore'],
+      env: { ...process.env, NODE_NO_WARNINGS: '1' },
+      shell: true,
     });
     const lines = out.split('\n').filter(Boolean);
     const texts: string[] = [];
@@ -61,6 +66,8 @@ function tryOllama(prompt: string): BrainResult | null {
       encoding: 'utf8',
       timeout: 120000,
       stdio: ['ignore', 'pipe', 'ignore'],
+      env: { ...process.env, NODE_NO_WARNINGS: '1' },
+      shell: true,
     });
     const text = out.trim();
     if (text) return { text, model, provider: 'ollama' };
@@ -80,11 +87,11 @@ export function brainAnswer(prompt: string): BrainResult {
 
 export function isBrainAvailable(): boolean {
   try {
-    execFileSync('kilo', ['--version'], { stdio: 'ignore', timeout: 5000 });
+    execFileSync('kilo', ['--version'], { stdio: 'ignore', timeout: 5000, shell: true, env: { ...process.env, NODE_NO_WARNINGS: '1' } });
     return true;
   } catch {
     try {
-      execFileSync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000 });
+      execFileSync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000, shell: true, env: { ...process.env, NODE_NO_WARNINGS: '1' } });
       return true;
     } catch {
       return !!process.env.AIR_BRAIN_MODEL_OLLAMA;
