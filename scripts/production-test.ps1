@@ -71,7 +71,7 @@ Run-Test "T2.1 air chat (read-only question)" "Tier2" {
     $p = [System.Diagnostics.Process]::Start($psi)
     Start-Sleep -Seconds 2
     $p.StandardInput.WriteLine("describe this repo")
-    Start-Sleep -Seconds 45
+    Start-Sleep -Seconds 20
     $p.StandardInput.WriteLine("/status")
     Start-Sleep -Seconds 2
     $p.StandardInput.WriteLine("/quit")
