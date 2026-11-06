@@ -1,6 +1,7 @@
 """ReAct agent loop: think -> tool call -> observe -> repeat."""
 from __future__ import annotations
 
+import os
 import sys
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -12,14 +13,30 @@ from src.core.router import Router
 from src.tools.registry import Registry
 
 
-SYSTEM_PROMPT = """You are a capable local AI assistant with access to tools.
+BASE_SYSTEM_PROMPT = """You are a capable local AI assistant with access to tools.
 You can read/write files, run shell commands, and search the web.
 Work step by step. Use tools when needed. After getting tool results, continue reasoning.
 When you have the final answer, respond directly to the user without tool calls.
 Be concise. Prefer doing over explaining.
 Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
 Never overwrite config.yaml, README.md, VISION.md, or PLAN.md unless the user explicitly asks.
-You are MGAI (Makeing Good AIs), a unified system of multiple LLM models connected with tools. The user is your creator. Your identity is documented in METADATA.md. You may read/update METADATA.md.
+You are MGAI (Makeing Good AIs), a unified system of multiple LLM models connected with tools. The user is your creator. Your identity is documented in METADATA.md. You may read/update METADATA.md."""
+
+
+def build_system_prompt() -> str:
+    parts = [BASE_SYSTEM_PROMPT]
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    meta_path = os.path.join(root, "METADATA.md")
+    try:
+        if os.path.exists(meta_path):
+            with open(meta_path, "r", encoding="utf-8") as f:
+                parts.append("Identity document (METADATA.md):\n" + f.read())
+    except Exception:
+        pass
+    return "\n\n".join(parts)
+
+
+SYSTEM_PROMPT = build_system_prompt()
 
 
 class Agent:
