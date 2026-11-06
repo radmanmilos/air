@@ -10,12 +10,12 @@ Structured test system per `docs/reviews/archive/air_e2e_test_redesign.md`.
 ### Structure
 - `tests/e2e/harness/` - sandbox, air-process, oracles, chat-driver, report, preflight, retry, mcp-client, known-gap
 - `tests/e2e/scenarios/` - scenario tests
-- `tests/e2e/fixtures/` - fixture specs and hidden acceptance tests
+- `tests/e2e/fixtures/` - fixture specs (TaskBoard lives in AIR repo; dedicated repo not yet split)
+- `tests/e2e/live/` - (not yet created; `e2e:live` currently runs no tests)
 
 ### Running
-- Deterministic suite (CI): `npm run e2e:det` (fake executors, no real tools)
-- Live suite (local): `npm run e2e:live` (real tools; separate config `vitest.live.config.ts`)
-- `results/` is gitignored and receives `results.json` / `summary.md` from `report.ts`.
+- Deterministic suite (CI): `npm test` (includes e2e scenarios)
+- `results/` output: report.ts exists but is not wired into a reporter yet (no results/ produced).
 
 ### AIR_EVENT_LOG
 When `AIR_EVENT_LOG=<path>` is set, AIR appends JSON lines for:

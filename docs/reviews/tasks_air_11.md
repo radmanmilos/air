@@ -62,7 +62,7 @@
 - Files: tests/e2e/scenarios/real-jobs.test.ts
 - Details: timing assertions, no if-around-key-assertion, wait for final reply/brain_end.
 
-### T11-013 [PARTIAL] — Delete/rewrite vacuous tests (security H-01, run-tasks, mcp, J-01, soak)
+### T11-013 [DONE] — Delete/rewrite vacuous tests (security H-01, run-tasks, mcp, J-01, soak)
 - Files: tests/e2e/scenarios/*.test.ts
 - Details: one ID one scenario, name equals content.
 
@@ -78,7 +78,7 @@
 
 ## P4 — Docs
 
-### T11-016 [PARTIAL] — Update docs/testing.md (only what exists)
+### T11-016 [DONE] — Update docs/testing.md (only what exists)
 - Files: docs/testing.md
 EOF
 Write-Path "E:/GitHub/air/docs/reviews/tasks_air_11.md"
