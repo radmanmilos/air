@@ -36,49 +36,49 @@
 - Files: tests/e2e/harness/oracles.ts, tests/e2e/harness/oracles.test.ts
 - Details: correctly escaped regexes; Linux/Mac/Windows scan; positive+negative unit tests with real marked process.
 
-### T11-007 [TODO] — H-brain: fake kilo brain (version, JSON output, records prompt)
+### T11-007 [DONE] — H-brain: fake kilo brain (version, JSON output, records prompt)
 - Files: tests/e2e/harness/fake-executors/fake-kilo.mjs, kilo/kilo.cmd shims
 - Details: supports --version and run ... --format json, prints JSON text line, supports FAKE_DELAY_MS, records prompt to file.
 
-### T11-008 [TODO] — H-mutation: real mutation gate running scenarios
+### T11-008 [DONE] — H-mutation: real mutation gate running scenarios
 - Files: scripts/mutation-check.mjs
 - Details: run real scenarios against each mutation; all must be detected.
 
-### T11-009 [TODO] — H-knowngap: use knownGap for P-06..P-09
+### T11-009 [PARTIAL] — H-knowngap: use knownGap for P-06..P-09
 - Files: tests/e2e/scenarios/real-jobs.test.ts
 - Details: mark open gaps with knownGap (XPASS forces removal).
 
-### T11-010 [TODO] — H-report: wire report.ts/preflight.ts/retry.ts/mcp-client.ts
+### T11-010 [PARTIAL] — H-report: wire report.ts/preflight.ts/retry.ts/mcp-client.ts
 - Files: tests/e2e/harness/*
 - Details: use in scenarios; produce results/ output; gitignore results/.
 
-### T11-011 [TODO] — H-live: create live suite
+### T11-011 [PARTIAL] — H-live: create live suite
 - Files: tests/e2e/live/*.live.test.ts
 - Details: at least listed live scenarios; SKIP with reason; zero tests fails.
 
 ## P2 — Rewrite weak tests with teeth
 
-### T11-012 [TODO] — Rewrite P-01..P-04, F-01, L-01 per round3 section 5.3
+### T11-012 [PARTIAL] — Rewrite P-01..P-04, F-01, L-01 per round3 section 5.3
 - Files: tests/e2e/scenarios/real-jobs.test.ts
 - Details: timing assertions, no if-around-key-assertion, wait for final reply/brain_end.
 
-### T11-013 [TODO] — Delete/rewrite vacuous tests (security H-01, run-tasks, mcp, J-01, soak)
+### T11-013 [PARTIAL] — Delete/rewrite vacuous tests (security H-01, run-tasks, mcp, J-01, soak)
 - Files: tests/e2e/scenarios/*.test.ts
 - Details: one ID one scenario, name equals content.
 
-### T11-014 [TODO] — Implement missing scenario groups (G, E, F, C/D, H, I, L, soak)
+### T11-014 [PARTIAL] — Implement missing scenario groups (G, E, F, C/D, H, I, L, soak)
 - Files: tests/e2e/scenarios/*.test.ts
 - Details: priority order per round3 section 4.4.
 
 ## P3 — Fixture work
 
-### T11-015 [TODO] — TaskBoard in radmanmilos/test + acceptance tests
+### T11-015 [PARTIAL] — TaskBoard in radmanmilos/test + acceptance tests
 - Files: tests/e2e/fixtures/
 - Details: tag baseline-v1, add missing fixture files, hidden acceptance tests for FEAT-1..4.
 
 ## P4 — Docs
 
-### T11-016 [TODO] — Update docs/testing.md (only what exists)
+### T11-016 [PARTIAL] — Update docs/testing.md (only what exists)
 - Files: docs/testing.md
 EOF
 Write-Path "E:/GitHub/air/docs/reviews/tasks_air_11.md"
