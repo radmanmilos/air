@@ -3,14 +3,15 @@
 A local-first AI agent system that turns small, weak models into capable assistants.
 See `VISION.md` for the goal and `PLAN.md` for progress.
 
-## Quickstart (Phase 1+)
+## Quickstart
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+See `HOW_TO_START.md` for full terminal instructions.
+
+```powershell
+cd E:\GitHub\MakeingGoodAIs
+ollama list
 python -m src.main models
-python -m src.main run "List the files in this folder and summarize the project"
+python -m src.main run "List the files in this folder and summarize the project" -y
 ```
 
 ## Status
