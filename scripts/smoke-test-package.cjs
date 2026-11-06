@@ -12,10 +12,14 @@ try {
   cp.execSync(`npm install "${tgz}" --prefix "${dir}" --no-save --no-package-lock`, {
     stdio: 'inherit',
   });
-  const bin = path.join(dir, 'node_modules', '.bin', 'air');
+  const binDir = path.join(dir, 'node_modules', '.bin');
+  const bin = process.platform === 'win32'
+    ? path.join(binDir, 'air.cmd')
+    : path.join(binDir, 'air');
   cp.execSync(`"${bin}" --help`, { stdio: 'inherit' });
   cp.execSync(`"${bin}" --version`, { stdio: 'inherit' });
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(tgz, { force: true });
 }
+EOF
