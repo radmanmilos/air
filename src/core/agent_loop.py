@@ -28,15 +28,9 @@ class Agent:
         self.registry = registry
         self.max_steps = max_steps
         self.verbose = verbose
+        self.messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    def run(self, goal: str, model: str | None = None, images: list[str] | None = None) -> str:
-        model = model or self.router.pick("default")
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        user_msg = {"role": "user", "content": goal}
-        if images:
-            user_msg["images"] = images
-        messages.append(user_msg)
-
+    def _loop(self, model: str, messages: list[dict]) -> str:
         for step in range(1, self.max_steps + 1):
             if self.verbose:
                 print(f"\n[step {step}] thinking with {model}...")
@@ -64,7 +58,6 @@ class Agent:
                 args = fn.get("arguments", {})
                 if self.verbose:
                     print(f"  -> tool: {name}({args})")
-                # approval gate for dangerous tools
                 tool = self.registry.get(name) if self.registry else None
                 if tool and tool.requires_approval:
                     from src.core.approval import approve
@@ -81,3 +74,22 @@ class Agent:
                 messages.append({"role": "tool", "content": result, "tool_call_id": tc.get("id")})
 
         return "Reached max steps without a final answer."
+
+    def run(self, goal: str, model: str | None = None, images: list[str] | None = None) -> str:
+        model = model or self.router.pick("default")
+        # one-shot: reset conversation
+        self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        user_msg = {"role": "user", "content": goal}
+        if images:
+            user_msg["images"] = images
+        self.messages.append(user_msg)
+        return self._loop(model, self.messages)
+
+    def chat(self, goal: str, model: str | None = None, images: list[str] | None = None) -> str:
+        model = model or self.router.pick("default")
+        user_msg = {"role": "user", "content": goal}
+        if images:
+            user_msg["images"] = images
+        self.messages.append(user_msg)
+        result = self._loop(model, self.messages)
+        return result

@@ -121,7 +121,7 @@ def main():
             print("Bye!")
             break
         try:
-            result = agent.run(user)
+            result = agent.chat(user)
             print(f"\nMGAI> {result}\n")
         except Exception as e:
             print(f"\n!! Error: {e}\n")
