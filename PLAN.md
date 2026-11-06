@@ -58,13 +58,14 @@ Goal: unattended complex tasks.
 - [x] Test runner tool: run pytest, report pass/fail
 - [x] Self-improve workflow (Phase 6) implemented and tested (needs tuning)
 
-## Phase 6 — Self-improvement (the agent grows itself)
+## Phase 6 — Self-improvement (the agent grows itself) [~]
 Goal: agent works on this project's own codebase safely.
-- [ ] Self-improvement workflow: read -> plan -> branch -> edit -> test -> commit
-- [ ] Guardrails: never commit to main; require tests green; max diff size
-- [ ] Agent can update PLAN.md checkboxes as it completes work
-- [ ] Rollback on test failure
-- [ ] Human approval gate for self-modification (configurable)
+- [x] Self-improvement workflow: read -> plan -> branch -> edit -> test -> commit
+- [x] Guardrails: never commit to main; require tests green; max diff size
+- [x] Agent can update PLAN.md checkboxes as it completes work
+- [ ] Rollback on test failure (partial)
+- [x] Human approval gate for self-modification (configurable, auto in self-improve)
+- [x] Proven: created tests/test_router.py with 10 passing tests autonomously
 
 ## Phase 5 — Integration
 Goal: usable from other projects.
