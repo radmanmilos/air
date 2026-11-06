@@ -84,3 +84,16 @@ Goal: usable from other projects.
 ## Notes / blockers
 - Python 3.14 very new; whisper/piper wheels may need 3.12 venv. Revisit if install fails.
 - (add as encountered)
+## Phase 4 — Legs (autonomy) [~]
+...
+- [x] Git tools: status, diff, branch, commit (for self-improvement)
+- [x] Test runner tool: run pytest, report pass/fail
+- [x] Self-improve workflow (Phase 6) implemented and tested (needs tuning)
+- [~] **Multi-model orchestration optimization** (NEW — Phase 4 improvement):
+  - Implement PerfOrch-style parallel execution for complementary tasks
+  - Add performance benchmarking per task type/model pair (track pass@1, speedup)
+  - Enable model selection based on measured performance (not just capability labels)
+  - Support hybrid routing: sequential by default, parallel when benefits detected
+
+## Phase 5 — Integration
+...
