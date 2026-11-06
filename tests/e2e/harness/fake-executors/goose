@@ -1,2 +1,2 @@
 #!/bin/sh
-FAKE_TOOL=goose node "$(dirname "")/fake-executor.mjs" "$@"
+FAKE_TOOL=goose node "$(dirname "$0")/fake-executor.mjs" "$@"

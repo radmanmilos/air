@@ -1,2 +1,2 @@
 #!/bin/sh
-FAKE_TOOL=kilocode node "$(dirname "")/fake-executor.mjs" "$@"
+FAKE_TOOL=kilocode node "$(dirname "$0")/fake-executor.mjs" "$@"

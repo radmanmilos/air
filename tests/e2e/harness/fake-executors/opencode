@@ -1,2 +1,2 @@
 #!/bin/sh
-FAKE_TOOL=opencode node "$(dirname "")/fake-executor.mjs" "$@"
+FAKE_TOOL=opencode node "$(dirname "$0")/fake-executor.mjs" "$@"

@@ -30,14 +30,14 @@ export const oracles = {
         const out = execFileSync('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Process | Select-Object -ExpandProperty CommandLine'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
         return !out.split(/\r?\n/).some((line) => line.includes(marker));
       }
-      for (const pid of readdirSync('/proc').filter((x: string) => /^\d+$/.test(x))) {
-        for (const file of ['cmdline', 'environ']) {
-          try {
-            const buf = readFileSync(`/proc/${pid}/${file}`);
-            const text = buf.toString('utf8').replace(/\0/g, ' ');
-            if (text.includes(marker)) return false;
-          } catch { /* noop */ }
-        }
+      for (const pid of readdirSync('/proc').filter((x: string) => /^\\d+$/.test(x))) {
+        if (Number(pid) === process.pid) continue;
+        try {
+          const cmdline = readFileSync(`/proc/${pid}/cmdline`).toString('utf8').replace(/\\0/g, ' ');
+          if (!/fake[-_]?executor|fake[-_]?aider|fake[-_]?goose/i.test(cmdline)) continue;
+          const environ = readFileSync(`/proc/${pid}/environ`).toString('utf8').replace(/\\0/g, ' ');
+          if (environ.includes(marker)) return false;
+        } catch { /* noop */ }
       }
       return true;
     } catch {

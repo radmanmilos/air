@@ -1,2 +1,2 @@
 #!/bin/sh
-FAKE_TOOL=ollama node "$(dirname "")/fake-executor.mjs" "$@"
+FAKE_TOOL=ollama node "$(dirname "$0")/fake-executor.mjs" "$@"
