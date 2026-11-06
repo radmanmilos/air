@@ -14,7 +14,7 @@ function ensureFixture(dir: string) {
   execSync('git init && git add -A && git commit -m baseline', { cwd: dir, stdio: 'ignore' });
 }
 
-describe('B-01: Brainstorm uses brain, no job', () => {
+describe('SMOKE: adapters chat starts', () => {
   it('short question does not spawn a job', async () => {
     const fixture = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
     ensureFixture(fixture);
@@ -29,7 +29,7 @@ describe('B-01: Brainstorm uses brain, no job', () => {
   });
 });
 
-describe('F-01: Secret redaction', () => {
+describe('SMOKE: secret redaction', () => {
   it('fake executor printing secret does not leak to output', async () => {
     const fixture = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
     ensureFixture(fixture);
@@ -46,7 +46,7 @@ describe('F-01: Secret redaction', () => {
   });
 });
 
-describe('E-01: Rate limit failover', () => {
+describe('SMOKE: rate limit status', () => {
   it('rate-limited adapter triggers failover', async () => {
     const fixture = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
     ensureFixture(fixture);

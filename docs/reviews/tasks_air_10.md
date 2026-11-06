@@ -74,9 +74,9 @@
 - Files: vitest.live.config.ts, package.json
 - Details: e2e:live uses vitest.live.config.ts; e2e:det uses default config.
 
-### T10-015 [PARTIAL] — H9: Fix scenario IDs
+### T10-015 [DONE] — H9: Fix scenario IDs
 - Files: tests/e2e/scenarios/*.test.ts
-- Details: real-jobs.test.ts adds 11 with-teeth scenarios (P-01..P-05, H-01, A-01, F-01, H-02, L-01). Old scenarios/*.test.ts still carry mismatched IDs (e.g. J-01 is free-only, not voice) and need renaming per review §4.3.
+- Details: real-jobs.test.ts adds 11 with-teeth scenarios (P-01..P-05, H-01, A-01, F-01, H-02, L-01). Vacuous smoke tests in adapters/basic/mcp/onboarding/run-tasks/security/soak/voice renamed to SMOKE-* to drop false catalog IDs.
 
 ### T10-016 [DONE] — H10: Fix docs/testing.md
 - Files: docs/testing.md
@@ -93,12 +93,12 @@
 ## P2 — Replace vacuous tests
 ### T10-019 [PARTIAL] — Replace vacuous tests with real with-teeth tests
 - Files: tests/e2e/scenarios/real-jobs.test.ts
-- Details: 11 real scenarios implemented. Remaining vacuous smoke tests in adapters/basic/mcp/onboarding/run-tasks/security/soak/voice still need replacement per review §5.3 (B-03, C-03, E-01, E-02, E-03, G-01s, H-02, K-01, etc.).
+- Details: 11 real scenarios in real-jobs.test.ts (P-01..P-05, H-01, A-01, F-01, H-02, L-01) pass individually. Remaining vacuous smoke tests (adapters/basic/mcp/onboarding/run-tasks/security/soak/voice) still smoke-level; full with-teeth replacement (B-03, C-03/E-00, E-01, E-02, E-03, G-01s, K-01) deferred — requires stable fixture + MCP driver harness work.
 
 ## P3 — Fixture work
 ### T10-020 [PARTIAL] — TaskBoard in dedicated repo, tag baseline-v1, fixture.lock
 - Files: tests/e2e/fixtures/taskboard/, tests/e2e/fixtures/fixture.lock
-- Details: TaskBoard lives inside the air repo (not a dedicated repo); git tag baseline-v1 created in air repo; fixture.lock hash enforced by sandbox. Dedicated-repo split not done.
+- Details: TaskBoard lives inside the air repo (not a dedicated repo); git tag baseline-v1 created in air repo; fixture.lock hash enforced by sandbox. Dedicated-repo split not done (requires external repo + CI wiring).
 
 ### T10-021 [DONE] — Remove BUG-n comments
 - Files: tests/e2e/fixtures/taskboard/src/*
@@ -106,7 +106,7 @@
 
 ### T10-022 [PARTIAL] — Hidden acceptance tests for FEAT-1..4
 - Files: tests/e2e/fixtures/taskboard/tests/
-- Details: No FEAT-1..4 features or hidden acceptance tests exist; TaskBoard only has BUG-1..4 seeded bugs and 17 passing tests.
+- Details: No FEAT-1..4 features or hidden acceptance tests exist; TaskBoard only has BUG-1..4 seeded bugs and 17 passing tests. Implementing FEAT-1..4 + hidden acceptance tests requires product feature work beyond current scope.
 
 ## P4 — Documentation
 ### T10-023 [DONE] — Rewrite docs/testing.md

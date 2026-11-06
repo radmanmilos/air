@@ -7,7 +7,7 @@ import { oracles } from '../harness/oracles';
 import { join } from 'node:path';
 import { rmSync } from 'node:fs';
 
-describe('A-01: New developer asks what the project is', () => {
+describe('SMOKE: onboarding chat starts', () => {
   it('reply arrives, repo unchanged, no job writes files', async () => {
     const fixture = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
     // Create a minimal fixture if it doesn't exist
