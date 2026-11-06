@@ -1,2 +1,0 @@
-#!/bin/sh
-FAKE_TOOL=kilo node "$(dirname "")/fake-executor.mjs" "$@"

@@ -63,14 +63,8 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
         const s = await orch.start(prompt, cwd, { mode: options.auto ? 'auto' : 'ask', readOnly: !!options.readOnly, files: options.files });
         sessions.push(s);
       }
-      // Wait for all to finish by polling task state.
-      const { readTaskState } = await import('../src/execution/task-state');
       for (const s of sessions) {
-        while (true) {
-          const st = await readTaskState(s.runId);
-          if (st && (st.state === 'COMPLETED' || st.state === 'FAILED' || st.state === 'CANCELLED')) break;
-          await new Promise((r) => setTimeout(r, 250));
-        }
+        try { await orch.waitFor(s.runId); } catch { /* noop */ }
       }
     } catch (err: any) {
       console.log(chalk.red(err?.message ?? String(err)));
@@ -101,20 +95,8 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
       allowDirty: !!options.allowDirty,
       allowProviders: options.allowProvider ? options.allowProvider.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
     });
-    // Wait for the async result propagation (session_completed event).
-    // The session object is updated when the run completes.
-    await new Promise<void>((resolve) => {
-      const check = () => {
-        const s = orch.get(session.runId);
-        if (s && (s.state === 'COMPLETED' || s.state === 'FAILED' || s.state === 'CANCELLED' || s.state === 'AWAITING_APPROVAL')) {
-          resolve();
-        } else {
-          setTimeout(check, 50);
-        }
-      };
-      check();
-    });
-
+    // Wait for the async run to finish (background promise).
+    try { await orch.waitFor(session.runId); } catch { /* noop */ }
     const s = orch.get(session.runId);
     if (!s) {
       console.log(chalk.red('No session result.'));

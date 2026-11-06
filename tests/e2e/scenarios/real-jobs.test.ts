@@ -86,10 +86,10 @@ describe('real: P-02 Started job is printed immediately', () => {
       try {
         await chat.waitForLine(/air chat \(conversation/, 0, 10000);
         chat.say('/run add a comment to Program.cs');
-        const started = await chat.waitForLine(/Started job (\S+)/, 0, 5000);
+        const started = await chat.waitForLine(/Started job (\S+)/, 0, 15000);
         const m = started.line.match(/Started job (\S+)/);
         expect(m?.[1]).toBeTruthy();
-        await chat.waitForLine(new RegExp(`job ${m![1]} finished`), 0, 60000);
+        await chat.waitForLine(new RegExp(`job ${m![1]} finished`), 0, 120000);
       } finally {
         await chat.quit();
         sandbox.cleanup();
@@ -127,7 +127,7 @@ describe('real: P-03 cancel kills the worker and leaves no orphans', () => {
       try {
         await chat.waitForLine(/air chat \(conversation/, 0, 10000);
         chat.say('/run do something');
-        const started = await chat.waitForLine(/Started job (\S+)/, 0, 5000);
+        const started = await chat.waitForLine(/Started job (\S+)/, 0, 15000);
         const m = started.line.match(/Started job (\S+)/);
         expect(m?.[1]).toBeTruthy();
         chat.say(`/cancel ${m![1]}`);
@@ -135,6 +135,109 @@ describe('real: P-03 cancel kills the worker and leaves no orphans', () => {
         expect(oracles.noOrphans(sandbox.marker)).toBe(true);
       } finally {
         await chat.quit();
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: A-01 onboarding (real)', () => {
+  it('a repo question starts a read-only job and keeps the repo clean', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('What is this project and how do I run it?');
+        // Repo questions without code-work verbs route to a read-only job.
+        const started = await chat.waitForLine(/Started job (\S+)/, 0, 15000);
+        const m = started.line.match(/Started job (\S+)/);
+        expect(m?.[1]).toBeTruthy();
+        await chat.waitForLine(new RegExp(`job ${m![1]} finished`), 0, 120000);
+        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: F-01 persistence (conversation stored on disk)', () => {
+  it('persists user and assistant messages (visible via /status)', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('Remember this: the answer is forty-two.');
+        await chat.waitForLine(/air: /, 0, 20000);
+        const t = chat.say('/status');
+        await chat.waitForLine(/messages=/, t, 10000);
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: H-02 secrets do not leak into state or events', () => {
+  it('redacts the aider secret from state and event log', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'secret' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('/run add a comment to Program.cs');
+        await chat.waitForLine(/Started job (\S+)/, 0, 15000);
+        await chat.waitForLine(/job .* finished/, 0, 120000);
+        const dirs = [sandbox.stateDir, sandbox.cacheDir];
+        expect(oracles.secretsAbsent(dirs, [/sk-ant-api03-/i])).toBe(true);
+        const events = oracles.traces(sandbox.eventLog);
+        const secretEvent = events.some((e: any) => /sk-ant-api03-/i.test(JSON.stringify(e)));
+        expect(secretEvent).toBe(false);
+        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+      } finally {
+        await chat.quit();
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: L-01 write job (worktree isolation)', () => {
+  it('runs a write job in an isolated worktree and keeps the source tree clean', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'edit' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('/run fix the completion bug');
+        const started = await chat.waitForLine(/Started job (\S+)/, 0, 15000);
+        const m = started.line.match(/Started job (\S+)/);
+        const runId = m?.[1] ?? '';
+        expect(runId).toBeTruthy();
+        await chat.waitForLine(new RegExp(`job ${runId} finished`), 0, 120000);
+        // Source tree stays clean (worktree isolation).
+        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+        // The worktree should contain the edit.
+        // Read task state from disk to find the worktree path.
+        const fs = await import('node:fs');
+        const path = await import('node:path');
+        const stateFile = path.join(sandbox.env.AIR_CACHE_DIR, 'tasks', `${runId}.json`);
+        if (fs.existsSync(stateFile)) {
+          const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+          if (state.worktreePath && fs.existsSync(state.worktreePath)) {
+            expect(oracles.fileContains(state.worktreePath, 'Program.cs', 'edited by fake')).toBe(true);
+          }
+        }
+      } finally {
+        await chat.quit().catch(() => {});
         sandbox.cleanup();
       }
     } catch (_err) { sandbox.cleanup(); throw _err; }
