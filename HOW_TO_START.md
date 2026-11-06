@@ -1,6 +1,32 @@
 # How to Start — Making Good AIs
 
-Step-by-step for a fresh terminal.
+## The simple way
+
+Open any terminal and type:
+
+```powershell
+mgai
+```
+
+That's it. It checks Python, starts Ollama if needed, installs missing deps, verifies models, then greets you and waits for your prompt:
+
+```
+  Hi! I'm MGAI. I'm ready to work beside you.
+  Type your request and press Enter. Type 'exit' or 'quit' to leave.
+
+you> _
+```
+
+Type `exit` or `quit` to leave. (If `mgai` is not recognized, open a *new* terminal so the PATH update takes effect, or run `python E:\GitHub\MakeingGoodAIs\mgai.py`.)
+
+## Alternative commands
+- `start-mgai` (same thing)
+- Double-click `start MGAI.bat` in the project folder
+- `python mgai.py` from inside the project folder
+
+---
+
+## Manual steps (if you want control)
 
 ## 1. Open a terminal
 PowerShell or CMD. Go to the project:
