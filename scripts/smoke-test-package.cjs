@@ -22,4 +22,3 @@ try {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.rmSync(tgz, { force: true });
 }
-EOF
