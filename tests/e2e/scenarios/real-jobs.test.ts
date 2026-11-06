@@ -85,10 +85,11 @@ describe('real: P-02 Started job is printed immediately', () => {
       const chat = startChat(env, sandbox.repoDir);
       try {
         await chat.waitForLine(/air chat \(conversation/, 0, 10000);
-        chat.say('/run add a comment to Program.cs');
+        const sentAt = chat.say('/run add a comment to Program.cs');
         const started = await chat.waitForLine(/Started job (\S+)/, 0, 15000);
         const m = started.line.match(/Started job (\S+)/);
         expect(m?.[1]).toBeTruthy();
+        expect(started.t - sentAt).toBeLessThan(10000);
         await chat.waitForLine(new RegExp(`job ${m![1]} finished`), 0, 120000);
       } finally {
         await chat.quit();
@@ -102,13 +103,14 @@ describe('real: P-04 chat stays responsive during a slow brain call', () => {
   it('answers /status within 2 s while a slow brain call is in flight', async () => {
     const sandbox = createSandbox(fixture());
     try {
-      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change', FAKE_DELAY_MS: '6000' });
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change', FAKE_DELAY_MS: '6000', FAKE_BRAIN_RECORD: sandbox.stateDir + '/brain.txt' });
       const chat = startChat(env, sandbox.repoDir);
       try {
         await chat.waitForLine(/air chat \(conversation/, 0, 10000);
-        chat.say('What is this project?');
-        const t = chat.say('/status');
-        await chat.waitForLine(/messages=/, t, 10000);
+        chat.say('Explain the difference between async and threads');
+        const sentAt = chat.say('/status');
+        const statusLine = await chat.waitForLine(/messages=/, sentAt, 10000);
+        expect(statusLine.t - sentAt).toBeLessThan(2000);
         expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
       } finally {
         await chat.quit();

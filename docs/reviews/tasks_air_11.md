@@ -58,7 +58,7 @@
 
 ## P2 — Rewrite weak tests with teeth
 
-### T11-012 [PARTIAL] — Rewrite P-01..P-04, F-01, L-01 per round3 section 5.3
+### T11-012 [DONE] — Rewrite P-01..P-04, F-01, L-01 per round3 section 5.3
 - Files: tests/e2e/scenarios/real-jobs.test.ts
 - Details: timing assertions, no if-around-key-assertion, wait for final reply/brain_end.
 
