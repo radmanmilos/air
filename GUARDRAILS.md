@@ -18,7 +18,15 @@
 - New tests under `tests/`.
 - New docs under `docs/`.
 - `METADATA.md` (identity updates only).
-- `PLAN.md` checkboxes (mark progress, never delete sections).
+- `PLAN.md` checkboxes (mark progress).
+
+## Plan-document hygiene (PLAN.md / VISION.md / README.md)
+- ALWAYS edit in place. Never append a new section at the end if the section already exists.
+- Never duplicate a heading or a phase block. If it exists, update it where it is.
+- Preserve the existing structure and ordering; insert new items into the correct existing section.
+- Do not rewrite the whole file; make targeted edits.
+- Mark progress by changing `[ ]` to `[x]`, never by adding a second copy.
+- Add new ideas as sub-items under the relevant existing phase, not as new top-level phases.
 
 ## Safe workflow for self-modification
 1. Always create a new git branch first (`self-improve/...`).
