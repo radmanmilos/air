@@ -16,7 +16,8 @@ SYSTEM_PROMPT = """You are a capable local AI assistant with access to tools.
 You can read/write files, run shell commands, and search the web.
 Work step by step. Use tools when needed. After getting tool results, continue reasoning.
 When you have the final answer, respond directly to the user without tool calls.
-Be concise. Prefer doing over explaining."""
+Be concise. Prefer doing over explaining.
+Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow."""
 
 
 class Agent:
