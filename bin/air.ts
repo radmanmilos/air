@@ -726,10 +726,12 @@ program
        if (trimmed.startsWith('/cancel ')) {
         const id = trimmed.slice(8).trim();
         const entry = jobHandles.get(id);
-        if (entry) {
-          try { await entry.orch.cancel(id); } catch { /* noop */ }
-          entry.controller.abort();
+        if (!entry) {
+          console.log(chalk.yellow(`No such job: ${id}`));
+          return;
         }
+        try { await entry.orch.cancel(id); } catch { /* noop */ }
+        entry.controller.abort();
         conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== id);
         saveConversation(conv!);
         console.log(chalk.yellow(`Cancelled ${id}`));
@@ -753,9 +755,10 @@ program
             const { brainAnswer, isBrainAvailable } = await import('../src/brain');
             let reply = 'Acknowledged.';
             if (await isBrainAvailable()) {
-              process.stdout.write(chalk.gray('air: thinking... '));
+              process.stdout.write(chalk.gray('air: thinking...\\n'));
               logEvent('brain_start', trimmed);
-              const r = await brainAnswer(trimmed, { history: conv!.messages, jobs: conv!.activeWorkIds });
+              const freshConv = loadConversation(conv!.id) ?? conv!;
+              const r = await brainAnswer(trimmed, { history: freshConv.messages, jobs: freshConv.activeWorkIds });
               process.stdout.write('\r' + ' '.repeat(20) + '\r');
               logEvent('brain_end', r.text.slice(0, 200));
               reply = r.text;

@@ -3,4 +3,4 @@ export interface DecideHints {
     requiresWrite?: boolean;
     requiresCode?: boolean;
 }
-export declare function decide(message: string, _conv: Conversation): any[];
+export declare function decide(message: string, conv: Conversation): any[];
