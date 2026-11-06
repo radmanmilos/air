@@ -30,31 +30,33 @@ Goal: agent can take a goal, use tools (files/shell/web), and complete a task en
 - [x] Smoke test: "list files in this folder" via agent (passed)
 - [x] Git tools + run_tests tool (bonus for self-improvement)
 
-## Phase 2 — Memory
+## Phase 2 — Memory [x]
 Goal: handle inputs larger than context; remember across sessions.
-- [ ] `memory/conversation.py` — sliding window + summarization
-- [ ] Pull `nomic-embed-text`
-- [ ] `memory/vector_store.py` — chromadb + embeddings (RAG)
-- [ ] Chunking for code/text
-- [ ] Persist memory to disk
+- [x] `memory/conversation.py` — sliding window
+- [x] Pull `nomic-embed-text`
+- [x] `memory/vector_store.py` — chromadb + embeddings (RAG)
+- [x] Chunking for code/text
+- [x] Persist memory to disk
+- [x] Memory tools (remember/recall/index_file) registered
 
-## Phase 3 — Senses (see/speak/listen)
+## Phase 3 — Senses (see/speak/listen) [x]
 Goal: full multimodal loop.
-- [ ] Vision tool (describe image / OCR) — uses qwen3.5 natively
-- [ ] `senses/stt.py` — faster-whisper (listen)
-- [ ] `senses/tts.py` — piper (speak)
-- [ ] `interfaces/voice_mode.py` — listen -> think -> speak loop
-- [ ] Mic/speaker device config
+- [x] Vision tool (describe_image) — uses qwen3.5 natively
+- [x] `senses/stt.py` — faster-whisper (listen)
+- [x] `senses/tts.py` — piper/pyttsx3 (speak)
+- [x] `interfaces/voice_mode.py` — listen -> think -> speak loop
+- [ ] Mic/speaker device config (basic works)
 
-## Phase 4 — Legs (autonomy)
+## Phase 4 — Legs (autonomy) [~]
 Goal: unattended complex tasks.
-- [ ] `autonomy/planner.py` — goal -> steps (deepseek-r1)
-- [ ] `autonomy/executor.py` — run steps, retry, checkpoint
-- [ ] `autonomy/critic.py` — self-check + redo
-- [ ] `autonomy/scheduler.py` — background/long tasks
-- [ ] Safety: approval gates, allowlists, sandboxed cwd
-- [ ] Git tools: status, diff, branch, commit (for self-improvement)
-- [ ] Test runner tool: run pytest, report pass/fail
+- [x] `autonomy/planner.py` — goal -> steps (deepseek-r1)
+- [x] `autonomy/executor.py` — run steps, retry, checkpoint
+- [x] `autonomy/critic.py` — self-check + redo
+- [x] `autonomy/scheduler.py` — background/long tasks
+- [x] Safety: approval gates, allowlists, sandboxed cwd
+- [x] Git tools: status, diff, branch, commit (for self-improvement)
+- [x] Test runner tool: run pytest, report pass/fail
+- [x] Self-improve workflow (Phase 6) implemented and tested (needs tuning)
 
 ## Phase 6 — Self-improvement (the agent grows itself)
 Goal: agent works on this project's own codebase safely.
