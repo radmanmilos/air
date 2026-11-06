@@ -1,6 +1,12 @@
 """CLI entrypoint."""
 from __future__ import annotations
 
+import sys
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 import json
 from pathlib import Path
 
@@ -68,6 +74,30 @@ def chat(model: str = typer.Option(None, help="Model to chat with")):
         content = msg.get("content", "")
         messages.append(msg)
         console.print(f"[cyan]ai:[/cyan] {content}")
+
+
+@app.command("plan")
+def run_plan_cmd(goal: str):
+    """Plan a goal into steps (no execution)."""
+    from src.autonomy.planner import plan
+    steps = plan(goal)
+    for i, s in enumerate(steps, 1):
+        console.print(f"{i}. {s}")
+
+
+@app.command("self-improve")
+def self_improve_cmd(goal: str):
+    """Run the self-improvement workflow on this project."""
+    from src.autonomy.self_improve import self_improve
+    res = self_improve(goal)
+    console.print(res)
+
+
+@app.command("voice")
+def voice_cmd(seconds: float = 5.0):
+    """Run voice mode (listen -> think -> speak)."""
+    from src.interfaces.voice_mode import run_voice_loop
+    run_voice_loop(seconds=seconds)
 
 
 @app.command()

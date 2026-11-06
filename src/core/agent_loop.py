@@ -1,6 +1,12 @@
 """ReAct agent loop: think -> tool call -> observe -> repeat."""
 from __future__ import annotations
 
+import sys
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 from src.core.ollama_client import OllamaClient
 from src.core.router import Router
 from src.tools.registry import Registry

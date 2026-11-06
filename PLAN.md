@@ -16,18 +16,19 @@ This file is the working plan. Updated as work progresses. See `VISION.md` for t
 - [x] Check hardware (RTX 3060 6GB, 16GB RAM, Ryzen 7 5800H)
 - [x] Create VISION.md + PLAN.md
 
-## Phase 1 — Brain + Arms (MVP) [~]
+## Phase 1 — Brain + Arms (MVP) [x]
 Goal: agent can take a goal, use tools (files/shell/web), and complete a task end-to-end via CLI.
-- [ ] Project skeleton (src/, tests/, config, requirements)
-- [ ] `core/ollama_client.py` — chat, embeddings, model listing
-- [ ] `core/router.py` — capability-based model selection
-- [ ] `tools/registry.py` — schema + dispatch
-- [ ] `tools/files.py` — read/write/list/search/move
-- [ ] `tools/shell.py` — run command (approval gate)
-- [ ] `tools/web.py` — search + fetch
-- [ ] `core/agent_loop.py` — ReAct loop
-- [ ] `main.py` + CLI (typer) — `run`, `chat`, `models`
-- [ ] Smoke test: "list files in this folder" via agent
+- [x] Project skeleton (src/, tests/, config, requirements)
+- [x] `core/ollama_client.py` — chat, embeddings, model listing
+- [x] `core/router.py` — capability-based model selection
+- [x] `tools/registry.py` — schema + dispatch
+- [x] `tools/files.py` — read/write/list/search/move
+- [x] `tools/shell.py` — run command (approval gate)
+- [x] `tools/web.py` — search + fetch
+- [x] `core/agent_loop.py` — ReAct loop
+- [x] `main.py` + CLI (typer) — `run`, `chat`, `models`, `inspect`
+- [x] Smoke test: "list files in this folder" via agent (passed)
+- [x] Git tools + run_tests tool (bonus for self-improvement)
 
 ## Phase 2 — Memory
 Goal: handle inputs larger than context; remember across sessions.
