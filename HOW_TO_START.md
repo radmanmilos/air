@@ -2,10 +2,28 @@
 
 ## The simple way
 
-Open any terminal and type:
+### In PowerShell (current folder)
+PowerShell does not run commands from the current folder by default, so use `.\`:
+
+```powershell
+.\mgai
+```
+
+### In CMD
+```cmd
+mgai
+```
+
+### From anywhere (after opening a NEW terminal)
+I added the project folder to your user PATH, so in a fresh terminal you can just type:
 
 ```powershell
 mgai
+```
+
+If it is still not recognized, run this once to refresh PATH in the current session:
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable("Path","User") + ";" + [Environment]::GetEnvironmentVariable("Path","Machine")
 ```
 
 That's it. It checks Python, starts Ollama if needed, installs missing deps, verifies models, then greets you and waits for your prompt:
