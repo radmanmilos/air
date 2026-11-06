@@ -12,7 +12,7 @@ const tool = process.env.FAKE_TOOL || 'aider';
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function main() {
-  if (behavior === 'hang') { await new Promise(() => {}); return; }
+  if (behavior === 'hang') { await new Promise(() => { setInterval(() => {}, 1000); }); return; }
   if (delayMs > 0) await sleep(delayMs);
 
   if (behavior === 'rate-limit') { process.stderr.write('rate limit exceeded: 429\n'); process.exit(1); }

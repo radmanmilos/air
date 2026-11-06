@@ -3,7 +3,9 @@ import { oracles } from '../harness/oracles';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+
+// ... (existing imports)
 
 describe('oracles', () => {
   it('gitClean returns true for clean repo', () => {
@@ -70,5 +72,25 @@ describe('oracles', () => {
     const changed = oracles.gitChangedFiles(dir);
     expect(changed).toContain('b.txt');
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('noOrphans', () => {
+  it('returns false when a marked process is alive', async () => {
+    if (process.platform === 'win32') return; // OS scan not available on Windows
+    const marker = 'air-e2e-test-marker-' + Date.now();
+    const child = spawn(process.execPath, [join(process.cwd(), 'tests', 'e2e', 'harness', 'fake-executors', 'fake-executor.mjs')], {
+      env: { ...process.env, AIR_E2E_MARKER: marker, FAKE_BEHAVIOR: 'hang' },
+      stdio: 'ignore',
+    });
+    await new Promise((r) => setTimeout(r, 1000));
+    expect(oracles.noOrphans(marker)).toBe(false);
+    child.kill();
+    await new Promise((r) => setTimeout(r, 500));
+  });
+
+  it('returns true when no marked process remains', () => {
+    const marker = 'air-e2e-test-marker-nonexistent-' + Date.now();
+    expect(oracles.noOrphans(marker)).toBe(true);
   });
 });

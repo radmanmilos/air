@@ -5,34 +5,34 @@
 
 ## P0 — Product bugs (fix first)
 
-### T11-001 [TODO] — P-06: Brain gets conversation history
+### T11-001 [DONE] — P-06: Brain gets conversation history
 - Priority: P0
 - Files: src/brain/index.ts, bin/air.ts, src/conversation
 - Details: load conversation from disk (or update in-memory conv on every append); build brain prompt with history + job digest; use fresh data for status/activeWorkIds.
 
-### T11-002 [TODO] — P-07: Destructive requests require confirmation
+### T11-002 [DONE] — P-07: Destructive requests require confirmation
 - Priority: P0
 - Files: src/conversation/decide.ts, bin/air.ts
 - Details: delete/remove all/drop/wipe require confirmation before spawning a write job.
 
-### T11-003 [TODO] — P-08: Intent routing gaps
+### T11-003 [DONE] — P-08: Intent routing gaps
 - Priority: P0
 - Files: src/conversation/decide.ts
 - Details: add write-intent patterns (I want, please make, make it, can you add); link "also..." follow-ups to previous job; handle natural-language cancel/status; keep brainstorm out of jobs.
 
-### T11-004 [TODO] — P-09: Grounded answers for repo files
+### T11-004 [DONE] — P-09: Grounded answers for repo files
 - Priority: P0
 - Files: src/conversation/decide.ts, src/brain/index.ts
 - Details: questions about named repo files route to read-only job or brain gets bounded repo context.
 
-### T11-005 [TODO] — P-10: /cancel unknown id + thinking... newline
+### T11-005 [DONE] — P-10: /cancel unknown id + thinking... newline
 - Priority: P0
 - Files: bin/air.ts
 - Details: /cancel of unknown id says so; print thinking... on its own line.
 
 ## P1 — Harness defects
 
-### T11-006 [TODO] — H-oracles: fix noOrphans (regex + unit tests)
+### T11-006 [DONE] — H-oracles: fix noOrphans (regex + unit tests)
 - Files: tests/e2e/harness/oracles.ts, tests/e2e/harness/oracles.test.ts
 - Details: correctly escaped regexes; Linux/Mac/Windows scan; positive+negative unit tests with real marked process.
 
