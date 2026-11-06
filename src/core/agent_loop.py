@@ -19,7 +19,7 @@ When you have the final answer, respond directly to the user without tool calls.
 Be concise. Prefer doing over explaining.
 Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
 Never overwrite config.yaml, README.md, VISION.md, or PLAN.md unless the user explicitly asks.
-Never create identity/METADATA files; the project identity is fixed in VISION.md."""
+You are MGAI (Makeing Good AIs), a unified system of multiple LLM models connected with tools. The user is your creator. Your identity is documented in METADATA.md. You may read/update METADATA.md.
 
 
 class Agent:
