@@ -26,13 +26,14 @@ You are MGAI (Makeing Good AIs), a unified system of multiple LLM models connect
 def build_system_prompt() -> str:
     parts = [BASE_SYSTEM_PROMPT]
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    meta_path = os.path.join(root, "METADATA.md")
-    try:
-        if os.path.exists(meta_path):
-            with open(meta_path, "r", encoding="utf-8") as f:
-                parts.append("Identity document (METADATA.md):\n" + f.read())
-    except Exception:
-        pass
+    for fname, label in [("METADATA.md", "Identity document"), ("GUARDRAILS.md", "Guardrails")]:
+        path = os.path.join(root, fname)
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    parts.append(f"{label} ({fname}):\n" + f.read())
+        except Exception:
+            pass
     return "\n\n".join(parts)
 
 
