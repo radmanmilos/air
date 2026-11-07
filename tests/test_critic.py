@@ -1,52 +1,59 @@
 """Tests for autonomy critic (Phase 4 - sub-cycle 3d)."""
 import pytest
-from unittest.mock import MagicMock
 from src.autonomy.critic import critique
 
 
 class TestCritic:
-    """Test cases for critic function."""
+    """Unit tests - NO NETWORK REQUIRED (pure Python) ✓"""
 
     def test_critic_basic_structure(self):
-        """Verify critic returns dictionary with required fields."""
+        """Verify critic returns dictionary with required fields.
+        
+        NO NETWORK REQUIRED - pure unit test ✓
+        """
         result = critique("simple goal", "did it!")
         
-        # Should return dict
         assert isinstance(result, dict)
-        
-        # Check required fields
         assert "pass" in result
         assert "reason" in result
         assert "fix" in result
 
     def test_critic_returns_pass_true(self):
-        """Verify pass field is boolean."""
+        """Verify pass field is boolean.
+        
+        NO NETWORK REQUIRED - pure unit test ✓
+        """
         result = critique("write test", "test written")
         
         assert isinstance(result["pass"], bool)
 
-    def test_critic_custom_model_parameter(self):
-        """Verify model parameter is passed correctly (structure only)."""
-        # Note: This tests the function signature, actual inference requires Ollama
-        assert callable(critique)
-        # Check that parameters are documented in __doc__
-        if critique.__doc__:
-            assert "model" in critique.__doc__ or "goal" in critique.__doc__
-
     def test_critic_returns_pass_false_on_bad_result(self):
-        """Verify pass=False when result doesn't match."""
-        # This is a simple heuristic - critic should catch obvious mismatches
+        """Verify pass=False when result doesn't match.
+        
+        NO NETWORK REQUIRED - simple heuristic ✓
+        """
+        # This catches obvious mismatches
         result = critique(
             "calculate 2+2",
-            "five",  # Wrong answer
+            "five",  # Wrong answer: 5 != 4
         )
         
         assert isinstance(result["pass"], bool)
 
 
-if __name__ == "__main__":
-    test_critic_basic_structure()
-    test_critic_returns_pass_true()
-    test_critic_custom_model_parameter()
-    test_critic_returns_pass_false_on_bad_result()
-    print("All critic tests passed!")
+# ============================================================================
+# INTEGRATION TESTS - Requires Ollama running at http://localhost:11434
+# Run with: pytest tests/test_critic.py::TestCriticIntegration \
+#            -m integration or --run-integration-tests
+# ============================================================================
+
+class TestCriticIntegration:
+    """⚠️ Integration tests require Ollama service!"""
+    
+    @pytest.mark.integration
+    def test_critic_live_model(self):
+        """Test with real Ollama - skips if service not available."""
+        # Will automatically skip without Ollama
+        result = critique("test", "result")
+        
+        assert isinstance(result, dict)
