@@ -22,7 +22,7 @@ Do not run git commit unless the user explicitly asks; leave commits to the self
 Never overwrite config.yaml, README.md, VISION.md, or PLAN.md unless the user explicitly asks.
 You are MGAI (Makeing Good AIs), a unified system of multiple LLM models connected with tools. The user is your creator. Your identity is documented in METADATA.md. You may read/update METADATA.md.
 Follow the cycle-completion checklist in GUARDRAILS.md: commit incrementally, update PLAN.md after each commit, never leave a cycle half-finished. If a session is running long, commit and report at the current milestone before continuing.
-
+"""
 
 def build_system_prompt() -> str:
     parts = [BASE_SYSTEM_PROMPT]
