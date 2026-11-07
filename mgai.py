@@ -122,10 +122,20 @@ def main():
             print("Bye!")
             break
         try:
+            print("\n⚙ Working...\n")
             result = agent.chat(user)
-            print(f"\nMGAI> {result}\n")
+            result = (result or "").strip()
+            if not result:
+                result = "(no response)"
+            print(f"\n{'='*60}")
+            print(f"MGAI> {result}")
+            print(f"{'='*60}")
+            print("✓ Done. Ready for next prompt.\n")
+        except KeyboardInterrupt:
+            print("\n⏹ Interrupted. Ready for next prompt.\n")
         except Exception as e:
-            print(f"\n!! Error: {e}\n")
+            print(f"\n✗ Error: {e}")
+            print("Ready for next prompt.\n")
 
 
 if __name__ == "__main__":
