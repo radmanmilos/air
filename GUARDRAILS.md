@@ -36,5 +36,15 @@
 5. Never install unknown packages without user approval.
 6. Never run destructive shell commands (rm -rf, format, etc.).
 
+## Cycle completion checklist (MANDATORY before saying "Done")
+Every self-improvement cycle MUST end with ALL of these. Do not stop early:
+1. Run the full test suite (`pytest`) — must pass. If not, fix or rollback.
+2. Update `PLAN.md` checkboxes for anything completed this cycle (mark `[x]`).
+3. Commit with a clear message referencing the cycle and what changed.
+4. Verify no protected files were changed (`check_guardrails`).
+5. Print a final report: what was done, commit hash, tests result, and what's next.
+6. Print the `✓ Done. Ready for next prompt.` marker.
+If any step cannot be completed, state explicitly why and ask the user before stopping. Never leave a cycle half-finished silently.
+
 ## If unsure
 Ask the user before changing anything not clearly allowed. When in doubt, do less.
