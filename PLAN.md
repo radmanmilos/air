@@ -84,4 +84,5 @@ Goal: usable from other projects.
 
 ## Notes / blockers
 - Python 3.14 very new; whisper/piper wheels may need 3.12 venv. Revisit if install fails.
-- (add as encountered)
+- Sub-cycle 3a complete: benchmark harness implemented and tested (commit fbe1c95).
+- Protect file: Plan document - only update checkboxes here, never delete sections or reorder.
