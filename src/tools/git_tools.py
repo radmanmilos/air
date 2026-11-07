@@ -4,6 +4,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+
 def _run(args: list[str], cwd: str = ".") -> str:
     workdir = Path(cwd).resolve() if Path(cwd).is_absolute() else (Path(".").resolve() / cwd).resolve()
     try:
@@ -17,6 +18,27 @@ def _run(args: list[str], cwd: str = ".") -> str:
         out.append("STDERR: " + proc.stderr.strip())
     out.append(f"EXIT: {proc.returncode}")
     return "\n".join(out)
+
+
+def _rollback(cwd: str = ".") -> str:
+    """Rollback to previous git state before changes."""
+    try:
+        prev_commit = subprocess.run(
+            ["git", "rev-parse", "~1"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(Path(cwd).resolve() if Path(cwd).is_absolute() else (Path(".").resolve() / cwd))
+        ).stdout.strip()
+        if prev_commit:
+            result = subprocess.run(
+                ["git", "checkout", prev_commit[:7]],
+                capture_output=True, text=True, timeout=30,
+                cwd=str(Path(cwd).resolve() if Path(cwd).is_absolute() else (Path(".").resolve() / cwd))
+            )
+            return f"Rolled back to {prev_commit[:8]}: EXIT: {result.returncode}"
+        else:
+            return "No previous commit found - rollback skipped"
+    except Exception as e:
+        return f"Rollback error: {e} (skipped)"
 
 
 def git_status(cwd: str = ".") -> str:
@@ -44,7 +66,13 @@ def git_log(cwd: str = ".", n: int = 10) -> str:
     return _run(["log", f"-{n}", "--oneline"], cwd)
 
 
-def run_tests(cwd: str = ".", pattern: str = "") -> str:
+def run_tests(cwd: str = ".", pattern: str = "", rollback_on_fail: bool = True) -> str:
+    # Rollback to previous commit if flag is set (safety for self-improve)
+    if rollback_on_fail:
+        print(f"  → Rolling back before tests...")
+        rollback_out = _rollback(cwd)
+        print(f"  {rollback_out}")
+    
     cmd = ["python", "-m", "pytest", "-q"]
     if pattern:
         cmd += ["-k", pattern]
