@@ -15,7 +15,7 @@ def plan(goal: str, model: str | None = None) -> list[str]:
         "Break the following goal into a concise numbered list of concrete steps. "
         "Return ONLY a JSON array of strings, no prose.\n\nGoal: " + goal
     )
-    resp = client.chat(model=model, messages=[{"role": "user", "content": prompt}], think=True)
+    resp = client.chat(model=model, messages=[{"role": "user", "content": prompt}], think=True, timeout=600)
     text = client.extract_text(resp)
     # try parse JSON
     m = re.search(r"\[.*\]", text, re.S)

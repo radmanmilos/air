@@ -18,6 +18,7 @@ def describe_image(path: str, question: str = "Describe this image in detail.") 
     resp = _client.chat(
         model=Router().pick("default"),
         messages=[{"role": "user", "content": question, "images": [b64]}],
+        timeout=600,
     )
     return OllamaClient.extract_text(resp) or "(no description)"
 

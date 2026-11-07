@@ -58,6 +58,8 @@ class Agent:
                 model=model,
                 messages=messages,
                 tools=self.registry.schemas() if self.registry else None,
+                stream=True,
+                timeout=600,
             )
             msg = resp.get("message", {})
             thinking = msg.get("thinking")

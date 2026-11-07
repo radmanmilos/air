@@ -13,7 +13,7 @@ def critique(goal: str, result: str, model: str | None = None) -> dict:
         '{"pass": true/false, "reason": "...", "fix": "..."}. '
         "Only JSON, no prose.\n\nGOAL: " + goal + "\n\nRESULT: " + result[:3000]
     )
-    resp = client.chat(model=model, messages=[{"role": "user", "content": prompt}], think=True)
+    resp = client.chat(model=model, messages=[{"role": "user", "content": prompt}], think=True, timeout=600)
     text = client.extract_text(resp)
     import json, re
     m = re.search(r"\{.*\}", text, re.S)

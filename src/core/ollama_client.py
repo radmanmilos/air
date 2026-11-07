@@ -33,6 +33,7 @@ class OllamaClient:
         images: list[str] | None = None,
         think: bool = True,
         stream: bool = False,
+        timeout: int = 600,
         options: dict | None = None,
     ) -> dict:
         payload: dict[str, Any] = {
@@ -49,9 +50,47 @@ class OllamaClient:
             payload["messages"] = self._attach_images(messages, images)
         if options:
             payload["options"] = options
-        r = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=300)
+
+        url = f"{self.base_url}/api/chat"
+        if not stream:
+            r = requests.post(url, json=payload, timeout=timeout)
+            r.raise_for_status()
+            return r.json()
+
+        # Streaming: accumulate chunks so long generations don't time out
+        # and we get progress. Ollama returns one JSON object per line.
+        r = requests.post(url, json=payload, stream=True, timeout=timeout)
         r.raise_for_status()
-        return r.json()
+        content = ""
+        thinking = ""
+        tool_calls: list[dict] = []
+        final: dict[str, Any] = {}
+        for line in r.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            try:
+                chunk = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            msg = chunk.get("message", {}) or {}
+            content += msg.get("content", "") or ""
+            thinking += msg.get("thinking", "") or ""
+            if msg.get("tool_calls"):
+                tool_calls.extend(msg["tool_calls"])
+            if chunk.get("done"):
+                final = chunk
+                break
+        return {
+            "model": model,
+            "message": {
+                "role": "assistant",
+                "content": content,
+                "thinking": thinking,
+                "tool_calls": tool_calls or None,
+            },
+            "done": True,
+            "total_duration": final.get("total_duration"),
+        }
 
     @staticmethod
     def _attach_images(messages: list[dict], images: list[str]) -> list[dict]:
