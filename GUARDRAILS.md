@@ -9,7 +9,8 @@ Do NOT create, modify, delete, or rename ANY file under these paths — even new
 - `src/tools/guardrail_tools.py`
 - `requirements.txt`
 - `.gitignore`
-- `VISION.md`, `PLAN.md`, `METADATA.md`, `GUARDRAILS.md`, `HOW_TO_START.md`, `README.md`
+- `VISION.md`, `METADATA.md`, `GUARDRAILS.md`, `HOW_TO_START.md`, `README.md`
+- `PLAN.md` — special: may ONLY update checkbox state (`[ ]`→`[x]`) and append to "Decisions log"/"Notes". Never delete sections, rewrite, or reorder.
 
 If a task seems to require changing one of these, STOP and ask the user first. Never work around this by creating a parallel file in a protected directory.
 

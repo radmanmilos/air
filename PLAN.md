@@ -72,8 +72,8 @@ Goal: agent works on this project's own codebase safely.
 Goal: usable from other projects.
 - [x] `interfaces/api.py` — FastAPI server (import OK, /health, /models, /tools/list verified)
 - [x] Web UI (minimal) — dashboard in src/interfaces/api_ui.py (HTML + /health, /models, /tools/list verified)
-- [ ] Docs + examples
-- [ ] Packaging (pip install -e .)
+- [x] Docs + examples (docs/README.md, quickstart.md, examples/)
+- [x] Packaging (pip install -e .) — pyproject.toml, mgai entry point installed
 
 ## Decisions log
 - 2026-11-06: Python as implementation language (ecosystem fit).
