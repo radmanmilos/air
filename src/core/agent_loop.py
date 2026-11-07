@@ -42,7 +42,7 @@ SYSTEM_PROMPT = build_system_prompt()
 
 class Agent:
     def __init__(self, client: OllamaClient | None = None, router: Router | None = None,
-                 registry: Registry | None = None, max_steps: int = 20, verbose: bool = True):
+                 registry: Registry | None = None, max_steps: int = 40, verbose: bool = True):
         self.client = client or OllamaClient()
         self.router = router or Router()
         self.registry = registry

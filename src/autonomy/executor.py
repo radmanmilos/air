@@ -11,7 +11,7 @@ from src.tools.builtin import build_registry
 
 
 class Executor:
-    def __init__(self, checkpoint_file: str = ".agent/plan_state.json", max_steps_per_task: int = 15):
+    def __init__(self, checkpoint_file: str = ".agent/plan_state.json", max_steps_per_task: int = 30):
         self.checkpoint_file = Path(checkpoint_file)
         self.checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
         self.max_steps_per_task = max_steps_per_task

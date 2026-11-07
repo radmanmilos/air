@@ -32,5 +32,5 @@ memory:
   top_k: 6
 
 agent:
-  max_steps: 20
+  max_steps: 40
   verbose: true

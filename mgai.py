@@ -107,7 +107,8 @@ def main():
 
     client = OllamaClient()
     registry = build_registry()
-    agent = Agent(client=client, router=Router(), registry=registry, verbose=True)
+    max_steps = client.cfg.get("agent", {}).get("max_steps", 40)
+    agent = Agent(client=client, router=Router(), registry=registry, verbose=True, max_steps=max_steps)
 
     while True:
         try:
