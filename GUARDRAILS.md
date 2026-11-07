@@ -1,5 +1,21 @@
 # Guardrails — What MGAI may and may not change
 
+## Cycle discipline (ALWAYS follow — this overrides everything else)
+Every self-improvement task MUST be done in small sub-cycles. After EACH sub-cycle you MUST, in this order, without skipping:
+1. Run the full test suite (`pytest`). If it fails, fix or rollback before continuing.
+2. Commit with a clear, focused message (one commit per sub-cycle).
+3. Update `PLAN.md` checkboxes (edit in place, mark `[x]`).
+4. Run `check_guardrails`. If protected files changed, revert them.
+5. Print a short report: what was done, commit hash, test result, what's next.
+6. Print `✓ Done. Ready for next prompt.`
+
+Rules:
+- Never batch multiple sub-cycles into one commit.
+- Never end a response without the `✓ Done.` marker.
+- If the session is running long, commit + report at the current milestone, then ask before continuing.
+- If truncated, the next session resumes from the last commit — do not re-do work.
+- Do not continue to the next sub-cycle without the user's approval.
+
 ## CRITICAL: Never touch these paths (read-only zones)
 Do NOT create, modify, delete, or rename ANY file under these paths — even new files:
 - `config.yaml`
