@@ -1,17 +1,22 @@
 # Guardrails — What MGAI may and may not change
 
-## CRITICAL: Never modify these files (breaks the system)
-- `config.yaml` — Ollama URL, model routing, tool settings. Overwriting breaks everything.
-- `src/core/ollama_client.py` — Ollama API wrapper.
-- `src/core/router.py` — model routing.
-- `src/core/agent_loop.py` — agent loop (only change with explicit user approval).
-- `src/tools/builtin.py` — tool registration.
-- `requirements.txt` — dependency list.
+## CRITICAL: Never touch these paths (read-only zones)
+Do NOT create, modify, delete, or rename ANY file under these paths — even new files:
+- `config.yaml`
+- `src/core/` (entire directory)
+- `src/tools/registry.py`
+- `src/tools/builtin.py`
+- `src/tools/guardrail_tools.py`
+- `requirements.txt`
 - `.gitignore`
+- `VISION.md`, `PLAN.md`, `METADATA.md`, `GUARDRAILS.md`, `HOW_TO_START.md`, `README.md`
+
+If a task seems to require changing one of these, STOP and ask the user first. Never work around this by creating a parallel file in a protected directory.
 
 ## Never delete or empty
-- `VISION.md`, `PLAN.md`, `METADATA.md`, `GUARDRAILS.md`, `HOW_TO_START.md`, `README.md`
+- Any file in the protected list above
 - The `src/` package or any `__init__.py`
+- The `tests/` directory or existing test files (only add new ones)
 
 ## Allowed to create/modify
 - New tool modules under `src/tools/` (register in builtin.py only if asked).
@@ -36,15 +41,20 @@
 5. Never install unknown packages without user approval.
 6. Never run destructive shell commands (rm -rf, format, etc.).
 
-## Cycle completion checklist (MANDATORY before saying "Done")
-Every self-improvement cycle MUST end with ALL of these. Do not stop early:
-1. Run the full test suite (`pytest`) — must pass. If not, fix or rollback.
-2. Update `PLAN.md` checkboxes for anything completed this cycle (mark `[x]`).
-3. Commit with a clear message referencing the cycle and what changed.
-4. Verify no protected files were changed (`check_guardrails`).
-5. Print a final report: what was done, commit hash, tests result, and what's next.
-6. Print the `✓ Done. Ready for next prompt.` marker.
-If any step cannot be completed, state explicitly why and ask the user before stopping. Never leave a cycle half-finished silently.
+## Cycle completion checklist (MANDATORY — do INCREMENTALLY, not at the end)
+Do not batch all bookkeeping at the end of a cycle. Sessions get truncated. Follow this order:
+1. **Before starting:** Create the feature branch first.
+2. **After each meaningful change:** Run `pytest` immediately. If it fails, fix or rollback before continuing.
+3. **After verification passes:** Commit immediately (small, focused commits). Do not wait until the end.
+4. **After commit:** Update `PLAN.md` checkbox right away (edit in place).
+5. **Verify guardrails:** Run `check_guardrails`. If protected files changed, revert them.
+6. **Final step only:** Print the cycle report + `✓ Done. Ready for next prompt.` marker.
+
+Rules:
+- Never leave a cycle with uncommitted changes if tests pass.
+- Never end a session without printing the `✓ Done.` marker.
+- If the session is running long, commit and report at the current milestone, then ask before continuing.
+- If truncated, the next session should resume from the last commit, not re-do work.
 
 ## If unsure
 Ask the user before changing anything not clearly allowed. When in doubt, do less.
