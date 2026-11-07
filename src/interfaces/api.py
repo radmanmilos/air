@@ -17,17 +17,19 @@ def get_tool_schemas() -> list[dict]:
     return registry.schemas()
 
 
-@app.get("/")
-async def root():
-    """Root endpoint with API info."""
+@app.get("/info")
+async def info():
+    """API info endpoint."""
     return {
         "name": "MGAI API Server",
         "version": "1.0",
         "endpoints": [
             "GET /",
+            "GET /info",
             "POST /chat",
             "GET /models",
             "POST /tools/list",
+            "GET /health",
         ]
     }
 

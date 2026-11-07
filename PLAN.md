@@ -71,7 +71,7 @@ Goal: agent works on this project's own codebase safely.
 ## Phase 5 — Integration
 Goal: usable from other projects.
 - [x] `interfaces/api.py` — FastAPI server (import OK, /health, /models, /tools/list verified)
-- [ ] Web UI (minimal)
+- [x] Web UI (minimal) — dashboard in src/interfaces/api_ui.py (HTML + /health, /models, /tools/list verified)
 - [ ] Docs + examples
 - [ ] Packaging (pip install -e .)
 
