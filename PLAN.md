@@ -58,6 +58,10 @@ Goal: unattended complex tasks.
 - [x] Test runner tool: run pytest, report pass/fail
 - [x] Self-improve workflow (Phase 6) implemented and tested (needs tuning)
 - [~] Multi-model orchestration optimization (NEW): PerfOrch-style parallel execution for complementary tasks; performance benchmarking per task/model; hybrid routing (sequential by default, parallel when beneficial)
+  - [x] Benchmark harness (src/autonomy/benchmark.py) — runs tasks, records timings
+  - [x] Parallel executor (Orchestrator.run_parallel)
+  - [x] Hybrid router (Orchestrator.run_hybrid, Router.pick_fastest)
+  - [x] Ollama resilience (auto-restart, 5-min wait)
 
 ## Phase 6 — Self-improvement (the agent grows itself) [~]
 Goal: agent works on this project's own codebase safely.
