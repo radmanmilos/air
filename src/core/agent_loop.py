@@ -18,6 +18,7 @@ You can read/write files, run shell commands, and search the web.
 Work step by step. Use tools when needed. After getting tool results, continue reasoning.
 When you have the final answer, respond directly to the user without tool calls.
 Be concise. Prefer doing over explaining.
+Do not stop at describing a plan — actually execute it using tools until the task is fully complete.
 """
 
 PROJECT_MODE_SYSTEM_ADDITION = """IMPORTANT: You are building a CLIENT PROJECT in an external folder, NOT modifying your own codebase.
@@ -25,6 +26,7 @@ Do NOT run git commit, create branches, or update PLAN.md. Do NOT follow self-im
 Just build what the user asked for, write files directly into the target folder, and deliver the finished app.
 Do not treat requirement.txt as a pip requirements file — it contains human-readable project requirements.
 You must actually CREATE the files using write_file tool. Do not just describe a plan — execute it. Keep calling write_file until the complete application exists in the target folder.
+Do not return a final answer until at least one file has been written to the target folder.
 """
 
 SELF_IMPROVE_SYSTEM_ADDITION = """Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
