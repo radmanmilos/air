@@ -5,6 +5,8 @@ import os
 import re
 from pathlib import Path
 
+from src.core.guardrails import is_protected
+
 ROOT = Path(".").resolve()
 
 
@@ -26,14 +28,18 @@ def read_file(path: str, max_chars: int = 20000) -> str:
     return text
 
 
-def write_file(path: str, content: str) -> str:
+def write_file(path: str, content: str, allow_protected: bool = False) -> str:
+    if is_protected(path) and not allow_protected:
+        return f"BLOCKED: '{path}' is a protected file. Refusing to overwrite."
     p = _safe(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
     return f"Wrote {len(content)} chars to {p}"
 
 
-def append_file(path: str, content: str) -> str:
+def append_file(path: str, content: str, allow_protected: bool = False) -> str:
+    if is_protected(path) and not allow_protected:
+        return f"BLOCKED: '{path}' is a protected file. Refusing to append."
     p = _safe(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "a", encoding="utf-8") as f:

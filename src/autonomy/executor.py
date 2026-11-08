@@ -12,40 +12,37 @@ from src.tools.builtin import build_registry
 
 
 class Executor:
-    def __init__(self, checkpoint_file: str = ".agent/plan_state.json", 
+    def __init__(self, checkpoint_file: str = ".agent/plan_state.json",
                  max_steps_per_task: int = 30):
         self.checkpoint_file = Path(checkpoint_file)
         self.checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
         self.max_steps_per_task = max_steps_per_task
 
-    def run_plan(self, goal: str, steps: list[str], 
+    def run_plan(self, goal: str, steps: list[str],
                  rollback_on_fail: bool = False) -> list[dict]:
         """Run steps with optional rollback on failure."""
         registry = build_registry()
-        agent = Agent(client=OllamaClient(), router=Router(), 
+        agent = Agent(client=OllamaClient(), router=Router(),
                      registry=registry, max_steps=self.max_steps_per_task, verbose=True)
         results = []
-        
+
         for i, step in enumerate(steps, 1):
             print(f"\n=== Step {i}/{len(steps)}: {step} ===")
-            
-            # Rollback support: if this is first step and --rollback was set,
-            # we can restore from previous state before starting
+
             if rollback_on_fail and i == 1:
                 try:
                     self._rollback()
                     print("Restored previous state successfully")
                 except Exception as e:
                     print(f"Rollback failed: {e}")
-            
+
             out = agent.run(f"Overall goal: {goal}\nCurrent step: {step}")
             results.append({"step": step, "result": out})
-            
-            # Check for failure to trigger rollback later
-            if "FAIL" in str(out.upper()):
+
+            if "FAIL" in str(out).upper():
                 if rollback_on_fail and i < len(steps):
-                    print(f"⚠️  Step failed at {i}/{len(steps)}")
-                    
+                    print(f"  Step failed at {i}/{len(steps)}")
+
         return results
 
     def _rollback(self) -> None:
@@ -59,13 +56,13 @@ class Executor:
                     capture_output=True, text=True, timeout=30
                 )
                 if result.returncode == 0:
-                    print("✓ Rolled back to git state successfully")
+                    print("Rolled back to git state successfully")
                 else:
-                    print(f"✗ Rollback failed: {result.stderr}")
+                    print(f"Rollback failed: {result.stderr}")
             else:
-                print("⚠️  No previous commit found - rollback skipped")
+                print("No previous commit found - rollback skipped")
         except Exception as e:
-            print(f"⚠️  Rollback error: {e} (skipping)")
+            print(f"Rollback error: {e} (skipping)")
 
     def _get_previous_commit(self) -> str | None:
         """Get the hash of the previous commit."""

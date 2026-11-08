@@ -1,37 +1,44 @@
 """Tests for autonomy planner (Phase 4 - sub-cycle 3b)."""
-import re
+from unittest.mock import patch, MagicMock
 from src.autonomy.planner import plan
 
 
-def test_plan_returns_list():
+@patch("src.autonomy.planner.OllamaClient")
+def test_plan_returns_list(mock_client_cls):
     """Verify planner returns a list of steps."""
+    mock_client = MagicMock()
+    mock_client.chat.return_value = {"message": {"content": '["step1","step2"]'}}
+    mock_client.extract_text.return_value = '["step1","step2"]'
+    mock_client_cls.return_value = mock_client
+
     result = plan("Read config.yaml, write file")
-    
-    # Should return a list
-    assert isinstance(result, list), "plan() should return a list"
-    
-    # Should be non-empty
-    assert len(result) > 0, "Plan should have at least one step"
 
-
-def test_plan_step_format():
-    """Verify each step is a string."""
-    result = plan("simple task")
-    
-    for step in result:
-        assert isinstance(step, str), f"Step should be string, got {type(step)}"
-
-
-def test_plan_empty_goal():
-    """Test planner with empty goal - should return minimal steps."""
-    result = plan("")
-    
-    # Should still handle gracefully (possibly empty list)
     assert isinstance(result, list)
+    assert len(result) > 0
 
 
-if __name__ == "__main__":
-    test_plan_returns_list()
-    test_plan_step_format()
-    test_plan_empty_goal()
-    print("All planner tests passed!")
+@patch("src.autonomy.planner.OllamaClient")
+def test_plan_step_format(mock_client_cls):
+    """Verify each step is a string."""
+    mock_client = MagicMock()
+    mock_client.chat.return_value = {"message": {"content": '["simple task"]'}}
+    mock_client.extract_text.return_value = '["simple task"]'
+    mock_client_cls.return_value = mock_client
+
+    result = plan("simple task")
+
+    for step in result:
+        assert isinstance(step, str)
+
+
+@patch("src.autonomy.planner.OllamaClient")
+def test_plan_empty_goal(mock_client_cls):
+    """Test planner with empty goal - should return minimal steps."""
+    mock_client = MagicMock()
+    mock_client.chat.return_value = {"message": {"content": '[]'}}
+    mock_client.extract_text.return_value = '[]'
+    mock_client_cls.return_value = mock_client
+
+    result = plan("")
+
+    assert isinstance(result, list)

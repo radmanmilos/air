@@ -1,11 +1,12 @@
 """
 Benchmark harness for multi-model performance measurement.
-Provides benchmark(task, model) function and compare_models() for cross-model analysis.
+Provides benchmark(task, model) and compare_models() for cross-model analysis.
 """
+from __future__ import annotations
+
 import time
 from typing import Any, Dict, Optional, List
 
-# Default model configuration
 DEFAULT_TIMEOUT = 60
 BASELINE_MODEL = "qwen3.5:4b"
 
@@ -15,115 +16,107 @@ def benchmark(
     model: str = BASELINE_MODEL,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> Dict[str, Any]:
+    """Benchmark a task on the specified model.
+
+    Runs the task through the agent when Ollama is available; otherwise
+    returns a 'skipped' result so callers/tests don't hang.
     """
-    Benchmark a task on the specified model.
-    
-    Args:
-        task: Description of the work to perform (string).
-        model: Ollama model name to use (string).
-        timeout: Maximum time in seconds before aborting.
-        
-    Returns:
-        Dict containing benchmark results with metrics.
-    """
+    from src.core.ollama_client import OllamaClient
+
+    client = OllamaClient()
     start_time = time.time()
-    
+
+    if not client.is_online():
+        return {
+            "task": task,
+            "model": model,
+            "status": "skipped",
+            "reason": "Ollama offline",
+            "elapsed_seconds": 0.0,
+        }
+
     try:
-        # Placeholder: actual task execution via agent loop would go here
-        # For now, we measure the overhead and can be extended to run real tasks
-        
-        if timeout is not None:
-            elapsed = time.time() - start_time
-        else:
-            elapsed = None
-            
+        from src.core.agent_loop import Agent
+        from src.core.router import Router
+        from src.tools.builtin import build_registry
+
+        agent = Agent(
+            client=client,
+            router=Router(),
+            registry=build_registry(),
+            max_steps=5,
+            verbose=False,
+        )
+        result = agent.run(task, model=model)
+        elapsed = time.time() - start_time
+        return {
+            "task": task,
+            "model": model,
+            "status": "success",
+            "result": result,
+            "elapsed_seconds": round(elapsed, 3),
+            "metrics": {"throughput_samples": 1},
+        }
     except Exception as e:
         return {
             "task": task,
             "model": model,
             "status": "failed",
             "error": str(e),
-            "elapsed_seconds": time.time() - start_time,
+            "elapsed_seconds": round(time.time() - start_time, 3),
         }
-    
-    return {
-        "task": task,
-        "model": model,
-        "status": "success",
-        "elapsed_seconds": elapsed or 0.0,
-        "metrics": {"throughput_samples": 1},
-    }
 
 
 def compare_models(
     tasks: List[str],
-    models: List[str] = [BASELINE_MODEL],
+    models: List[str] = None,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> Dict[str, Any]:
-    """
-    Benchmark multiple models on the same task(s).
-    
-    Args:
-        tasks: List of task descriptions to benchmark.
-        models: List of model names to compare (defaults to baseline).
-        timeout: Maximum time per model in seconds.
-        
-    Returns:
-        Dict containing comparative benchmark results.
-        
-    Example:
-        >>> result = compare_models(["read config.yaml"], ["qwen3.5:4b", "deepseek-r1:8b"])
-        >>> print(result)
-    """
+    """Benchmark multiple models on the same task(s)."""
+    if models is None:
+        models = [BASELINE_MODEL]
+
     comparison_results = []
-    
+
     for task in tasks:
         model_results = []
-        
         for model in models:
             result = benchmark(task, model=model, timeout=timeout)
-            if result["status"] == "success":
-                elapsed = float(result["elapsed_seconds"])
-            else:
-                elapsed = None
-            
+            model_results.append(result)
             comparison_results.append({
                 "task": task,
                 "model": model,
                 "status": result["status"],
-                "elapsed_seconds": elapsed,
-                "error": result.get("error"),
+                "elapsed_seconds": result.get("elapsed_seconds"),
+                "error": result.get("error") or result.get("reason"),
             })
-        
-        # Calculate speedup for multi-model comparison
-        completed_models = [r for r in comparison_results if r["status"] == "success" and r["elapsed_seconds"] is not None]
-        if len(completed_models) >= 2:
-            times = [float(r["elapsed_seconds"]) for r in completed_models]
+
+        completed = [r for r in model_results if r["status"] == "success" and r.get("elapsed_seconds") is not None]
+        if len(completed) >= 2:
+            times = [float(r["elapsed_seconds"]) for r in completed]
             fastest = min(times)
             slowest = max(times)
-            speedup_percentage = ((slowest - fastest) / slowest * 100) if slowest > 0 else 0
-            
+            speedup_pct = ((slowest - fastest) / slowest * 100) if slowest > 0 else 0.0
             comparison_results.append({
                 "task": task,
                 "model": "aggregate",
                 "status": "success",
                 "elapsed_seconds": fastest,
                 "metrics": {
-                    "models_tested": len(completed_models),
-                    "avg_time": sum(times) / len(times),
+                    "models_tested": len(completed),
+                    "avg_time": round(sum(times) / len(times), 3),
                     "min_time": fastest,
                     "max_time": slowest,
-                    "speedup_percentage": speedup_percentage,
+                    "speedup_percentage": round(speedup_pct, 2),
                 },
             })
-    
+
     return {"comparisons": comparison_results}
 
 
 if __name__ == "__main__":
-    # Example usage - benchmark on multiple models
     result = compare_models(
         tasks=["read config.yaml"],
-        models=["qwen3.5:4b", "deepseek-r1:8b"]
+        models=["qwen3.5:4b"],
     )
     print(result)

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from src.tools.registry import Registry, Tool
 from src.tools import files, shell, web, git_tools
-from src.tools import guardrail_tools
+from src.tools import guardrail_tools, ollama_tools
 from src.memory import tools as mem_tools
 from src.senses import tools as sense_tools
 
@@ -82,6 +82,9 @@ def build_registry() -> Registry:
     r.register(Tool(name="memory_count", description="Count stored memories.", parameters={"type": "object", "properties": {}, "required": []}, func=mem_tools.memory_count))
 
     r.register(Tool(name="check_guardrails", description="Check if current git changes violate guardrails (protected files, diff size).", parameters={"type": "object", "properties": {"cwd": {"type": "string"}}, "required": []}, func=guardrail_tools.check_guardrails))
+
+    r.register(Tool(name="ensure_ollama_online", description="Restart Ollama if offline and wait up to 5 minutes for it to come online.", parameters={"type": "object", "properties": {"timeout": {"type": "integer"}}, "required": []}, func=ollama_tools.ensure_ollama_online))
+    r.register(Tool(name="is_ollama_online", description="Check if Ollama is currently online.", parameters={"type": "object", "properties": {}, "required": []}, func=ollama_tools.is_ollama_online))
 
     # senses
     r.register(Tool(name="describe_image", description="Describe/understand an image file (vision).", parameters={"type": "object", "properties": {"path": {"type": "string"}, "question": {"type": "string"}}, "required": ["path"]}, func=sense_tools.describe_image))

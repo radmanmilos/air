@@ -86,3 +86,5 @@ Goal: usable from other projects.
 - Python 3.14 very new; whisper/piper wheels may need 3.12 venv. Revisit if install fails.
 - Sub-cycle 3a complete: benchmark harness implemented and tested (commit fbe1c95).
 - Protect file: Plan document - only update checkboxes here, never delete sections or reorder.
+- 2026-11-08: Correction: earlier note claiming self_reflection.py created was inaccurate — but the file now exists (merged from mini-cycle-a). test_planner/test_critic basic tests used live Ollama; fixed by mocking. Current: 29 passed, 1 skipped, 0 failed (offline).
+- 2026-11-08: Ollama resilience added: client now auto-restarts Ollama (up to 5 min) on connection failure. OLLAMA_MODELS env points to a dir with only qwen2.5-coder; other models in E:\AIModels. For full functionality, point OLLAMA_MODELS at the dir containing all needed models.

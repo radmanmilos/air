@@ -1,43 +1,61 @@
 """Tests for autonomy critic (Phase 4 - sub-cycle 3d)."""
 import pytest
+from unittest.mock import patch, MagicMock
 from src.autonomy.critic import critique
 
 
 class TestCritic:
     """Unit tests - NO NETWORK REQUIRED (pure Python) ✓"""
 
-    def test_critic_basic_structure(self):
+    @patch("src.autonomy.critic.OllamaClient")
+    def test_critic_basic_structure(self, mock_client_cls):
         """Verify critic returns dictionary with required fields.
-        
+
         NO NETWORK REQUIRED - pure unit test ✓
         """
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": '{"pass": true, "reason": "ok", "fix": ""}'}}
+        mock_client.extract_text.return_value = '{"pass": true, "reason": "ok", "fix": ""}'
+        mock_client_cls.return_value = mock_client
+
         result = critique("simple goal", "did it!")
-        
+
         assert isinstance(result, dict)
         assert "pass" in result
         assert "reason" in result
         assert "fix" in result
 
-    def test_critic_returns_pass_true(self):
+    @patch("src.autonomy.critic.OllamaClient")
+    def test_critic_returns_pass_true(self, mock_client_cls):
         """Verify pass field is boolean.
-        
+
         NO NETWORK REQUIRED - pure unit test ✓
         """
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": '{"pass": true, "reason": "ok", "fix": ""}'}}
+        mock_client.extract_text.return_value = '{"pass": true, "reason": "ok", "fix": ""}'
+        mock_client_cls.return_value = mock_client
+
         result = critique("write test", "test written")
-        
+
         assert isinstance(result["pass"], bool)
 
-    def test_critic_returns_pass_false_on_bad_result(self):
+    @patch("src.autonomy.critic.OllamaClient")
+    def test_critic_returns_pass_false_on_bad_result(self, mock_client_cls):
         """Verify pass=False when result doesn't match.
-        
+
         NO NETWORK REQUIRED - simple heuristic ✓
         """
-        # This catches obvious mismatches
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {"message": {"content": '{"pass": false, "reason": "mismatch", "fix": ""}'}}
+        mock_client.extract_text.return_value = '{"pass": false, "reason": "mismatch", "fix": ""}'
+        mock_client_cls.return_value = mock_client
+
         result = critique(
             "calculate 2+2",
             "five",  # Wrong answer: 5 != 4
         )
-        
+
         assert isinstance(result["pass"], bool)
 
 
@@ -53,7 +71,16 @@ class TestCriticIntegration:
     @pytest.mark.integration
     def test_critic_live_model(self):
         """Test with real Ollama - skips if service not available."""
-        # Will automatically skip without Ollama
+        # Skip if Ollama or the model is unavailable
+        import os, requests
+        ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
+        try:
+            r = requests.get(f"{ollama_url}/api/tags", timeout=5)
+            models = [m.get("name", "") for m in r.json().get("models", [])]
+            if not any("qwen3.5" in m for m in models):
+                pytest.skip("qwen3.5:4b not available in this Ollama instance")
+        except Exception:
+            pytest.skip("Ollama service not available")
         result = critique("test", "result")
         
         assert isinstance(result, dict)
