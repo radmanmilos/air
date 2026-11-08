@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
-import sys
+import re
 import subprocess
+import sys
 import time
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT)
@@ -25,6 +27,26 @@ BANNER = r"""
 
  Making Good AIs - local agent
 """
+
+
+REPO_ROOT = Path(ROOT).resolve()
+
+
+def _goal_points_outside_repo(text: str) -> bool:
+    """Heuristic: detect file paths in the goal that live outside the MGAI repo."""
+    path_pattern = r"[a-zA-Z]:[\\/][^\\/\"'<>|?*\n]*(?:[\\/][^\\/\"'<>|?*\n]*)*|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
+    candidates = re.findall(path_pattern, text)
+    for p in candidates:
+        try:
+            candidate = Path(p)
+            if not candidate.is_absolute():
+                continue
+            resolved = candidate.resolve()
+            if not str(resolved).startswith(str(REPO_ROOT) + "\\"):
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def step(msg):
@@ -123,7 +145,8 @@ def main():
             break
         try:
             print("\n⚙ Working...\n")
-            result = agent.chat(user)
+            project_mode = _goal_points_outside_repo(user)
+            result = agent.chat(user, project_mode=project_mode)
             result = (result or "").strip()
             if not result:
                 result = "(no response)"
