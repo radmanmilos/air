@@ -8,6 +8,7 @@ except Exception:
     pass
 
 import json
+import re
 from pathlib import Path
 
 import typer
@@ -21,6 +22,26 @@ from src.tools.builtin import build_registry
 
 app = typer.Typer(help="Making Good AIs — local agent")
 console = Console()
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _goal_points_outside_repo(goal: str) -> bool:
+    """Heuristic: detect file paths in the goal that live outside the MGAI repo."""
+    path_pattern = r"[a-zA-Z]:[\\/][^\\/\"'<>|?*\n]*(?:[\\/][^\\/\"'<>|?*\n]*)*|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
+    candidates = re.findall(path_pattern, goal)
+    repo_root = REPO_ROOT.resolve()
+    for p in candidates:
+        try:
+            candidate = Path(p)
+            if not candidate.is_absolute():
+                continue
+            resolved = candidate.resolve()
+            if not str(resolved).startswith(str(repo_root) + "\\"):
+                return True
+        except Exception:
+            continue
+    return False
 
 
 @app.command()
@@ -39,7 +60,9 @@ def models():
 
 
 @app.command()
-def run(goal: str, model: str = typer.Option(None, help="Override model"), yes: bool = typer.Option(False, "--yes", "-y", help="Auto-approve tool calls")):
+def run(goal: str, model: str = typer.Option(None, help="Override model"), yes: bool = typer.Option(False, "--yes", "-y", help="Auto-approve tool calls"),
+        project: bool = typer.Option(False, "--project", help="Treat as new-project work (external folder), skip self-improvement cycle"),
+        self_improve: bool = typer.Option(False, "--self-improve", help="Force self-improvement mode on MGAI's own codebase")):
     """Run the agent on a goal."""
     client = OllamaClient()
     registry = build_registry()
@@ -47,8 +70,14 @@ def run(goal: str, model: str = typer.Option(None, help="Override model"), yes: 
         # monkeypatch approval
         import src.core.approval as a
         a.approve = lambda *a, **k: True
-    agent = Agent(client=client, router=Router(), registry=registry, verbose=True)
-    result = agent.run(goal, model=model)
+    if self_improve:
+        project_mode = False
+    elif _goal_points_outside_repo(goal):
+        project_mode = True
+    else:
+        project_mode = project
+    agent = Agent(client=client, router=Router(), registry=registry, verbose=True, project_mode=project_mode)
+    result = agent.run(goal, model=model, project_mode=project_mode)
     console.print("\n[bold green]Result:[/bold green]")
     console.print(result)
 

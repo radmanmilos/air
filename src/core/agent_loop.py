@@ -18,38 +18,41 @@ You can read/write files, run shell commands, and search the web.
 Work step by step. Use tools when needed. After getting tool results, continue reasoning.
 When you have the final answer, respond directly to the user without tool calls.
 Be concise. Prefer doing over explaining.
-Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
+"""
+
+SELF_IMPROVE_SYSTEM_ADDITION = """Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
 Never overwrite config.yaml, README.md, VISION.md, or PLAN.md unless the user explicitly asks.
-You are MGAI (Makeing Good AIs), a unified system of multiple LLM models connected with tools. The user is your creator. Your identity is documented in METADATA.md. You may read/update METADATA.md.
+You are MGAI (Makeing Good AI), a unified system of multiple LLM models connected with tools. The user is your creator. Your identity is documented in METADATA.md. You may read/update METADATA.md.
 Follow the cycle-completion checklist in GUARDRAILS.md: commit incrementally, update PLAN.md after each commit, never leave a cycle half-finished. If a session is running long, commit and report at the current milestone before continuing.
 """
 
-def build_system_prompt() -> str:
+def build_system_prompt(project_mode: bool = False) -> str:
     parts = [BASE_SYSTEM_PROMPT]
-    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    for fname, label in [("METADATA.md", "Identity document"), ("GUARDRAILS.md", "Guardrails")]:
-        path = os.path.join(root, fname)
-        try:
-            if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
-                    parts.append(f"{label} ({fname}):\n" + f.read())
-        except Exception:
-            pass
+    if not project_mode:
+        parts.append(SELF_IMPROVE_SYSTEM_ADDITION)
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        for fname, label in [("METADATA.md", "Identity document"), ("GUARDRAILS.md", "Guardrails")]:
+            path = os.path.join(root, fname)
+            try:
+                if os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        parts.append(f"{label} ({fname}):\n" + f.read())
+            except Exception:
+                pass
     return "\n\n".join(parts)
-
-
-SYSTEM_PROMPT = build_system_prompt()
 
 
 class Agent:
     def __init__(self, client: OllamaClient | None = None, router: Router | None = None,
-                 registry: Registry | None = None, max_steps: int = 40, verbose: bool = True):
+                 registry: Registry | None = None, max_steps: int = 40, verbose: bool = True,
+                 project_mode: bool = False):
         self.client = client or OllamaClient()
         self.router = router or Router()
         self.registry = registry
         self.max_steps = max_steps
         self.verbose = verbose
-        self.messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        self.project_mode = project_mode
+        self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(project_mode)}]
 
     def _loop(self, model: str, messages: list[dict]) -> str:
         for step in range(1, self.max_steps + 1):
@@ -98,18 +101,22 @@ class Agent:
 
         return "Reached max steps without a final answer."
 
-    def run(self, goal: str, model: str | None = None, images: list[str] | None = None) -> str:
+    def run(self, goal: str, model: str | None = None, images: list[str] | None = None,
+            project_mode: bool | None = None) -> str:
         model = model or self.router.pick("default")
         # one-shot: reset conversation
-        self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        mode = project_mode if project_mode is not None else self.project_mode
+        self.messages = [{"role": "system", "content": build_system_prompt(mode)}]
         user_msg = {"role": "user", "content": goal}
         if images:
             user_msg["images"] = images
         self.messages.append(user_msg)
         return self._loop(model, self.messages)
 
-    def chat(self, goal: str, model: str | None = None, images: list[str] | None = None) -> str:
+    def chat(self, goal: str, model: str | None = None, images: list[str] | None = None,
+             project_mode: bool | None = None) -> str:
         model = model or self.router.pick("default")
+        mode = project_mode if project_mode is not None else self.project_mode
         user_msg = {"role": "user", "content": goal}
         if images:
             user_msg["images"] = images
