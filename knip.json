@@ -1,0 +1,7 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": ["bin/air.ts", "src/index.ts", "src/mcp/server.ts"],
+  "project": ["src/**", "bin/**"],
+  "ignore": ["dist", "scripts/check-dead-code.mjs"],
+  "ignoreBinaries": ["goose", "opencode", "kilocode", "codex", "ollama"]
+}

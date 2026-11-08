@@ -49,10 +49,11 @@
 - Review refs: K-09
 - Details: Mark unwired modules; correct README claims; reduce PLAN.md.
 
-#### T8-007 [TODO] — Dead-code CI check
+#### T8-007 [DONE] — Dead-code CI check
 - Priority: P0
 - Review refs: K-04
 - Details: Add knip/ts-prune; fail on unused exports.
+- Acceptance: `scripts/check-dead-code.mjs` now runs knip (JSON report) and exits non-zero on any unused export/type not in the baselined intentional API surface; `npm run check:dead-code` wired in package.json; `tests/check-dead-code.test.ts` covers pass + fail paths; `knip.json` configures src/bin entry points. Full validation checklist green (typecheck, typecheck:test, lint, test, build, pack --dry-run).
 
 ### Phase 1 — Job runtime (placeholder)
 ### Phase 2 — Front agent (placeholder)
