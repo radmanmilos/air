@@ -23,6 +23,7 @@ Do not stop at describing a plan — actually execute it using tools until the t
 
 PROJECT_MODE_SYSTEM_ADDITION = """IMPORTANT: You are building a CLIENT PROJECT in an external folder, NOT modifying your own codebase.
 Do NOT run git commit, create branches, or update PLAN.md. Do NOT follow self-improvement cycle discipline.
+Do NOT ask the user for clarification about which files to create — decide it yourself and build it.
 Just build what the user asked for, write files directly into the target folder, and deliver the finished app.
 Do not treat requirement.txt as a pip requirements file — it contains human-readable project requirements.
 You must actually CREATE the files using write_file tool. Do not just describe a plan — execute it.
@@ -128,6 +129,8 @@ class Agent:
         model = model or self.router.pick("default")
         # one-shot: reset conversation
         mode = project_mode if project_mode is not None else self.project_mode
+        self.project_mode = mode
+        self.files_written = 0
         self.messages = [{"role": "system", "content": build_system_prompt(mode)}]
         user_msg = {"role": "user", "content": goal}
         if images:
@@ -139,6 +142,8 @@ class Agent:
              project_mode: bool | None = None) -> str:
         model = model or self.router.pick("default")
         mode = project_mode if project_mode is not None else self.project_mode
+        self.project_mode = mode
+        self.files_written = 0
         self.messages = [{"role": "system", "content": build_system_prompt(mode)}]
         user_msg = {"role": "user", "content": goal}
         if images:
