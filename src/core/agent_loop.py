@@ -237,8 +237,8 @@ def _extract_target_folder(goal: str) -> str | None:
     # Quoted paths can contain spaces
     quoted_pattern = r'"([a-zA-Z]:[\\/][^"]*)"'
     # Unquoted paths stop at whitespace and sentence punctuation
-    unquoted_pattern = r"[a-zA-Z]:[\\/][^\s,.;!?\\/\"'<>|?*\n]*(?:[\\/][^\s,.;!?\\/\"'<>|?*\n]*)*"
-    path_pattern = f"{quoted_pattern}|{unquoted_pattern}|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
+    unquoted_pattern = r'[a-zA-Z]:[\\/][^\s,.;!?<>|?*\n]*(?:[\\/][^\s,.;!?<>|?*\n]*)*'
+    path_pattern = f"{quoted_pattern}|{unquoted_pattern}|\\\\[^<>|?*\n]+(?:\\\\[^<>|?*\n]+)+"
     candidates = re.findall(path_pattern, goal)
     for p in candidates:
         # re.findall returns tuples when groups exist; take the first non-empty group

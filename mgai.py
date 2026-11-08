@@ -34,7 +34,7 @@ REPO_ROOT = Path(ROOT).resolve()
 
 def _goal_points_outside_repo(text: str) -> bool:
     """Heuristic: detect file paths in the goal that live outside the MGAI repo."""
-    path_pattern = r'"([a-zA-Z]:[\\/][^"]*)"|[a-zA-Z]:[\\/][^\s,.;!?\\/\"\'<>|?*\n]*(?:[\\/][^\s,.;!?\\/\"\'<>|?*\n]*)*|\\\\[^\\/\"\'<>|?*\n]+(?:\\\\[^\\/\"\'<>|?*\n]+)+"
+    path_pattern = r'"([a-zA-Z]:[\\/][^"]*)"|[a-zA-Z]:[\\/][^\s,.;!?<>|?*\n]*(?:[\\/][^\s,.;!?<>|?*\n]*)*|\\\\[^<>|?*\n]+(?:\\\\[^<>|?*\n]+)+'
     candidates = re.findall(path_pattern, text)
     for p in candidates:
         if isinstance(p, tuple):
