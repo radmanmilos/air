@@ -146,6 +146,8 @@ def main():
         try:
             print("\n⚙ Working...\n")
             project_mode = _goal_points_outside_repo(user)
+            if project_mode:
+                print("  [project mode: external folder detected — building deliverable, not self-improvement]")
             result = agent.chat(user, project_mode=project_mode)
             result = (result or "").strip()
             if not result:
