@@ -24,6 +24,7 @@ PROJECT_MODE_SYSTEM_ADDITION = """IMPORTANT: You are building a CLIENT PROJECT i
 Do NOT run git commit, create branches, or update PLAN.md. Do NOT follow self-improvement cycle discipline.
 Just build what the user asked for, write files directly into the target folder, and deliver the finished app.
 Do not treat requirement.txt as a pip requirements file — it contains human-readable project requirements.
+You must actually CREATE the files using write_file tool. Do not just describe a plan — execute it. Keep calling write_file until the complete application exists in the target folder.
 """
 
 SELF_IMPROVE_SYSTEM_ADDITION = """Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
