@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from src.tools.registry import Registry, Tool
 from src.tools import files, shell, web, git_tools
+from src.tools import guardrail_tools
 from src.memory import tools as mem_tools
 from src.senses import tools as sense_tools
 
@@ -79,6 +80,8 @@ def build_registry() -> Registry:
     r.register(Tool(name="recall", description="Retrieve relevant memories for a query.", parameters={"type": "object", "properties": {"query": {"type": "string"}, "top_k": {"type": "integer"}}, "required": ["query"]}, func=mem_tools.recall))
     r.register(Tool(name="index_file", description="Index a file into long-term memory (RAG).", parameters={"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}, func=mem_tools.index_file))
     r.register(Tool(name="memory_count", description="Count stored memories.", parameters={"type": "object", "properties": {}, "required": []}, func=mem_tools.memory_count))
+
+    r.register(Tool(name="check_guardrails", description="Check if current git changes violate guardrails (protected files, diff size).", parameters={"type": "object", "properties": {"cwd": {"type": "string"}}, "required": []}, func=guardrail_tools.check_guardrails))
 
     # senses
     r.register(Tool(name="describe_image", description="Describe/understand an image file (vision).", parameters={"type": "object", "properties": {"path": {"type": "string"}, "question": {"type": "string"}}, "required": ["path"]}, func=sense_tools.describe_image))
