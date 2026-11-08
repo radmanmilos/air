@@ -1,13 +1,30 @@
 // tests/e2e/scenarios/real-jobs.test.ts
 // Real scenarios with teeth: send messages through chat, assert job effects.
 // These verify the product-bug fixes (P-01..P-05) and harness (H-01..H-12).
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { createSandbox } from '../harness/sandbox';
 import { oracles } from '../harness/oracles';
 import { startChat } from '../harness/chat-driver';
+import { writeReport, type ScenarioResult } from '../harness/report';
+import { preflight, hasDotnet } from '../harness/preflight';
+import { retry } from '../harness/retry';
 import { join } from 'node:path';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+
+const runResults: ScenarioResult[] = [];
+const runId = `e2e-${Date.now()}`;
+
+function pushResult(id: string, title: string, status: ScenarioResult['status'], durationMs: number, reason?: string): void {
+  runResults.push({ id, title, status, durationMs, reason });
+}
+
+afterAll(() => {
+  try {
+    const outDir = join(process.cwd(), 'results', runId);
+    writeReport(outDir, { runId, results: runResults });
+  } catch { /* noop */ }
+});
 
 function fixture(): string {
   const f = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
@@ -243,5 +260,147 @@ describe('real: L-01 write job (worktree isolation)', () => {
         sandbox.cleanup();
       }
     } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: P-06 brain receives conversation history', () => {
+  it('persists prior turns so they are available to the brain', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change' });
+      const chat = startChat(env, sandbox.repoDir);
+      let convId = '';
+      try {
+        await chat.waitForLine(/air chat \(conversation (\S+)/, 0, 10000);
+        const m = chat.lines().find((l) => /air chat \(conversation/.test(l.line))?.line.match(/conversation ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/);
+        convId = m?.[1] ?? '';
+        chat.say('Remember: the magic number is seven.');
+        await chat.waitForLine(/air: /, 0, 20000);
+        chat.say('What is the magic number?');
+        await chat.waitForLine(/air: /, 0, 20000);
+        const msgs = JSON.parse(readFileSync(join(sandbox.env.AIR_CACHE_DIR, 'conversations', `${convId}.json`), 'utf8')).messages;
+        const userTexts = msgs.filter((m: any) => m.role === 'user').map((m: any) => m.content);
+        expect(userTexts).toContain('Remember: the magic number is seven.');
+        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: P-07 destructive request requires confirmation', () => {
+  it('replies with a clarify prompt instead of spawning a write job', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'edit' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('delete all the files');
+        const reply = await chat.waitForLine(/air: /, 0, 20000);
+        expect(reply.line.toLowerCase()).toMatch(/destructive|confirm/);
+        expect(chat.lines().some((l) => /Started job/.test(l.line))).toBe(false);
+        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: P-08 intent gaps route to jobs', () => {
+  it('executes write-intent questions instead of answering', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'edit' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('I want a function that returns the greeting');
+        await chat.waitForLine(/Started job (\S+)/, 0, 20000);
+        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+
+  it('treats natural-language status and cancel as control actions, not brain answers', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('what is the status of my job?');
+        await chat.waitForLine(/messages=/, 0, 20000);
+        chat.say('cancel that');
+        await chat.waitForLine(/air: /, 0, 20000);
+        expect(chat.lines().some((l) => /Started job/.test(l.line))).toBe(false);
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: P-09 repo-file questions are grounded', () => {
+  it('routes questions about named repo files to a read-only job', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('what does Program.cs do');
+        await chat.waitForLine(/Started job (\S+)/, 0, 20000);
+        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('real: P-10 cancel unknown id and thinking newline', () => {
+  it('/cancel of an unknown id reports no such job', async () => {
+    const sandbox = createSandbox(fixture());
+    try {
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change' });
+      const chat = startChat(env, sandbox.repoDir);
+      try {
+        await chat.waitForLine(/air chat \(conversation/, 0, 10000);
+        chat.say('/cancel nonexistent-id-12345');
+        const reply = await chat.waitForLine(/No such job/, 0, 20000);
+        expect(reply.line).toContain('No such job');
+      } finally {
+        await chat.quit().catch(() => {});
+        sandbox.cleanup();
+      }
+    } catch (_err) { sandbox.cleanup(); throw _err; }
+  });
+});
+
+describe('H-wiring: preflight / retry / report harness modules', () => {
+  it('preflight returns environment details (dotnet, node)', () => {
+    const pf = preflight();
+    expect(pf.ok).toBeDefined();
+    expect(pf.details.node).toBeDefined();
+    expect(typeof hasDotnet()).toBe('boolean');
+    pushResult('H-preflight', 'preflight returns environment details', 'PASS', 0);
+  });
+
+  it('retry succeeds on the first attempt without extra calls', async () => {
+    const calls: number[] = [];
+    const value = await retry(async () => { calls.push(1); return 42; });
+    expect(value).toBe(42);
+    expect(calls).toHaveLength(1);
+    pushResult('H-retry', 'retry succeeds on first attempt', 'PASS', 0);
   });
 });
