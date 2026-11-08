@@ -25,8 +25,12 @@ PROJECT_MODE_SYSTEM_ADDITION = """IMPORTANT: You are building a CLIENT PROJECT i
 Do NOT run git commit, create branches, or update PLAN.md. Do NOT follow self-improvement cycle discipline.
 Just build what the user asked for, write files directly into the target folder, and deliver the finished app.
 Do not treat requirement.txt as a pip requirements file — it contains human-readable project requirements.
-You must actually CREATE the files using write_file tool. Do not just describe a plan — execute it. Keep calling write_file until the complete application exists in the target folder.
+You must actually CREATE the files using write_file tool. Do not just describe a plan — execute it.
 Do not return a final answer until at least one file has been written to the target folder.
+For a Windows file search app, create these files:
+- app.py — tkinter GUI app: folder picker, search box, results list with file path/line number/match %, progress bar while searching
+- USER_MANUAL.md — how to install and use the app
+Keep calling write_file until both files exist in the target folder.
 """
 
 SELF_IMPROVE_SYSTEM_ADDITION = """Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
@@ -63,6 +67,7 @@ class Agent:
         self.max_steps = max_steps
         self.verbose = verbose
         self.project_mode = project_mode
+        self.files_written = 0
         self.messages: list[dict] = [{"role": "system", "content": build_system_prompt(project_mode)}]
 
     def _loop(self, model: str, messages: list[dict]) -> str:
@@ -85,6 +90,10 @@ class Agent:
             tool_calls = msg.get("tool_calls") or []
             if not tool_calls:
                 content = msg.get("content", "")
+                if self.project_mode and self.files_written == 0:
+                    # Safety net: force file creation before allowing a final answer
+                    messages.append({"role": "system", "content": "SAFETY NET: You have not written any files yet. You MUST call write_file now to create app.py in the target folder. Do not describe what you will do — actually write the file. Keep calling write_file until files exist."})
+                    continue
                 if self.verbose:
                     print(f"\n[done] {content[:500]}")
                 return content
@@ -105,6 +114,8 @@ class Agent:
                         messages.append({"role": "tool", "content": result, "tool_call_id": tc.get("id")})
                         continue
                 result = self.registry.dispatch(name, args) if self.registry else "ERROR: no registry"
+                if name == "write_file" and not result.startswith("ERROR"):
+                    self.files_written += 1
                 if self.verbose:
                     preview = result[:400].replace("\n", " ")
                     print(f"     <- {preview}{'...' if len(result) > 400 else ''}")
