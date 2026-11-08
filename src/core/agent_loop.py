@@ -228,10 +228,22 @@ def build_system_prompt(project_mode: bool = False) -> str:
 
 
 def _extract_target_folder(goal: str) -> str | None:
-    """Extract an absolute external folder path from the goal text."""
-    path_pattern = r"[a-zA-Z]:[\\/][^\\/\"'<>|?*\n]*(?:[\\/][^\\/\"'<>|?*\n]*)*|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
+    r"""Extract an absolute external folder path from the goal text.
+
+    Stops at spaces and sentence punctuation so a path like
+    'E:\GitHub\testproject1' is not swallowed by the rest of the sentence.
+    Quoted paths (e.g. "C:\My Folder\project") are supported for paths with spaces.
+    """
+    # Quoted paths can contain spaces
+    quoted_pattern = r'"([a-zA-Z]:[\\/][^"]*)"'
+    # Unquoted paths stop at whitespace and sentence punctuation
+    unquoted_pattern = r"[a-zA-Z]:[\\/][^\s,.;!?\\/\"'<>|?*\n]*(?:[\\/][^\s,.;!?\\/\"'<>|?*\n]*)*"
+    path_pattern = f"{quoted_pattern}|{unquoted_pattern}|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
     candidates = re.findall(path_pattern, goal)
     for p in candidates:
+        # re.findall returns tuples when groups exist; take the first non-empty group
+        if isinstance(p, tuple):
+            p = next((g for g in p if g), "")
         try:
             candidate = Path(p)
             if not candidate.is_absolute():

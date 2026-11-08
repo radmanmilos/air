@@ -34,9 +34,11 @@ REPO_ROOT = Path(ROOT).resolve()
 
 def _goal_points_outside_repo(text: str) -> bool:
     """Heuristic: detect file paths in the goal that live outside the MGAI repo."""
-    path_pattern = r"[a-zA-Z]:[\\/][^\\/\"'<>|?*\n]*(?:[\\/][^\\/\"'<>|?*\n]*)*|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
+    path_pattern = r'"([a-zA-Z]:[\\/][^"]*)"|[a-zA-Z]:[\\/][^\s,.;!?\\/\"\'<>|?*\n]*(?:[\\/][^\s,.;!?\\/\"\'<>|?*\n]*)*|\\\\[^\\/\"\'<>|?*\n]+(?:\\\\[^\\/\"\'<>|?*\n]+)+"
     candidates = re.findall(path_pattern, text)
     for p in candidates:
+        if isinstance(p, tuple):
+            p = next((g for g in p if g), "")
         try:
             candidate = Path(p)
             if not candidate.is_absolute():
@@ -120,7 +122,7 @@ def main():
     print()
     greet()
 
-    from src.core.agent_loop import Agent
+    from src.core.agent_loop import Agent, _extract_target_folder
     from src.core.ollama_client import OllamaClient
     from src.core.router import Router
     from src.tools.builtin import build_registry
@@ -149,18 +151,7 @@ def main():
             target_folder = None
             if project_mode:
                 print("  [project mode: external folder detected — building deliverable, not self-improvement]")
-                path_pattern = r"[a-zA-Z]:[\\/][^\\/\"'<>|?*\n]*(?:[\\/][^\\/\"'<>|?*\n]*)*|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
-                candidates = re.findall(path_pattern, user)
-                for p in candidates:
-                    try:
-                        candidate = Path(p)
-                        if candidate.is_absolute():
-                            resolved = candidate.resolve()
-                            if not str(resolved).startswith(str(REPO_ROOT) + "\\"):
-                                target_folder = str(resolved)
-                                break
-                    except Exception:
-                        continue
+                target_folder = _extract_target_folder(user)
             result = agent.chat(user, project_mode=project_mode, target_folder=target_folder)
             result = (result or "").strip()
             if not result:
