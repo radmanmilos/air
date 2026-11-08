@@ -146,9 +146,22 @@ def main():
         try:
             print("\n⚙ Working...\n")
             project_mode = _goal_points_outside_repo(user)
+            target_folder = None
             if project_mode:
                 print("  [project mode: external folder detected — building deliverable, not self-improvement]")
-            result = agent.chat(user, project_mode=project_mode)
+                path_pattern = r"[a-zA-Z]:[\\/][^\\/\"'<>|?*\n]*(?:[\\/][^\\/\"'<>|?*\n]*)*|\\\\[^\\/\"'<>|?*\n]+(?:\\\\[^\\/\"'<>|?*\n]+)+"
+                candidates = re.findall(path_pattern, user)
+                for p in candidates:
+                    try:
+                        candidate = Path(p)
+                        if candidate.is_absolute():
+                            resolved = candidate.resolve()
+                            if not str(resolved).startswith(str(REPO_ROOT) + "\\"):
+                                target_folder = str(resolved)
+                                break
+                    except Exception:
+                        continue
+            result = agent.chat(user, project_mode=project_mode, target_folder=target_folder)
             result = (result or "").strip()
             if not result:
                 result = "(no response)"
