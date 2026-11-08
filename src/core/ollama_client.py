@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import base64
 import json
+import os
+import subprocess
+import time
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -23,6 +26,47 @@ class OllamaClient:
         self.base_url = (base_url or cfg["ollama"]["base_url"]).rstrip("/")
         self.keep_alive = keep_alive or cfg["ollama"]["keep_alive"]
         self.cfg = cfg
+        self._last_online_check = 0.0
+        self._online_cache_ttl = 10.0
+
+    # ---------- Ollama lifecycle / resilience ----------
+    def is_online(self) -> bool:
+        now = time.time()
+        # throttle checks
+        if now - self._last_online_check < self._online_cache_ttl:
+            return getattr(self, "_last_online_state", False)
+        try:
+            r = requests.get(f"{self.base_url}/api/version", timeout=5)
+            state = r.status_code == 200
+        except Exception:
+            state = False
+        self._last_online_state = state
+        self._last_online_check = now
+        return state
+
+    def ensure_online(self, timeout: int = 300) -> bool:
+        """Make sure Ollama is running. Start it if needed, wait up to `timeout` seconds.
+        Returns True if online, False if it could not be brought up."""
+        if self.is_online():
+            return True
+        # try to launch ollama serve
+        try:
+            subprocess.Popen(
+                ["ollama", "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+            )
+        except Exception:
+            pass
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            # bypass cache
+            self._last_online_check = 0.0
+            if self.is_online():
+                return True
+            time.sleep(2)
+        return False
 
     # ---------- chat ----------
     def chat(
@@ -52,46 +96,51 @@ class OllamaClient:
             payload["options"] = options
 
         url = f"{self.base_url}/api/chat"
-        if not stream:
-            r = requests.post(url, json=payload, timeout=timeout)
+
+        def _do_request(stream_flag: bool):
+            if not stream_flag:
+                r = requests.post(url, json=payload, timeout=timeout)
+                r.raise_for_status()
+                return r.json()
+            r = requests.post(url, json=payload, stream=True, timeout=timeout)
             r.raise_for_status()
-            return r.json()
+            content = ""
+            thinking = ""
+            tool_calls: list[dict] = []
+            final: dict[str, Any] = {}
+            for line in r.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                msg = chunk.get("message", {}) or {}
+                content += msg.get("content", "") or ""
+                thinking += msg.get("thinking", "") or ""
+                if msg.get("tool_calls"):
+                    tool_calls.extend(msg["tool_calls"])
+                if chunk.get("done"):
+                    final = chunk
+                    break
+            return {
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": content,
+                    "thinking": thinking,
+                    "tool_calls": tool_calls or None,
+                },
+                "done": True,
+                "total_duration": final.get("total_duration"),
+            }
 
-        # Streaming: accumulate chunks so long generations don't time out
-        # and we get progress. Ollama returns one JSON object per line.
-        r = requests.post(url, json=payload, stream=True, timeout=timeout)
-        r.raise_for_status()
-        content = ""
-        thinking = ""
-        tool_calls: list[dict] = []
-        final: dict[str, Any] = {}
-        for line in r.iter_lines(decode_unicode=True):
-            if not line:
-                continue
-            try:
-                chunk = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            msg = chunk.get("message", {}) or {}
-            content += msg.get("content", "") or ""
-            thinking += msg.get("thinking", "") or ""
-            if msg.get("tool_calls"):
-                tool_calls.extend(msg["tool_calls"])
-            if chunk.get("done"):
-                final = chunk
-                break
-        return {
-            "model": model,
-            "message": {
-                "role": "assistant",
-                "content": content,
-                "thinking": thinking,
-                "tool_calls": tool_calls or None,
-            },
-            "done": True,
-            "total_duration": final.get("total_duration"),
-        }
-
+        try:
+            return _do_request(stream)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            # Ollama may have died; try to bring it back (up to 5 min)
+            if self.ensure_online(timeout=300):
+                return _do_request(stream)
     @staticmethod
     def _attach_images(messages: list[dict], images: list[str]) -> list[dict]:
         out = [dict(m) for m in messages]
