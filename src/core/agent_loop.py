@@ -239,11 +239,9 @@ def _extract_target_folder(goal: str) -> str | None:
     # Unquoted paths stop at whitespace and sentence punctuation
     unquoted_pattern = r'[a-zA-Z]:[\\/][^\s,.;!?<>|?*\n]*(?:[\\/][^\s,.;!?<>|?*\n]*)*'
     path_pattern = f"{quoted_pattern}|{unquoted_pattern}|\\\\[^<>|?*\n]+(?:\\\\[^<>|?*\n]+)+"
-    candidates = re.findall(path_pattern, goal)
-    for p in candidates:
-        # re.findall returns tuples when groups exist; take the first non-empty group
-        if isinstance(p, tuple):
-            p = next((g for g in p if g), "")
+    candidates = re.finditer(path_pattern, goal)
+    for m in candidates:
+        p = m.group(0).strip('"')
         try:
             candidate = Path(p)
             if not candidate.is_absolute():
