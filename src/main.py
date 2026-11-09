@@ -19,6 +19,7 @@ from src.core.agent_loop import Agent
 from src.core.ollama_client import OllamaClient
 from src.core.router import Router
 from src.tools.builtin import build_registry
+from src.autonomy.project_executor import ProjectExecutor
 
 app = typer.Typer(help="Making Good AIs — local agent")
 console = Console()
@@ -138,6 +139,56 @@ def inspect(model: str):
     console.print("\nDetails:")
     for k in ("model", "parameters"):
         console.print(f"  {k}: {info.get(k)}")
+
+
+@app.command("project-execute")
+def project_execute_cmd(folder: str = typer.Argument(..., help="Project folder path"),
+                        goal: str = typer.Argument("", help="Project goal (reads requirement.txt if omitted)")):
+    """Execute a project: plan → execute → verify → iterate."""
+    executor = ProjectExecutor(folder)
+    result = executor.execute(goal)
+    console.print(f"\n[bold green]Result:[/bold green]\n{result}")
+
+
+@app.command("project-status")
+def project_status_cmd(folder: str = typer.Argument(..., help="Project folder path")):
+    """Check status of a saved project."""
+    executor = ProjectExecutor(folder)
+    st = executor.status()
+    console.print(f"\n[bold cyan]Project:[/bold cyan] {st['folder']}")
+    console.print(f"[bold cyan]Key:[/bold cyan] {st['key']}")
+    console.print(f"[bold cyan]Completed:[/bold cyan] {st['completed']}")
+    console.print(f"[bold cyan]Steps:[/bold cyan] {st['steps_completed']}/{st['steps_total']}")
+    console.print(f"[bold cyan]Files:[/bold cyan] {len(st['files_created'])}")
+    for f in st["files_created"]:
+        console.print(f"  - {f}")
+
+
+@app.command("project-plan")
+def project_plan_cmd(folder: str = typer.Argument(..., help="Project folder path"),
+                     goal: str = typer.Argument("", help="Project goal")):
+    """Decompose a goal into steps without executing."""
+    from src.autonomy.task_decomposer import decompose_goal
+    req_file = Path(folder) / "requirement.txt"
+    requirement = ""
+    if req_file.exists():
+        requirement = req_file.read_text(encoding="utf-8", errors="replace")
+    if not goal:
+        goal = requirement
+    steps = decompose_goal(goal, requirement)
+    console.print(f"\n[bold cyan]Project plan for:[/bold cyan] {goal}")
+    console.print(f"[bold cyan]Folder:[/bold cyan] {folder}")
+    console.print(f"[bold cyan]Steps:[/bold cyan] {len(steps)}")
+    for i, s in enumerate(steps, 1):
+        console.print(f"  {i}. {s}")
+
+
+@app.command("project-resume")
+def project_resume_cmd(folder: str = typer.Argument(..., help="Project folder path")):
+    """Resume an interrupted project."""
+    executor = ProjectExecutor(folder)
+    result = executor.resume()
+    console.print(f"\n[bold green]Result:[/bold green]\n{result}")
 
 
 if __name__ == "__main__":

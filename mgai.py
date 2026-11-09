@@ -152,6 +152,18 @@ def main():
                 print("  [project mode: external folder detected — building deliverable, not self-improvement]")
                 target_folder = _extract_target_folder(user)
                 print(f"  [DEBUG] target_folder={target_folder}")
+                # Use ProjectExecutor for plan→execute→verify→iterate
+                from src.autonomy.project_executor import ProjectExecutor
+                executor = ProjectExecutor(target_folder)
+                result = executor.execute(user)
+                result = (result or "").strip()
+                if not result:
+                    result = "(no response)"
+                print(f"\n{'='*60}")
+                print(f"MGAI> {result}")
+                print(f"{'='*60}")
+                print("✓ Done. Ready for next prompt.\n")
+                continue
             result = agent.chat(user, project_mode=project_mode, target_folder=target_folder)
             result = (result or "").strip()
             if not result:

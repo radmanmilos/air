@@ -47,7 +47,7 @@ Goal: full multimodal loop.
 - [x] `interfaces/voice_mode.py` — listen -> think -> speak loop
 - [ ] Mic/speaker device config (basic works)
 
-## Phase 4 — Legs (autonomy) [~]
+## Phase 4 — Legs (autonomy) [x]
 Goal: unattended complex tasks.
 - [x] `autonomy/planner.py` — goal -> steps (deepseek-r1)
 - [x] `autonomy/executor.py` — run steps, retry, checkpoint
@@ -57,13 +57,23 @@ Goal: unattended complex tasks.
 - [x] Git tools: status, diff, branch, commit (for self-improvement)
 - [x] Test runner tool: run pytest, report pass/fail
 - [x] Self-improve workflow (Phase 6) implemented and tested (needs tuning)
-- [~] Multi-model orchestration optimization (NEW): PerfOrch-style parallel execution for complementary tasks; performance benchmarking per task/model; hybrid routing (sequential by default, parallel when beneficial)
-  - [x] Benchmark harness (src/autonomy/benchmark.py) — runs tasks, records timings
+- [x] Multi-model orchestration optimization: PerfOrch-style parallel execution; performance benchmarking per task/model; hybrid routing
+  - [x] Benchmark harness (src/autonomy/benchmark.py)
   - [x] Parallel executor (Orchestrator.run_parallel)
   - [x] Hybrid router (Orchestrator.run_hybrid, Router.pick_fastest)
   - [x] Ollama resilience (auto-restart, 5-min wait)
 
-## Phase 6 — Self-improvement (the agent grows itself) [~]
+## Phase 7 — Project Execution (NEW) [x]
+Goal: build complete client projects from requirements with plan→execute→verify→iterate.
+- [x] `autonomy/project_executor.py` — decompose, execute, verify, retry, state persistence
+- [x] `autonomy/task_decomposer.py` — break goals into steps, model routing per step type
+- [x] `autonomy/result_verifier.py` — critique step results, verify final deliverables
+- [x] `tools/project_tools.py` — project_init, project_plan, project_execute, project_status, project_resume, project_files
+- [x] `tools/code_analysis.py` — analyze_code, check_dependencies, install_packages, count_lines
+- [x] `mgai.py` — auto-detects external folders, uses ProjectExecutor for project work
+- [x] `src/main.py` — project-execute, project-status, project-plan, project-resume CLI commands
+
+## Phase 6 — Self-improvement (the agent grows itself) [x]
 Goal: agent works on this project's own codebase safely.
 - [x] Self-improvement workflow: read -> plan -> branch -> edit -> test -> commit
 - [x] Guardrails: never commit to main; require tests green; max diff size
@@ -92,3 +102,4 @@ Goal: usable from other projects.
 - Protect file: Plan document - only update checkboxes here, never delete sections or reorder.
 - 2026-11-08: Correction: self_reflection.py exists (merged from mini-cycle-a). test_planner/test_critic basic tests used live Ollama; fixed by mocking. Current: 29 passed, 1 skipped, 0 failed (offline).
 - 2026-11-08: Ollama resilience added: client now auto-restarts Ollama (up to 5 min) on connection failure. OLLAMA_MODELS env points to a dir with only qwen2.5-coder; other models in E:\AIModels. For full functionality, point OLLAMA_MODELS at the dir containing all needed models.
+- 2026-11-09: Project Execution Engine added (Phase 7): decompose→execute→verify→iterate with state persistence, code analysis tools, dependency-ordered step execution. 36 tools total. No protected files modified.

@@ -4,6 +4,8 @@ from __future__ import annotations
 from src.tools.registry import Registry, Tool
 from src.tools import files, shell, web, git_tools
 from src.tools import guardrail_tools, ollama_tools
+from src.tools import project_tools
+from src.tools import code_analysis
 from src.memory import tools as mem_tools
 from src.senses import tools as sense_tools
 
@@ -91,5 +93,11 @@ def build_registry() -> Registry:
     r.register(Tool(name="speak", description="Speak text aloud via TTS.", parameters={"type": "object", "properties": {"text": {"type": "string"}, "output_path": {"type": "string"}}, "required": ["text"]}, func=sense_tools.speak))
     r.register(Tool(name="listen", description="Listen via microphone for N seconds and return transcription.", parameters={"type": "object", "properties": {"seconds": {"type": "number"}}, "required": []}, func=sense_tools.listen))
     r.register(Tool(name="transcribe_file", description="Transcribe an audio file to text.", parameters={"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}, func=sense_tools.transcribe))
+
+    # project execution tools
+    project_tools.register_tools(r)
+
+    # code analysis tools
+    code_analysis.register_tools(r)
 
     return r
