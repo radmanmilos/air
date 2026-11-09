@@ -304,6 +304,7 @@ class Agent:
             if not tool_calls:
                 content = msg.get("content", "")
                 if self.project_mode and self.files_written == 0:
+                    print(f"\n[DEBUG] project_mode={self.project_mode}, files_written={self.files_written}, safety_net_fired={safety_net_fired}")
                     if not safety_net_fired:
                         # First attempt: force with system message
                         messages.append({"role": "system", "content": "SAFETY NET: You have not written any files yet. You MUST call write_file now to create app.py in the target folder. Do not describe what you will do — actually write the file. Keep calling write_file until files exist."})
@@ -364,6 +365,7 @@ class Agent:
         self.project_mode = mode
         self.files_written = 0
         self.target_folder = target_folder or (_extract_target_folder(goal) if mode else None)
+        print(f"\n[DEBUG] chat: project_mode={self.project_mode}, target_folder={self.target_folder}")
         self.messages = [{"role": "system", "content": build_system_prompt(mode)}]
         user_msg = {"role": "user", "content": goal}
         if images:

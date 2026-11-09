@@ -152,6 +152,7 @@ def main():
             if project_mode:
                 print("  [project mode: external folder detected — building deliverable, not self-improvement]")
                 target_folder = _extract_target_folder(user)
+                print(f"  [DEBUG] target_folder={target_folder}")
             result = agent.chat(user, project_mode=project_mode, target_folder=target_folder)
             result = (result or "").strip()
             if not result:
