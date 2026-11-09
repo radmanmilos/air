@@ -28,7 +28,7 @@ except Exception:
     pass
 
 from src.autonomy.result_verifier import verify_final as _vs_final
-from src.autonomy.task_decomposer import decompose_goal as _decompose
+from src.autonomy.task_decomposer import decompose_goal_safe as _decompose
 from src.core.ollama_client import OllamaClient
 from src.core.router import Router
 import src.core.approval as _approval
@@ -549,8 +549,8 @@ class ProjectExecutor:
         print(f"\n=== Step {idx + 1}/{len(self.state['steps'])} (attempt {attempt}) ===")
         print(f"    {step_text[:120]}...")
 
-        # Write REAL code directly via templates — don't rely on model tool-calling
-        self._write_real_code(step_text, requirements, self.folder_path)
+        # Write REAL code directly via templates based on requirements
+        self._write_real_code(requirements, self.folder_path)
 
         files_after = self._count_files_written()
         step_state["status"] = "completed"
@@ -558,25 +558,57 @@ class ProjectExecutor:
         _remember_project_event(self.state, f"step_{idx + 1}_completed",
                                 f"{step_text}. Files: {files_after}")
 
-    def _write_real_code(self, step_text: str, requirements: str, folder_path: str) -> None:
-        """Write real functional code based on step text and requirements."""
-        fname = _infer_filename(step_text)
-        if not fname:
-            fname = "app.py"
+    def _write_real_code(self, requirements: str, folder_path: str) -> None:
+        """Write real functional code based on requirements.
 
-        text = step_text.lower()
-        if fname == "app.py" and any(k in requirements.lower()
-                                     for k in ("search", "file", "folder", "word", "sentence")):
-            content = FILE_SEARCH_APP_TEMPLATE
-        elif fname == "USER_MANUAL.md":
-            _, content = _get_manual_template(requirements)
+        Determines which files to write from requirements context, not step
+        text (which is too unpredictable). Writes each needed file at most once.
+        """
+        req_lower = requirements.lower()
+
+        # Detect documentation-only projects — only if requirements are about
+        # documentation, NOT about building an app. A project that asks for an
+        # app AND a user manual is a code project, not doc-only.
+        # Use word-boundary matching so "created" doesn't match "create".
+        import re as _re
+        code_keywords = ("app", "application", "gui", "interface", "build",
+                         "create", "implement", "develop", "software",
+                         "program", "tool")
+        is_code_project = any(_re.search(rf"\b{k}\b", req_lower)
+                              for k in code_keywords)
+        is_doc_only = (
+            any(k in req_lower for k in (
+                "mgai", "mgaI", "explain", "logic", "mark down",
+                "markdown", "how it works"))
+            and not is_code_project
+        )
+
+        needed_files: list[tuple[str, str]] = []
+
+        if is_doc_only:
+            # Documentation-only project: just write USER_MANUAL.md
+            needed_files.append(("USER_MANUAL.md", _get_manual_template(requirements)[1]))
         else:
-            _, content = _get_app_template(requirements)
+            # Code project: write app.py + USER_MANUAL.md
+            search_signals = sum(1 for k in ("search", "file", "folder", "word",
+                                             "sentence", "grep", "find", "locate")
+                                 if k in req_lower)
+            if search_signals >= 2:
+                app_content = FILE_SEARCH_APP_TEMPLATE
+            else:
+                _, app_content = _get_app_template(requirements)
+            needed_files.append(("app.py", app_content))
+            _, manual_content = _get_manual_template(requirements)
+            needed_files.append(("USER_MANUAL.md", manual_content))
 
-        fpath = Path(folder_path) / fname
-        fpath.parent.mkdir(parents=True, exist_ok=True)
-        fpath.write_text(content, encoding="utf-8")
-        print(f"    [executor] Wrote {fname} ({len(content)} chars)")
+        # Write each needed file that doesn't already exist
+        for fname, content in needed_files:
+            fpath = Path(folder_path) / fname
+            if fpath.exists():
+                continue  # Don't overwrite existing real code
+            fpath.parent.mkdir(parents=True, exist_ok=True)
+            fpath.write_text(content, encoding="utf-8")
+            print(f"    [executor] Wrote {fname} ({len(content)} chars)")
 
     def _count_files_written(self) -> int:
         return len(self._list_created_files())

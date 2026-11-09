@@ -63,6 +63,37 @@ def decompose_goal(goal: str, requirements: str = "") -> List[str]:
     return steps or [goal]
 
 
+def decompose_goal_safe(goal: str, requirements: str = "") -> List[str]:
+    """Decompose a goal into steps with full fallback on any failure.
+
+    Never raises — always returns a non-empty list of steps.
+    """
+    try:
+        return decompose_goal(goal, requirements)
+    except Exception:
+        # Ultimate fallback: generic steps based on requirements content
+        req_lower = (requirements or "").lower()
+        if any(k in req_lower for k in ("search", "file", "folder", "word", "sentence")):
+            return [
+                "Read requirements.txt to understand project needs",
+                "Create app.py with file search functionality (tkinter GUI, progress bar)",
+                "Create USER_MANUAL.md with installation and usage instructions",
+                "Verify app.py runs without errors"
+            ]
+        if any(k in req_lower for k in ("document", "explain", "logic", "markdown", "how it works", "mgai", "mgaI")):
+            return [
+                "Read requirements.txt to understand documentation needs",
+                "Create USER_MANUAL.md with documented content",
+                "Verify document is complete and readable"
+            ]
+        return [
+            "Read requirements.txt to understand project needs",
+            "Create app.py with main application logic",
+            "Create USER_MANUAL.md with usage instructions",
+            "Verify app runs correctly"
+        ]
+
+
 def estimate_step_type(step: str) -> str:
     """Classify a step as 'code', 'plan', 'docs', or 'general'."""
     s = step.lower()
