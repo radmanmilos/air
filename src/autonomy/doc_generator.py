@@ -34,6 +34,11 @@ def _parse_file(file_path: str) -> dict:
     except SyntaxError:
         return {}
 
+    # Set parent attributes on all child nodes so we can detect top-level functions
+    for node in ast.walk(tree):
+        for child in ast.iter_child_nodes(node):
+            child.parent = node
+
     result: Dict[str, Any] = {
         "path": str(path),
         "name": path.stem,
@@ -68,8 +73,8 @@ def _parse_file(file_path: str) -> dict:
                 "is_private": node.name.startswith("_"),
             })
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            # Only top-level functions
-            if isinstance(node.parent, ast.Module) if hasattr(node, 'parent') else True:
+            # Only top-level functions (parent is the Module)
+            if isinstance(getattr(node, "parent", None), ast.Module):
                 result["functions"].append({
                     "name": node.name,
                     "args": [a.arg for a in node.args.args],

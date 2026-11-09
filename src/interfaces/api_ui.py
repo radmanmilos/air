@@ -6,6 +6,7 @@ HTML dashboard route on top, so endpoints are defined in one place.
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from src.interfaces.api import app
 
@@ -80,7 +81,7 @@ HTML_FILE = """<!DOCTYPE html>
 @app.get("/")
 async def ui_root():
     """Serve the UI dashboard (overrides the JSON root from api.py)."""
-    return HTML_FILE
+    return HTMLResponse(content=HTML_FILE)
 
 
 if __name__ == "__main__":

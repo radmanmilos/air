@@ -67,15 +67,17 @@ class RoleAgent:
     """Single-role agent wrapper."""
 
     def __init__(self, role: str, client: OllamaClient, router: Router,
-                 registry=None, verbose: bool = True):
+                 registry=None, verbose: bool = True, target_folder: str | None = None):
         self.role = role
         self.client = client
         self.router = router
         self.registry = registry
         self.verbose = verbose
+        self.target_folder = target_folder
         model = router.pick("code" if role == "coder" else "reason")
         self.agent = Agent(client=client, router=router, registry=registry,
-                           max_steps=25, verbose=verbose, project_mode=True)
+                           max_steps=25, verbose=verbose, project_mode=True,
+                           target_folder=target_folder)
 
     def run(self, prompt: str) -> str:
         system = ROLE_PROMPTS.get(self.role, "")
@@ -92,13 +94,13 @@ class MultiAgentTeam:
         self.router = Router()
         self.registry = build_registry()
         self.architect = RoleAgent("architect", self.client, self.router,
-                                   self.registry)
+                                   self.registry, target_folder=self.folder_path)
         self.coder = RoleAgent("coder", self.client, self.router,
-                               self.registry)
+                               self.registry, target_folder=self.folder_path)
         self.reviewer = RoleAgent("reviewer", self.client, self.router,
-                                  self.registry)
+                                  self.registry, target_folder=self.folder_path)
         self.integrator = RoleAgent("integrator", self.client, self.router,
-                                    self.registry)
+                                    self.registry, target_folder=self.folder_path)
 
     def build(self, goal: str, requirements: str) -> dict:
         """Run the full multi-agent pipeline."""

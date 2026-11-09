@@ -109,3 +109,10 @@ Goal: usable from other projects.
 - 2026-11-08: Ollama resilience added: client now auto-restarts Ollama (up to 5 min) on connection failure. OLLAMA_MODELS env points to a dir with only qwen2.5-coder; other models in E:\AIModels. For full functionality, point OLLAMA_MODELS at the dir containing all needed models.
 - 2026-11-09: Project Execution Engine added (Phase 7): decompose→execute→verify→iterate with state persistence, code analysis tools, dependency-ordered step execution. 36 tools total. No protected files modified.
 - 2026-11-09: Cutting-edge additions: multi-agent role collaboration (architect/coder/reviewer/integrator), auto-test generation, project scaffolding templates (file_search/cli_tool/api_service/documentation), auto-documentation (README/ARCHITECTURE/API), dynamic plugin system. 44 tools total.
+- 2026-11-09: Bug fixes & enhancements:
+  - Fixed api.py /chat endpoint: client.chat() was called with wrong positional args (message string as messages list, images as think, system_prompt as stream). Now builds proper messages list with optional system prompt.
+  - Fixed api_ui.py: ui_root() returned raw HTML string instead of HTMLResponse; now returns proper HTMLResponse.
+  - Fixed doc_generator.py: ast.FunctionDef has no 'parent' attribute by default; added parent tracking via ast.iter_child_nodes so only top-level functions are listed.
+  - Fixed multi_agent.py: RoleAgent now passes target_folder to Agent so coder/architect know where to write files.
+  - Enhanced project_executor.py: added CLI tool and API service templates with keyword-based detection; added requirements.txt and __init__.py generation for client projects; added py_compile code verification; added _run_app_briefly() import check; integrated result_verifier.verify_step() and verify_final() for step/final critique; added _score_complete() to final report.
+  - Added tests/test_project_executor.py with 20 tests covering template selection, requirements generation, file writing, code compilation, and app syntax verification.

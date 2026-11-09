@@ -55,7 +55,10 @@ def chat(
     """Send a chat request to the Ollama model."""
     try:
         client = OllamaClient()
-        response = client.chat(model_name, message, images, system_prompt)
+        messages: list[dict] = [{"role": "user", "content": message}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+        response = client.chat(model_name, messages, images=images)
         return {"role": "assistant", "content": response.get("message", {}).get("content", "")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
