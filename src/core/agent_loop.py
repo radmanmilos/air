@@ -30,10 +30,8 @@ Just build what the user asked for, write files directly into the target folder,
 Do not treat requirement.txt as a pip requirements file — it contains human-readable project requirements.
 You must actually CREATE the files using write_file tool. Do not just describe a plan — execute it.
 Do not return a final answer until at least one file has been written to the target folder.
-For a Windows file search app, create these files:
-- app.py — tkinter GUI app: folder picker, search box, results list with file path/line number/match %, progress bar while searching
-- USER_MANUAL.md — how to install and use the app
-Keep calling write_file until both files exist in the target folder.
+Read the requirements file first, then create the files it describes based on its content.
+Keep calling write_file until all required files exist in the target folder.
 """
 
 SELF_IMPROVE_SYSTEM_ADDITION = """Do not run git commit unless the user explicitly asks; leave commits to the self-improvement workflow.
@@ -281,7 +279,7 @@ class Agent:
         return f"Wrote {', '.join(written)} to {self.target_folder}"
 
     def _loop(self, model: str, messages: list[dict], goal: str) -> str:
-        safety_net_fired = False
+        safety_net_attempts = 0
         for step in range(1, self.max_steps + 1):
             if self.verbose:
                 print(f"\n[step {step}] thinking with {model}...")
@@ -302,13 +300,17 @@ class Agent:
             if not tool_calls:
                 content = msg.get("content", "")
                 if self.project_mode and self.files_written == 0:
-                    print(f"\n[DEBUG] project_mode={self.project_mode}, files_written={self.files_written}, safety_net_fired={safety_net_fired}")
-                    if not safety_net_fired:
-                        # First attempt: force with system message
-                        messages.append({"role": "system", "content": "SAFETY NET: You have not written any files yet. You MUST call write_file now to create app.py in the target folder. Do not describe what you will do — actually write the file. Keep calling write_file until files exist."})
-                        safety_net_fired = True
+                    print(f"\n[DEBUG] project_mode={self.project_mode}, files_written={self.files_written}, safety_net_attempts={safety_net_attempts}")
+                    if safety_net_attempts < 2:
+                        # Force with system message — give model more chances before direct write
+                        attempt = safety_net_attempts + 1
+                        safety_net_attempts += 1
+                        if attempt == 1:
+                            messages.append({"role": "system", "content": "SAFETY NET: You have not written any files yet. You MUST call write_file now to create the required files in the target folder. Do not describe what you will do — actually write the file."})
+                        else:
+                            messages.append({"role": "system", "content": "SAFETY NET (final warning): You still have not written any files. Call write_file immediately to create the required deliverables in the target folder. Do not return text without tool calls."})
                         continue
-                    # Second attempt: directly write files via registry
+                    # Last resort: directly write files via registry
                     result = self._write_default_project_files()
                     if self.verbose:
                         print(f"\n[safety net] {result}")
