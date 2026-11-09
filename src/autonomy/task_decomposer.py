@@ -41,7 +41,7 @@ def decompose_goal(goal: str, requirements: str = "") -> List[str]:
         "Keep steps small and focused."
     )
     resp = client.chat(model=model, messages=[{"role": "user", "content": prompt}],
-                       think=True, timeout=600)
+                       think=True, timeout=30)
     text = OllamaClient.extract_text(resp)
     m = re.search(r"\[.*\]", text, re.S)
     if m:

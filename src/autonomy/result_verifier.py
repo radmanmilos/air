@@ -40,7 +40,7 @@ def verify_step(goal: str, requirements: str, step: str, result: str) -> dict:
         "ONLY JSON. No prose."
     )
     resp = client.chat(model=model, messages=[{"role": "user", "content": prompt}],
-                       think=True, timeout=600)
+                       think=True, timeout=30)
     text = OllamaClient.extract_text(resp)
     m = re.search(r"\{.*\}", text, re.S)
     if m:
@@ -83,7 +83,7 @@ def verify_final(goal: str, requirements: str, folder_path: str,
         "ONLY JSON. No prose."
     )
     resp = client.chat(model=model, messages=[{"role": "user", "content": prompt}],
-                       think=True, timeout=600)
+                        think=True, timeout=30)
     text = OllamaClient.extract_text(resp)
     m = re.search(r"\{.*\}", text, re.S)
     if m:

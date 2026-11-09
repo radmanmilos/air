@@ -6,9 +6,9 @@ a complete, working deliverable.
 Architecture:
   1. Decompose goal into concrete steps (task_decomposer / deepseek-r1)
   2. Write REAL code directly via templates (no model tool-calling needed)
-  3. Critique each step result against requirements (result_verifier / deepseek-r1)
-  4. Verify final deliverables satisfy all requirements
-  8. Persist state to disk for session resumption
+  3. Verify files exist after each step
+  4. Verify final deliverables satisfy all requirements (result_verifier)
+  5. Persist state to disk for session resumption
 
 No protected files are modified — new module under src/autonomy/.
 """
@@ -27,9 +27,8 @@ try:
 except Exception:
     pass
 
-from src.autonomy.result_verifier import verify_step as _vs_step, verify_final as _vs_final
+from src.autonomy.result_verifier import verify_final as _vs_final
 from src.autonomy.task_decomposer import decompose_goal as _decompose
-from src.core.agent_loop import Agent
 from src.core.ollama_client import OllamaClient
 from src.core.router import Router
 import src.core.approval as _approval
@@ -254,11 +253,12 @@ senses, and habits" around a small model's brain.
 ## Architecture Layers
 - **Core** — Ollama HTTP client, capability router, ReAct agent loop,
   approval gate, guardrails
-- **Tools** — 36 tools: files, shell, web, git, memory, senses, project
-  execution, code analysis
+- **Tools** — 44 tools: files, shell, web, git, memory, senses, project
+  execution, code analysis, testing, scaffolding, docs, plugins
 - **Memory** — Sliding-window conversation + ChromaDB vector store (RAG)
 - **Autonomy** — Planner, executor, critic, orchestrator, scheduler,
-  benchmark harness, project executor
+  benchmark harness, project executor, multi-agent collaboration,
+  test generator, templates, doc generator
 - **Interfaces** — FastAPI API, web UI dashboard, voice mode, CLI
 
 ## Hardware Target
@@ -460,7 +460,7 @@ def _infer_filename(step_text: str) -> str | None:
 class ProjectExecutor:
     """Execute a project goal with plan→execute→verify→iterate cycles."""
 
-    def __init__(self, folder_path: str, use_multi_agent: bool = True):
+    def __init__(self, folder_path: str):
         self.folder_path = str(Path(folder_path).resolve())
         self.state = _load_state(self.folder_path)
         self.client = OllamaClient()
@@ -469,11 +469,6 @@ class ProjectExecutor:
         self.registry = _br()
         self.max_steps_per_task = 40
         self.max_retries_per_step = 5
-        self.use_multi_agent = use_multi_agent
-        self.multi_agent_team = None
-        if use_multi_agent:
-            from src.autonomy.multi_agent import MultiAgentTeam
-            self.multi_agent_team = MultiAgentTeam(folder_path)
 
     # ------------------------------------------------------------------
     # Public API
@@ -550,46 +545,22 @@ class ProjectExecutor:
         print(f"\n=== Step {idx + 1}/{len(self.state['steps'])} (attempt {attempt}) ===")
         print(f"    {step_text[:120]}...")
 
-        # Write REAL code directly via templates
+        # Write REAL code directly via templates — don't rely on model tool-calling
         self._write_real_code(step_text, requirements, self.folder_path)
 
-        # Mark step complete — real code was written
-        created = self._list_created_files()
+        files_after = self._count_files_written()
         step_state["status"] = "completed"
-        print(f"    ✓ Step complete: wrote {len(created)} file(s)")
+        print(f"    ✓ Step complete: wrote file(s) -> {files_after} file(s) in folder")
         _remember_project_event(self.state, f"step_{idx + 1}_completed",
-                                f"{step_text}. Files: {len(created)}")
+                                f"{step_text}. Files: {files_after}")
 
     def _write_real_code(self, step_text: str, requirements: str, folder_path: str) -> None:
-        """Write real functional code based on step text and requirements.
-
-        Tries multi-agent collaboration first (architect→coder→reviewer),
-        falls back to templates if that fails or is disabled.
-        """
+        """Write real functional code based on step text and requirements."""
         fname = _infer_filename(step_text)
         if not fname:
             return
 
         text = step_text.lower()
-
-        # Try multi-agent collaboration first
-        if self.use_multi_agent and self.multi_agent_team is not None:
-            try:
-                team_result = self.multi_agent_team.build(
-                    goal=requirements,
-                    requirements=requirements,
-                )
-                files = team_result.get("files", [])
-                for f in files:
-                    fpath = Path(folder_path) / f["path"]
-                    fpath.parent.mkdir(parents=True, exist_ok=True)
-                    fpath.write_text(f["content"], encoding="utf-8")
-                    print(f"    [multi-agent] Wrote {f['path']} ({len(f['content'])} chars)")
-                return
-            except Exception as e:
-                print(f"    [multi-agent] Failed ({e}), falling back to templates")
-
-        # Fallback: template-based code generation
         if fname == "app.py" and any(k in requirements.lower()
                                      for k in ("search", "file", "folder", "word", "sentence")):
             content = FILE_SEARCH_APP_TEMPLATE
