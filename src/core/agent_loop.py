@@ -168,14 +168,18 @@ class Agent:
             tool_calls = msg.get("tool_calls") or []
             if not tool_calls:
                 content = msg.get("content", "")
-                if self.project_mode and self.files_written == 0:
-                    # Immediate safety net: model won't call write_file on its own.
-                    # Write minimal stubs so files exist, then continue the loop
-                    # so the model can read them and replace with real content.
-                    result = self._write_default_project_files()
-                    if self.verbose:
-                        print(f"\n[safety net] {result}")
-                    messages.append({"role": "system", "content": "Files have been created in the target folder. Read them, then replace the TODO stubs with real implementation using write_file. Continue until the complete application exists."})
+                if self.project_mode:
+                    if self.files_written == 0:
+                        # Immediate safety net: model won't call write_file on its own.
+                        # Write minimal stubs so files exist, then continue the loop
+                        # so the model can read them and replace with real content.
+                        result = self._write_default_project_files()
+                        if self.verbose:
+                            print(f"\n[safety net] {result}")
+                        messages.append({"role": "system", "content": "Files have been created in the target folder. Read them, then replace the TODO stubs with real implementation using write_file. Continue until the complete application exists."})
+                    else:
+                        # Files exist but model still returns text without writing real code.
+                        messages.append({"role": "system", "content": "You still have not completed the application. Read the existing files and replace stubs with real implementation using write_file. Do not return text without tool calls — keep writing files until the app is complete."})
                     continue
                 if self.verbose:
                     print(f"\n[done] {content[:500]}")
