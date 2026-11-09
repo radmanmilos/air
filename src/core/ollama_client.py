@@ -75,7 +75,7 @@ class OllamaClient:
         messages: list[dict],
         tools: list[dict] | None = None,
         images: list[str] | None = None,
-        think: bool = True,
+        think: bool | None = None,
         stream: bool = False,
         timeout: int = 600,
         options: dict | None = None,
@@ -85,12 +85,15 @@ class OllamaClient:
             "messages": messages,
             "stream": stream,
             "keep_alive": self.keep_alive,
-            "think": think,
         }
+        # Only send 'think' for models that support it (qwen3.x, deepseek-r1)
+        if think is not None and think:
+            model_lower = model.lower()
+            if any(m in model_lower for m in ("qwen3", "deepseek-r1")):
+                payload["think"] = True
         if tools:
             payload["tools"] = tools
         if images:
-            # attach images to last user message if not already
             payload["messages"] = self._attach_images(messages, images)
         if options:
             payload["options"] = options
