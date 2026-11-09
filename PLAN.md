@@ -68,8 +68,13 @@ Goal: build complete client projects from requirements with plan→execute→ver
 - [x] `autonomy/project_executor.py` — decompose, execute, verify, retry, state persistence
 - [x] `autonomy/task_decomposer.py` — break goals into steps, model routing per step type
 - [x] `autonomy/result_verifier.py` — critique step results, verify final deliverables
-- [x] `tools/project_tools.py` — project_init, project_plan, project_execute, project_status, project_resume, project_files
-- [x] `tools/code_analysis.py` — analyze_code, check_dependencies, install_packages, count_lines
+- [x] `autonomy/multi_agent.py` — architect/coder/reviewer/integrator role collaboration
+- [x] `autonomy/test_generator.py` — auto-generate pytest tests for projects
+- [x] `autonomy/templates.py` — project scaffolding (file_search, cli_tool, api_service, documentation)
+- [x] `autonomy/doc_generator.py` — auto-generate README/ARCHITECTURE/API docs
+- [x] `tools/project_tools.py` — 6 project management tools
+- [x] `tools/code_analysis.py` — 4 code analysis tools (lint, deps, pip install, line count)
+- [x] `tools/plugin_system.py` — dynamic plugin discovery/loading
 - [x] `mgai.py` — auto-detects external folders, uses ProjectExecutor for project work
 - [x] `src/main.py` — project-execute, project-status, project-plan, project-resume CLI commands
 
@@ -103,3 +108,4 @@ Goal: usable from other projects.
 - 2026-11-08: Correction: self_reflection.py exists (merged from mini-cycle-a). test_planner/test_critic basic tests used live Ollama; fixed by mocking. Current: 29 passed, 1 skipped, 0 failed (offline).
 - 2026-11-08: Ollama resilience added: client now auto-restarts Ollama (up to 5 min) on connection failure. OLLAMA_MODELS env points to a dir with only qwen2.5-coder; other models in E:\AIModels. For full functionality, point OLLAMA_MODELS at the dir containing all needed models.
 - 2026-11-09: Project Execution Engine added (Phase 7): decompose→execute→verify→iterate with state persistence, code analysis tools, dependency-ordered step execution. 36 tools total. No protected files modified.
+- 2026-11-09: Cutting-edge additions: multi-agent role collaboration (architect/coder/reviewer/integrator), auto-test generation, project scaffolding templates (file_search/cli_tool/api_service/documentation), auto-documentation (README/ARCHITECTURE/API), dynamic plugin system. 44 tools total.

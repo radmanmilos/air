@@ -6,6 +6,10 @@ from src.tools import files, shell, web, git_tools
 from src.tools import guardrail_tools, ollama_tools
 from src.tools import project_tools
 from src.tools import code_analysis
+from src.tools import plugin_system
+from src.autonomy import test_generator
+from src.autonomy import templates
+from src.autonomy import doc_generator
 from src.memory import tools as mem_tools
 from src.senses import tools as sense_tools
 
@@ -99,5 +103,95 @@ def build_registry() -> Registry:
 
     # code analysis tools
     code_analysis.register_tools(r)
+
+    # auto-test generation
+    r.register(Tool(
+        name="generate_tests",
+        description="Generate pytest tests for all Python files in a project folder.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string", "description": "Project folder path"}
+            },
+            "required": ["folder"]
+        },
+        func=test_generator.generate_tests_for_project,
+    ))
+    r.register(Tool(
+        name="run_project_tests",
+        description="Run pytest on a project's test suite.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string", "description": "Project folder path"}
+            },
+            "required": ["folder"]
+        },
+        func=test_generator.run_tests_for_project,
+    ))
+
+    # project scaffolding templates
+    r.register(Tool(
+        name="list_templates",
+        description="List available project scaffolding templates.",
+        parameters={"type": "object", "properties": {}, "required": []},
+        func=templates.list_templates,
+    ))
+    r.register(Tool(
+        name="scaffold_project",
+        description="Scaffold a new project from a template.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "template": {"type": "string",
+                             "description": "Template name (file_search, cli_tool, api_service, documentation)"},
+                "folder": {"type": "string", "description": "Target folder path"}
+            },
+            "required": ["template", "folder"]
+        },
+        func=templates.scaffold_project,
+    ))
+
+    # auto-documentation
+    r.register(Tool(
+        name="generate_docs",
+        description="Generate README.md, ARCHITECTURE.md, and API.md for a project.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string", "description": "Project folder path"}
+            },
+            "required": ["folder"]
+        },
+        func=doc_generator.generate_all_docs,
+    ))
+
+    # plugin system
+    r.register(Tool(
+        name="list_plugins",
+        description="List loaded MGAI plugins.",
+        parameters={"type": "object", "properties": {}, "required": []},
+        func=plugin_system.plugin_manager.list_plugins,
+    ))
+    r.register(Tool(
+        name="load_plugins",
+        description="Discover, load, and register all MGAI plugins.",
+        parameters={"type": "object", "properties": {}, "required": []},
+        func=lambda: plugin_system.auto_load_plugins(r),
+    ))
+    r.register(Tool(
+        name="create_sample_plugin",
+        description="Create an example plugin file in the plugins/ directory.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "plugins_dir": {"type": "string",
+                                "description": "Plugins directory path",
+                                "default": "plugins"}
+            },
+            "required": []
+        },
+        func=plugin_system.create_sample_plugin,
+    ))
 
     return r
