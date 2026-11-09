@@ -149,7 +149,6 @@ class Agent:
         return f"Wrote {', '.join(written)} to {self.target_folder}"
 
     def _loop(self, model: str, messages: list[dict], goal: str) -> str:
-        safety_net_attempts = 0
         for step in range(1, self.max_steps + 1):
             if self.verbose:
                 print(f"\n[step {step}] thinking with {model}...")
@@ -170,21 +169,14 @@ class Agent:
             if not tool_calls:
                 content = msg.get("content", "")
                 if self.project_mode and self.files_written == 0:
-                    print(f"\n[DEBUG] project_mode={self.project_mode}, files_written={self.files_written}, safety_net_attempts={safety_net_attempts}")
-                    if safety_net_attempts < 5:
-                        # Force with system message — give model multiple chances before direct write
-                        attempt = safety_net_attempts + 1
-                        safety_net_attempts += 1
-                        if attempt < 4:
-                            messages.append({"role": "system", "content": f"SAFETY NET (attempt {attempt}/5): You have not written any files yet. You MUST call write_file now to create the required files in the target folder. Do not describe what you will do — actually write the file."})
-                        else:
-                            messages.append({"role": "system", "content": f"SAFETY NET (FINAL, attempt {attempt}/5): This is your last chance. Call write_file immediately to create the required deliverables in the target folder. Do not return text without tool calls."})
-                        continue
-                    # Last resort: directly write minimal stub files via registry
+                    # Immediate safety net: model won't call write_file on its own.
+                    # Write minimal stubs so files exist, then continue the loop
+                    # so the model can read them and replace with real content.
                     result = self._write_default_project_files()
                     if self.verbose:
                         print(f"\n[safety net] {result}")
-                    return result
+                    messages.append({"role": "system", "content": "Files have been created in the target folder. Read them, then replace the TODO stubs with real implementation using write_file. Continue until the complete application exists."})
+                    continue
                 if self.verbose:
                     print(f"\n[done] {content[:500]}")
                 return content
