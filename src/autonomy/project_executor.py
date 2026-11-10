@@ -508,18 +508,34 @@ def _remember_project_event(state: dict, event: str, details: str) -> None:
         pass
 
 
-def _recall_similar_projects(goal: str, top_k: int = 3) -> str:
+def _recall_similar_projects(goal: str, project_key: str | None = None,
+                              folder_path: str | None = None, top_k: int = 3) -> str:
     try:
         store = VectorStore()
-        results = store.query(goal, top_k=top_k)
+        results = store.query(goal, top_k=top_k * 4)
         if not results:
             return ""
         lines = ["Past project memories:"]
+        count = 0
         for r in results:
+            meta = r.get("metadata", {}) or {}
+            if project_key and meta.get("project") != project_key:
+                continue
+            if folder_path and meta.get("folder") != folder_path:
+                continue
             lines.append(f"- {r['text'][:300]}")
+            count += 1
+            if count >= top_k:
+                break
+        if count == 0:
+            return ""
         return "\n".join(lines)
     except Exception:
         return ""
+
+
+def _requirements_hash(requirements: str) -> str:
+    return hashlib.sha256(requirements.encode("utf-8")).hexdigest()[:16]
 
 
 def _extract_file_refs(step_text: str) -> Set[str]:
@@ -620,15 +636,18 @@ class ProjectExecutor:
         if requirements:
             print(f"[PROJECT EXECUTOR] Requirements loaded ({len(requirements)} chars)")
 
-        memories = _recall_similar_projects(goal)
+        memories = _recall_similar_projects(goal,
+                                            project_key=self.state.get("key"),
+                                            folder_path=self.folder_path)
         if memories:
             print(f"[PROJECT EXECUTOR] Past memories:\n{memories[:500]}")
 
-        if not self.state.get("steps"):
+        if not self.state.get("steps") or self.state.get("requirements_hash") != _requirements_hash(requirements):
             steps_text = _decompose(goal, requirements)
             self.state["steps"] = [{"text": s, "status": "pending",
                                     "result": "", "attempts": 0,
                                     "critique": None} for s in steps_text]
+            self.state["requirements_hash"] = _requirements_hash(requirements)
             _save_state(self.state)
             print(f"[PROJECT EXECUTOR] Decomposed into {len(steps_text)} steps")
         else:
@@ -704,8 +723,8 @@ class ProjectExecutor:
         print(f"\n=== Step {idx + 1}/{len(self.state['steps'])} (attempt {attempt}) ===")
         print(f"    {step_text[:120]}...")
 
-        # Write REAL code directly via templates based on requirements
-        self._write_real_code(requirements, self.folder_path)
+        # Write REAL code via model generation based on step + requirements
+        self._write_real_code(step_text, requirements, self.folder_path)
 
         # Verify code compiles (for Python files)
         verify_result = self._verify_code_compiles()
@@ -731,18 +750,40 @@ class ProjectExecutor:
         _remember_project_event(self.state, f"step_{idx + 1}_completed",
                                 f"{step_text}. Files: {files_after}")
 
-    def _write_real_code(self, requirements: str, folder_path: str) -> None:
-        """Write real functional code based on requirements.
+    def _write_real_code(self, step_text_or_requirements: str,
+                         requirements_or_folder: str,
+                         folder_path: str | None = None) -> None:
+        """Write real functional code based on step + requirements.
 
-        Determines which files to write from requirements context, not step
-        text (which is too unpredictable). Writes each needed file at most once.
+        Supports two calling conventions:
+        - Old: _write_real_code(requirements, folder_path) — writes all needed files
+        - New: _write_real_code(step_text, requirements, folder_path) — writes one file for the step
         """
+        # Detect calling convention
+        if folder_path is None:
+            # Old 2-arg convention: (requirements, folder_path)
+            requirements = step_text_or_requirements
+            folder_path = requirements_or_folder
+            step_text = requirements  # Use requirements as step text for filename inference
+            write_all = True
+        else:
+            # New 3-arg convention: (step_text, requirements, folder_path)
+            step_text = step_text_or_requirements
+            requirements = requirements_or_folder
+            write_all = False
+
+        if write_all:
+            # Old behavior: write all needed files based on requirements
+            self._write_all_files(requirements, folder_path)
+        else:
+            # New behavior: write one file for this step
+            self._write_single_file(step_text, requirements, folder_path)
+
+    def _write_all_files(self, requirements: str, folder_path: str) -> None:
+        """Write all needed files for a project (old behavior for backward compat)."""
         req_lower = requirements.lower()
 
-        # Detect documentation-only projects — only if requirements are about
-        # documentation, NOT about building an app. A project that asks for an
-        # app AND a user manual is a code project, not doc-only.
-        # Use word-boundary matching so "created" doesn't match "create".
+        # Detect documentation-only projects
         import re as _re
         code_keywords = ("app", "application", "gui", "interface", "build",
                          "create", "implement", "develop", "software",
@@ -759,10 +800,8 @@ class ProjectExecutor:
         needed_files: list[tuple[str, str]] = []
 
         if is_doc_only:
-            # Documentation-only project: just write USER_MANUAL.md
             needed_files.append(("USER_MANUAL.md", _get_manual_template(requirements)[1]))
         else:
-            # Code project: write app.py + USER_MANUAL.md + __init__.py + requirements.txt
             search_signals = sum(1 for k in ("search", "file", "folder", "word",
                                              "sentence", "grep", "find", "locate")
                                  if k in req_lower)
@@ -776,14 +815,33 @@ class ProjectExecutor:
             needed_files.append(("__init__.py", '"""{project} package."""\n'))
             needed_files.append(("requirements.txt", self._generate_requirements_txt(app_content)))
 
-        # Write each needed file that doesn't already exist
         for fname, content in needed_files:
             fpath = Path(folder_path) / fname
             if fpath.exists():
-                continue  # Don't overwrite existing real code
+                continue
             fpath.parent.mkdir(parents=True, exist_ok=True)
             fpath.write_text(content, encoding="utf-8")
             print(f"    [executor] Wrote {fname} ({len(content)} chars)")
+
+    def _write_single_file(self, step_text: str, requirements: str,
+                           folder_path: str) -> None:
+        """Write one file for a specific step using model generation."""
+        fname = _infer_filename(step_text)
+        if not fname:
+            return
+
+        fpath = Path(folder_path) / fname
+        if fpath.exists():
+            return
+
+        fpath.parent.mkdir(parents=True, exist_ok=True)
+
+        content = self._generate_code_with_model(step_text, requirements, fname)
+        if content is None:
+            content = self._fallback_template(fname, requirements)
+
+        fpath.write_text(content, encoding="utf-8")
+        print(f"    [executor] Wrote {fname} ({len(content)} chars)")
 
     def _generate_requirements_txt(self, app_content: str) -> str:
         """Infer pip dependencies from app content and generate a requirements.txt."""
