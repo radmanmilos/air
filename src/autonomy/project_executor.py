@@ -594,16 +594,19 @@ def _topological_order(steps: List[dict], deps: List[Set[int]]) -> List[List[int
     return waves
 
 
-def _infer_filename(step_text: str) -> str | None:
+def _infer_filename(step_text: str, requirements: str = "") -> str | None:
     """Infer the target filename from step text.
 
-    First tries to extract an actual filename mentioned in the step
-    (e.g., "create testproject3.cs" → "testproject3.cs").
-    Falls back to keyword-based inference, then slug-based generation.
+    Priority:
+    1. Explicit filename in step text (e.g., "create Program.cs" → "Program.cs")
+    2. Requirements language (authoritative — if req says C#, use .cs)
+    3. Keyword-based fallback (manual → .md, app → app{ext}, etc.)
+
     Returns None for non-creation steps (read, verify, plan, etc.).
     """
     text = step_text
     text_lower = text.lower()
+    req_lower = requirements.lower()
     import re as _re
 
     # Non-creation steps: reading, verifying, planning — don't write files
@@ -617,8 +620,7 @@ def _infer_filename(step_text: str) -> str | None:
                                               "generate", "implement", "make")):
             return None
 
-    # Extract explicit filename from step text (e.g., "testproject3.cs", "app.py")
-    # Look for patterns like "create X.cs", "write X.py", "file X.csproj"
+    # 1. Extract explicit filename from step text (e.g., "create Program.cs")
     filename_patterns = [
         r"\b([a-zA-Z0-9_\-]+\.(?:cs|csproj|py|js|ts|html|md|txt|json|xml|yml|yaml|sql|db|sqlite|bat|sh|ps1))",
     ]
@@ -629,20 +631,52 @@ def _infer_filename(step_text: str) -> str | None:
             if fname and len(fname) < 100:
                 return fname
 
-    # Fall back to keyword-based inference
+    # 2. Determine authoritative language from requirements
+    req_ext = _detect_extension_from_text(req_lower)
+
+    # 3. Keyword-based inference using requirements language for code files
     if any(k in text_lower for k in ("manual", "user guide", "readme", "docs")):
         return "USER_MANUAL.md"
     if any(k in text_lower for k in ("app", "application", "gui", "main")):
-        return "app.py"
+        return f"app{req_ext}"
     if "readme" in text_lower:
         return "README.md"
+    if any(k in text_lower for k in ("database", "sqlite", "db", "sql", "table", "schema")):
+        # Database files should be .sql regardless of code language
+        return "database.sql"
+    if any(k in text_lower for k in ("csproj", "project file", "project configuration", ".net project")):
+        return "project.csproj"
 
-    # Default: generate slug-based .py filename
+    # 4. Default: generate slug-based filename with requirements language extension
     slug = _re.sub(r"[^a-z0-9]+", "_", text_lower).strip("_")
     slug = slug[:60] if len(slug) > 60 else slug
     if slug:
-        return f"{slug}.py"
+        return f"{slug}{req_ext}"
     return None
+
+
+def _detect_extension_from_text(text_lower: str) -> str:
+    """Determine the file extension from step text language keywords."""
+    if any(k in text_lower for k in ("c#", "csharp", ".net", "dotnet", "net core",
+                                      "netframework", "windows forms", "wpf", "csproj",
+                                      ".cs", "c sharp", "xaml")):
+        return ".cs"
+    if any(k in text_lower for k in ("csproj", ".net project", "dotnet project")):
+        return ".csproj"
+    if any(k in text_lower for k in ("sqlite", ".db", "database file", ".sql")):
+        return ".sql"
+    if any(k in text_lower for k in ("javascript", "node", ".js", "react", "vue")):
+        return ".js"
+    if any(k in text_lower for k in ("typescript", ".ts", "angular")):
+        return ".ts"
+    if any(k in text_lower for k in ("html", ".html", "web page", "webpage")):
+        return ".html"
+    if any(k in text_lower for k in ("css", ".css", "stylesheet")):
+        return ".css"
+    if any(k in text_lower for k in ("python", ".py", "pip", "django", "flask")):
+        return ".py"
+    # Default to .py for generic code steps
+    return ".py"
 
 
 # ============================================================================
@@ -762,7 +796,7 @@ class ProjectExecutor:
         print(f"    {step_text[:120]}...")
 
         # Check if this is a non-creation step (read, verify, plan, etc.)
-        target_fname = _infer_filename(step_text)
+        target_fname = _infer_filename(step_text, requirements)
         if target_fname is None:
             # Non-creation step: nothing to write, mark complete
             step_state["status"] = "completed"
@@ -900,7 +934,7 @@ class ProjectExecutor:
     def _write_single_file(self, step_text: str, requirements: str,
                            folder_path: str) -> None:
         """Write one file for a specific step using model generation."""
-        fname = _infer_filename(step_text)
+        fname = _infer_filename(step_text, requirements)
         if not fname:
             return
 
@@ -988,6 +1022,58 @@ class ProjectExecutor:
                     if k in req_lower) >= 2
             ) else _get_app_template(requirements)[1]
             return self._generate_requirements_txt(app_content)
+        elif fname.endswith(".csproj"):
+            return '''<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>
+'''
+        elif fname.endswith(".cs"):
+            stem = Path(fname).stem
+            return f'''using System;
+using System.IO;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using Microsoft.Data.Sqlite;
+
+namespace {stem};
+
+public class {stem} : Form
+{{
+    public {stem}()
+    {{
+        Text = "{stem}";
+        Size = new Size(800, 600);
+    }}
+
+    [STAThread]
+    static void Main()
+    {{
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        Application.Run(new {stem}());
+    }}
+}}
+'''
+        elif fname.endswith(".sql") or fname.endswith(".db"):
+            return "-- SQLite database schema\n-- Implement based on requirements\n"
         return f"# {fname}\n# TODO: Implement based on requirements.\n"
 
     def _generate_requirements_txt(self, app_content: str) -> str:
