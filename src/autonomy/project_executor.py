@@ -843,6 +843,60 @@ class ProjectExecutor:
         fpath.write_text(content, encoding="utf-8")
         print(f"    [executor] Wrote {fname} ({len(content)} chars)")
 
+    def _generate_code_with_model(self, step_text: str, requirements: str,
+                                   fname: str) -> str | None:
+        """Use qwen2.5-coder to generate code for a specific step."""
+        try:
+            model = self.router.pick("code")
+            prompt = (
+                "You are a code generator. Given a PROJECT GOAL, REQUIREMENTS, "
+                "a STEP, and a TARGET FILENAME, write the complete file content "
+                "for that file. Reply with ONLY the file content, no markdown "
+                "code blocks, no explanations.\n\n"
+                f"GOAL: {step_text}\n"
+                f"REQUIREMENTS: {requirements}\n"
+                f"STEP: {step_text}\n"
+                f"TARGET FILE: {fname}\n\n"
+                "FILE CONTENT:"
+            )
+            resp = self.client.chat(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                think=False,
+                timeout=120,
+            )
+            text = OllamaClient.extract_text(resp)
+            if text and len(text.strip()) > 10:
+                return text.strip()
+            return None
+        except Exception:
+            return None
+
+    def _fallback_template(self, fname: str, requirements: str) -> str:
+        """Fallback to hardcoded template if model generation fails."""
+        req_lower = requirements.lower()
+        if fname == "app.py":
+            search_signals = sum(1 for k in ("search", "file", "folder", "word",
+                                             "sentence", "grep", "find", "locate")
+                                 if k in req_lower)
+            if search_signals >= 2:
+                return FILE_SEARCH_APP_TEMPLATE
+            _, content = _get_app_template(requirements)
+            return content
+        elif fname == "USER_MANUAL.md":
+            _, content = _get_manual_template(requirements)
+            return content
+        elif fname == "__init__.py":
+            return '"""{project} package."""\n'
+        elif fname == "requirements.txt":
+            app_content = FILE_SEARCH_APP_TEMPLATE if (
+                sum(1 for k in ("search", "file", "folder", "word",
+                                "sentence", "grep", "find", "locate")
+                    if k in req_lower) >= 2
+            ) else _get_app_template(requirements)[1]
+            return self._generate_requirements_txt(app_content)
+        return f"# {fname}\n# TODO: Implement based on requirements.\n"
+
     def _generate_requirements_txt(self, app_content: str) -> str:
         """Infer pip dependencies from app content and generate a requirements.txt."""
         packages: set[str] = set()
