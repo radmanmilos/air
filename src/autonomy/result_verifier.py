@@ -95,11 +95,18 @@ def verify_final(goal: str, requirements: str, folder_path: str,
 
 
 def score_completeness(files_created: List[str], requirements: str) -> float:
-    """Heuristic completeness score from 0.0 to 1.0 based on files present."""
+    """Heuristic completeness score from 0.0 to 1.0 based on files present.
+
+    Credits any code file (not just .py), documentation files, READMEs, and
+    user manuals.
+    """
     if not files_created:
         return 0.0
     score = 0.0
-    has_code = any(f.endswith(".py") for f in files_created)
+    code_extensions = (".py", ".cs", ".js", ".ts", ".java", ".cpp", ".c",
+                       ".rb", ".go", ".rs", ".sql", ".html", ".css",
+                       ".xml", ".json", ".md", ".txt")
+    has_code = any(f.lower().endswith(code_extensions) for f in files_created)
     has_docs = any(f.lower().endswith((".md", ".txt")) for f in files_created)
     has_readme = any(f.lower() in ("readme.md", "readme.txt") for f in files_created)
     has_manual = any("manual" in f.lower() for f in files_created)

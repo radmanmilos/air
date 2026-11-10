@@ -596,14 +596,28 @@ def _topological_order(steps: List[dict], deps: List[Set[int]]) -> List[List[int
 
 def _infer_filename(step_text: str) -> str | None:
     text = step_text.lower()
+    # Detect file extension mentioned in step text FIRST (e.g., Program.cs, .csproj)
+    import re as _re
+    ext_match = _re.search(r"\.(\w+)\b", text)
+    if ext_match:
+        ext = ext_match.group(1)
+        if ext in ("cs", "csproj", "py", "js", "ts", "html", "md", "txt",
+                    "json", "xml", "yaml", "yml", "sql", "db", "sqlite"):
+            base = _re.sub(r"[^a-z0-9]+", "_", text).strip("_")[:50]
+            if base:
+                return f"{base}.{ext}"
+    # Fall back to keyword-based inference
     if any(k in text for k in ("manual", "user guide", "readme", "docs")):
         return "USER_MANUAL.md"
-    if any(k in text for k in ("app", "application", "gui", "main", "search")):
+    if any(k in text for k in ("app", "application", "gui", "main")):
         return "app.py"
-    if any(k in text for k in ("search", "engine", "core", "logic")):
-        return "search_engine.py"
-    if any(k in text for k in ("readme",)):
+    if "readme" in text:
         return "README.md"
+    # Default: generate .py filename
+    slug = _re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    slug = slug[:60] if len(slug) > 60 else slug
+    if slug:
+        return f"{slug}.py"
     return None
 
 
@@ -723,13 +737,41 @@ class ProjectExecutor:
         print(f"\n=== Step {idx + 1}/{len(self.state['steps'])} (attempt {attempt}) ===")
         print(f"    {step_text[:120]}...")
 
+        # Track files before writing
+        files_before = set(self._list_created_files())
+
         # Write REAL code via model generation based on step + requirements
         self._write_real_code(step_text, requirements, self.folder_path)
+
+        # Track files after writing
+        files_after = set(self._list_created_files())
+        new_files = files_after - files_before
 
         # Verify code compiles (for Python files)
         verify_result = self._verify_code_compiles()
         if verify_result:
             print(f"    [verify] {verify_result}")
+
+        # If no new file was created, check if the step's target file already exists
+        if not new_files:
+            target_fname = _infer_filename(step_text)
+            if target_fname:
+                target_path = Path(self.folder_path) / target_fname
+                if target_path.exists():
+                    # File already exists from a previous step — step is done
+                    step_state["status"] = "completed"
+                    print(f"    ✓ Step complete: {target_fname} already exists")
+                    _remember_project_event(self.state, f"step_{idx + 1}_completed",
+                                            f"{step_text}. File {target_fname} already exists.")
+                    return
+
+            print(f"    [!] No files created for this step")
+            step_state["critique"] = {"pass": False,
+                                      "reason": "No files were created for this step",
+                                      "fix": "Write at least one file for this step"}
+            _remember_project_event(self.state, f"step_{idx + 1}_critique_failed",
+                                    f"{step_text}. No files created.")
+            return
 
         # Critique step result using result_verifier
         created = self._list_created_files()
@@ -840,20 +882,33 @@ class ProjectExecutor:
         if content is None:
             content = self._fallback_template(fname, requirements)
 
+        # Validate Python syntax for .py files; other language types are
+        # written as-is (MGAI may not have their compiler installed).
+        if fname.endswith(".py"):
+            try:
+                compile(content, fname, "exec")
+            except SyntaxError:
+                content = self._fallback_template(fname, requirements)
+
         fpath.write_text(content, encoding="utf-8")
         print(f"    [executor] Wrote {fname} ({len(content)} chars)")
 
     def _generate_code_with_model(self, step_text: str, requirements: str,
                                    fname: str) -> str | None:
-        """Use qwen2.5-coder to generate code for a specific step."""
+        """Use qwen2.5-coder to generate code for a specific step.
+
+        Language-agnostic: the target filename's extension determines the
+        language; the model is free to generate C#, Python, JS, SQL, docs,
+        or any other text-based file type.
+        """
         try:
             model = self.router.pick("code")
             prompt = (
-                "You are a code generator. Given a PROJECT GOAL, REQUIREMENTS, "
-                "a STEP, and a TARGET FILENAME, write the complete file content "
-                "for that file. Reply with ONLY the file content, no markdown "
-                "code blocks, no explanations.\n\n"
-                f"GOAL: {step_text}\n"
+                "You are a code generator. Write the complete file content for "
+                "the target filename. Reply with ONLY the file content, no "
+                "markdown code blocks, no explanations.\n"
+                "Use the language implied by the file extension (e.g. .cs for C#, "
+                ".py for Python, .js for JavaScript, .sql for SQL, .md for markdown).\n\n"
                 f"REQUIREMENTS: {requirements}\n"
                 f"STEP: {step_text}\n"
                 f"TARGET FILE: {fname}\n\n"
@@ -867,7 +922,13 @@ class ProjectExecutor:
             )
             text = OllamaClient.extract_text(resp)
             if text and len(text.strip()) > 10:
-                return text.strip()
+                # Strip any markdown code fences that might leak in (any language)
+                text = text.replace("```python", "").replace("```c#", "")
+                text = text.replace("```cpp", "").replace("```java", "")
+                text = text.replace("```javascript", "").replace("```ts", "")
+                text = text.replace("```", "").strip()
+                if len(text) > 10:
+                    return text
             return None
         except Exception:
             return None
@@ -917,38 +978,69 @@ class ProjectExecutor:
         return "\n".join(lines) + "\n"
 
     def _verify_code_compiles(self) -> str | None:
-        """Try to compile all Python files in the project folder. Return a status message or None."""
+        """Verify syntax of all code files in the project folder.
+
+        Python files are syntax-checked with py_compile. Other file types
+        (C#, JS, SQL, docs, etc.) are acknowledged but not compiled since
+        MGAI may not have the corresponding toolchain installed.
+        """
         folder = Path(self.folder_path)
-        py_files = [f for f in folder.rglob("*.py") if not f.name.startswith(".")]
-        if not py_files:
+        code_extensions = (".py", ".cs", ".js", ".ts", ".java", ".cpp",
+                           ".c", ".rb", ".go", ".rs", ".sql", ".html",
+                           ".css", ".xml", ".json", ".md", ".txt")
+        code_files = [f for f in folder.rglob("*")
+                      if f.is_file() and f.suffix.lower() in code_extensions
+                      and "__pycache__" not in f.parts
+                      and not f.name.startswith(".")]
+        if not code_files:
             return None
+
+        py_files = [f for f in code_files if f.suffix.lower() == ".py"]
         errors: list[str] = []
         for fpath in py_files:
             try:
                 py_compile.compile(str(fpath), doraise=True)
             except py_compile.PyCompileError as e:
                 errors.append(f"{fpath.name}: {e}")
-        if errors:
-            return "Code compile errors: " + "; ".join(errors)
-        return f"All {len(py_files)} Python file(s) compiled OK"
+
+        other_count = len(code_files) - len(py_files)
+        msg_parts = []
+        if py_files:
+            if errors:
+                msg_parts.append("Code compile errors: " + "; ".join(errors))
+            else:
+                msg_parts.append(f"All {len(py_files)} Python file(s) compiled OK")
+        if other_count:
+            msg_parts.append(f"{other_count} non-Python file(s) present (not compiled)")
+        return "; ".join(msg_parts) if msg_parts else None
 
     def _run_app_briefly(self) -> str | None:
-        """Try to import the app module to verify it loads without errors."""
+        """Try to verify the app entry point loads without errors.
+
+        Looks for common entry points (app.py, Program.cs, main.py, etc.).
+        Only syntax-checks Python files; other file types are acknowledged.
+        """
         folder = Path(self.folder_path)
-        app_file = folder / "app.py"
-        if not app_file.exists():
-            return None
-        try:
-            result = subprocess.run(
-                [sys.executable, "-c",
-                 "import ast; ast.parse(open('app.py').read()); print('OK')"],
-                cwd=str(folder), capture_output=True, text=True, timeout=15
-            )
-            if result.returncode == 0:
-                return "App syntax verified OK"
-            return f"App syntax check failed: {result.stderr.strip()[:200]}"
-        except Exception as e:
-            return f"App syntax check error: {e}"
+        entry_points = ("app.py", "main.py", "Program.cs", "main.js",
+                        "index.js", "index.ts", "main.cs")
+        for ep in entry_points:
+            app_file = folder / ep
+            if app_file.exists():
+                if ep.endswith(".py"):
+                    try:
+                        result = subprocess.run(
+                            [sys.executable, "-c",
+                             "import ast; ast.parse(open('app.py').read()); print('OK')"],
+                            cwd=str(folder), capture_output=True, text=True, timeout=15
+                        )
+                        if result.returncode == 0:
+                            return "App syntax verified OK"
+                        return f"App syntax check failed: {result.stderr.strip()[:200]}"
+                    except Exception as e:
+                        return f"App syntax check error: {e}"
+                else:
+                    return f"Entry point {ep} found (not syntax-checked by MGAI)"
+        return None
 
     def _count_files_written(self) -> int:
         return len(self._list_created_files())
@@ -962,7 +1054,8 @@ class ProjectExecutor:
         files = []
         for p in folder.rglob("*"):
             if p.is_file() and not p.name.startswith(".") \
-               and p.name not in ("requirement.txt", "requirements.txt"):
+               and p.name not in ("requirement.txt", "requirements.txt") \
+               and "__pycache__" not in p.parts:
                 files.append(str(p.relative_to(folder)))
         return sorted(files)
 
