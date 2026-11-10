@@ -595,26 +595,50 @@ def _topological_order(steps: List[dict], deps: List[Set[int]]) -> List[List[int
 
 
 def _infer_filename(step_text: str) -> str | None:
-    text = step_text.lower()
-    # Detect file extension mentioned in step text FIRST (e.g., Program.cs, .csproj)
+    """Infer the target filename from step text.
+
+    First tries to extract an actual filename mentioned in the step
+    (e.g., "create testproject3.cs" → "testproject3.cs").
+    Falls back to keyword-based inference, then slug-based generation.
+    Returns None for non-creation steps (read, verify, plan, etc.).
+    """
+    text = step_text
+    text_lower = text.lower()
     import re as _re
-    ext_match = _re.search(r"\.(\w+)\b", text)
-    if ext_match:
-        ext = ext_match.group(1)
-        if ext in ("cs", "csproj", "py", "js", "ts", "html", "md", "txt",
-                    "json", "xml", "yaml", "yml", "sql", "db", "sqlite"):
-            base = _re.sub(r"[^a-z0-9]+", "_", text).strip("_")[:50]
-            if base:
-                return f"{base}.{ext}"
+
+    # Non-creation steps: reading, verifying, planning — don't write files
+    non_creation_verbs = ("read", "verify", "check", "test", "plan",
+                          "analyze", "review", "inspect", "audit",
+                          "confirm", "validate", "ensure", "break down",
+                          "decompose", "summarize")
+    if any(v in text_lower for v in non_creation_verbs):
+        # Still allow if a specific filename is mentioned with create/write
+        if not any(k in text_lower for k in ("create", "write", "build",
+                                              "generate", "implement", "make")):
+            return None
+
+    # Extract explicit filename from step text (e.g., "testproject3.cs", "app.py")
+    # Look for patterns like "create X.cs", "write X.py", "file X.csproj"
+    filename_patterns = [
+        r"\b([a-zA-Z0-9_\-]+\.(?:cs|csproj|py|js|ts|html|md|txt|json|xml|yml|yaml|sql|db|sqlite|bat|sh|ps1))",
+    ]
+    for pat in filename_patterns:
+        m = _re.search(pat, text, re.IGNORECASE)
+        if m:
+            fname = m.group(1)
+            if fname and len(fname) < 100:
+                return fname
+
     # Fall back to keyword-based inference
-    if any(k in text for k in ("manual", "user guide", "readme", "docs")):
+    if any(k in text_lower for k in ("manual", "user guide", "readme", "docs")):
         return "USER_MANUAL.md"
-    if any(k in text for k in ("app", "application", "gui", "main")):
+    if any(k in text_lower for k in ("app", "application", "gui", "main")):
         return "app.py"
-    if "readme" in text:
+    if "readme" in text_lower:
         return "README.md"
-    # Default: generate .py filename
-    slug = _re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+
+    # Default: generate slug-based .py filename
+    slug = _re.sub(r"[^a-z0-9]+", "_", text_lower).strip("_")
     slug = slug[:60] if len(slug) > 60 else slug
     if slug:
         return f"{slug}.py"
@@ -737,6 +761,16 @@ class ProjectExecutor:
         print(f"\n=== Step {idx + 1}/{len(self.state['steps'])} (attempt {attempt}) ===")
         print(f"    {step_text[:120]}...")
 
+        # Check if this is a non-creation step (read, verify, plan, etc.)
+        target_fname = _infer_filename(step_text)
+        if target_fname is None:
+            # Non-creation step: nothing to write, mark complete
+            step_state["status"] = "completed"
+            print(f"    ✓ Step complete: non-creation step (no file to write)")
+            _remember_project_event(self.state, f"step_{idx + 1}_completed",
+                                    f"{step_text}. Non-creation step, no file written.")
+            return
+
         # Track files before writing
         files_before = set(self._list_created_files())
 
@@ -754,21 +788,19 @@ class ProjectExecutor:
 
         # If no new file was created, check if the step's target file already exists
         if not new_files:
-            target_fname = _infer_filename(step_text)
-            if target_fname:
-                target_path = Path(self.folder_path) / target_fname
-                if target_path.exists():
-                    # File already exists from a previous step — step is done
-                    step_state["status"] = "completed"
-                    print(f"    ✓ Step complete: {target_fname} already exists")
-                    _remember_project_event(self.state, f"step_{idx + 1}_completed",
-                                            f"{step_text}. File {target_fname} already exists.")
-                    return
+            target_path = Path(self.folder_path) / target_fname
+            if target_path.exists():
+                # File already exists from a previous step — step is done
+                step_state["status"] = "completed"
+                print(f"    ✓ Step complete: {target_fname} already exists")
+                _remember_project_event(self.state, f"step_{idx + 1}_completed",
+                                        f"{step_text}. File {target_fname} already exists.")
+                return
 
             print(f"    [!] No files created for this step")
             step_state["critique"] = {"pass": False,
                                       "reason": "No files were created for this step",
-                                      "fix": "Write at least one file for this step"}
+                                      "fix": f"Write {target_fname} for this step"}
             _remember_project_event(self.state, f"step_{idx + 1}_critique_failed",
                                     f"{step_text}. No files created.")
             return
