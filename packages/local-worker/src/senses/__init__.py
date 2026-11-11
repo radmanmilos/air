@@ -1,0 +1,1 @@
+"""Senses: vision, speech, hearing."""
