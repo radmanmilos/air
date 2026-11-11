@@ -1,17 +1,14 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mgai"
-version = "0.1.0"
-description = "MGAI (Makeing Good AI) - A unified multi-model LLM system with integrated tools for autonomous agents"
+name = "air-local"
+version = "0.2.0"
+description = "AIR local worker: Ollama transport, tool registry, and project scaffolding"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [
-    { name = "MGAI Creator", email = "creator@example.com" }
-]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -21,32 +18,38 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    # Core dependencies (see requirements.txt)
     "requests>=2.32",
-    "httpx>=0.27",
-    "typer>=0.12",
-    "rich>=13.7",
-    "pydantic>=2.8",
     "pyyaml>=6.0",
-    "chromadb>=0.5",
-    "faster-whisper>=1.0",
-    "sounddevice>=0.4.7",
-    "numpy>=1.26",
-    "piper-tts>=1.2",
-    "duckduckgo-search>=6.2",
-    "beautifulsoup4>=4.12",
-    "fastapi>=0.115",
-    "uvicorn>=0.34",
 ]
-
-[project.scripts]
-mgai = "src.main:main"
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.2",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+web = [
+    "duckduckgo-search>=6.2",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*"]
+include = ["air_local*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["air_local"]
+ignore_missing_imports = true
+warn_unused_configs = true

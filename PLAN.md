@@ -376,6 +376,16 @@ applied. Conflicts were resolved as follows:
   goose, mock-for-tests) and documents known limitations.
 
 ## Current state (2026-11-11)
+- Monorepo absorption: `MakeingGoodAIs` was imported with `git subtree` into
+  `packages/local-worker` (full history preserved) and pruned to the useful
+  subset: Ollama transport, ReAct loop, tool registry, and scaffolding.
+  MGAI orchestration, planner, critic, memory, senses, interfaces, and plugin
+  system were dropped. The package is `air_local`; no `mgai` entrypoint exists.
+- The worker is hardened: one `policy` layer (job-root jail, read-only mode,
+  protected files, shell/network gates), argv-only shell with an allowlist, no
+  interactive approval, no destructive git rollback.
+- Python package tests: 60 passing (`pytest`); `ruff` and `mypy` clean. CI runs
+  Node plus Python 3.12/3.14 on Ubuntu and Windows.
 - M0 truth pass: version strings unified at 0.2.0 (`src/index.ts` is the
   source), README/`air commands` document `air merge`, adapter verification
   table matches `src/adapters/registry.ts`, and the `--allow-paid` claim was
@@ -383,8 +393,12 @@ applied. Conflicts were resolved as follows:
 - E2E fixes: E-04 now searches after the first "Started job" line instead of
   re-matching it; F-02 extracts the UUID conversation id (the store rejects
   anything else).
-- Active task list: `docs/reviews/tasks_air_12.md` (monorepo absorption of
-  MakeingGoodAIs as `packages/local-worker`).
+- E2E determinism: fixtures are read-only inputs and each sandbox builds its own
+  git baseline; `oracles.gitChangedFiles` parses porcelain correctly. Write jobs
+  now fail closed when worktree creation fails instead of touching the source
+  tree. Latest full suite: 300 passed, 15 skipped, green on repeated runs.
+- Active task list: `docs/reviews/tasks_air_12.md` (M3–M5 remain: contract and
+  entrypoint, AIR adapter, apply UX and decommission).
 - `npm test` is green (deterministic suite; live scenarios remain gated).
 
 ## Adapters

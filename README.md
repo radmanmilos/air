@@ -76,6 +76,14 @@ Components:
 - **Planner / result compiler** — Lightweight task decomposition and coherent reply compilation (`src/planner`, `src/result-compiler`).
 - **Permissions** — Shared permission policy (`src/permissions`) applied before worker invocation.
 - **Workspace** — Real git worktree isolation per write job (`src/workspace`).
+- **Local worker** — Internal Python package (`packages/local-worker`) providing an Ollama transport, a jailed tool set, and project scaffolding. `air` is its only entrypoint; there is no separate CLI or install.
+
+## Repository layout
+
+- `bin/`, `src/` — the TypeScript control plane (CLI, MCP server, router, adapters, conversation, workspace).
+- `packages/local-worker/` — the internal Python worker (`air_local`). Never invoked by users directly.
+- `contracts/` — shared job contract between the control plane and the worker (M3).
+- `docs/` — behavior spec, adapter notes, and the active task ledger.
 
 ## Quick start
 

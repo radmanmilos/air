@@ -38,42 +38,67 @@ Take MGAI's **tools and local model transport**, not its orchestration:
 - Removed the unimplemented `--allow-paid` claim; documented `air merge`;
   adapter verification table now matches `src/adapters/registry.ts`.
 
-## M1 — Monorepo absorption
+### T12-005 [DONE] — Deterministic e2e fixtures and honest git oracle
+- Root cause of two flakes: `real-jobs.test.ts` wrote into the shared
+  `tests/e2e/fixtures/minimal` on every call, while other test files copied the
+  same directory. A copy taken mid-write landed dirty, so write jobs were
+  refused as dirty-tree (E-04 timed out waiting for "Started job") and MCP saw
+  phantom changes.
+- Fixes: fixtures are read-only inputs; `createSandbox` establishes the git
+  baseline in the copy (`tests/e2e/harness/sandbox.ts`), with regression tests.
+- `oracles.gitChangedFiles` trimmed the raw porcelain output before slicing the
+  status columns, turning `Program.cs` into `rogram.cs`; it now parses lines
+  without trimming and resolves rename destinations.
+- Write jobs fail closed: `createWorktree` retries/prunes and
+  `Orchestrator.start` throws `Workspace isolation failed` instead of running a
+  write task in the source tree (`tests/worktree-failclosed.test.ts`).
+- `Orchestrator.persist` no longer leaves a rejected lock promise unhandled.
 
-### T12-010 [ ] — Subtree import
-- Command: `git subtree add --prefix packages/local-worker ../MakeingGoodAIs master`
-- Preserve full history; one commit.
+## M1 — Monorepo absorption [DONE]
 
-### T12-011 [ ] — Prune to the retained subset
-- Delete everything outside the keep list, plus `mgai.egg-info/`,
-  `.pytest_cache/`, `METADATA.md`, `mgai.py`, `mgai.bat`.
-- One commit. Dropped files remain reachable through the subtree merge.
+### T12-010 [DONE] — Subtree import
+- `git subtree add --prefix packages/local-worker ../MakeingGoodAIs master`
+  (commit `137e0a4`). Full history preserved; `git log --follow` reaches
+  pre-absorb commits.
 
-### T12-012 [ ] — Rename package `src` → `air_local`
-- Rewrite `from src.` → `from air_local.`; keep `tests/` working.
-- Add a test that fails on stale `from src.` imports.
+### T12-011 [DONE] — Prune to the retained subset
+- Kept `air_local/{ollama,loop,models,policy}.py`,
+  `air_local/tools/{registry,files,shell,web,git,ollama_tools,code_analysis,builtin}.py`,
+  `air_local/scaffold/{templates,doc_generator,test_generator}.py`.
+- Dropped orchestrator/planner/executor/critic/verifier/self-improve/
+  multi-agent/approval/guardrails/scheduler/memory/senses/interfaces/voice/
+  plugin system, `mgai.py`, `mgai.bat`, and the MGAI top-level docs.
 
-### T12-013 [ ] — Python CI job + AGENTS.md polyglot checklist
-- `.github/workflows/ci.yml`: `pytest`, `ruff`, `mypy` on Python 3.12/3.14,
-  path-filtered.
-- `AGENTS.md` validation checklist gains the Python commands.
+### T12-012 [DONE] — Rename package `src` → `air_local`
+- Imports rewritten to `air_local.*`; `tools/git_tools.py` → `tools/git.py`.
+- `tests/test_smoke.py::test_no_stale_imports` fails on `from src.`,
+  `import src.`, or references to dropped subpackages.
 
-## M2 — Harden the retained worker
+### T12-013 [DONE] — Python CI job + AGENTS.md polyglot checklist
+- `.github/workflows/ci.yml` job `python` on Ubuntu + Windows, Python 3.12 and
+  3.14, running `ruff`, `mypy air_local`, `pytest`.
+- `AGENTS.md` validation checklist gains the three Python commands.
 
-### T12-020 [ ] — Shell tool: argv, allowlist, cwd jail
-- `tools/shell.py`: no `shell=True`; split with `shlex`, enforce allowlist,
-  resolve cwd inside the job root.
+## M2 — Harden the retained worker [DONE]
 
-### T12-021 [ ] — State and cwd isolation
-- `--cwd` respected (no `os.chdir(ROOT)`); explicit `--state-dir`; config via
-  `AIR_LOCAL_CONFIG`.
+### T12-020 [DONE] — Shell tool: argv, allowlist, cwd jail
+- `tools/shell.py`: no `shell=True`; `shlex` split, allowlisted binaries,
+  metacharacters rejected, cwd resolved inside the job root.
 
-### T12-022 [ ] — No interactive approval
-- Headless path never calls `input()`; policy flags decide write/shell access.
+### T12-021 [DONE] — State and cwd isolation
+- `air_local.policy` owns the job root; no `os.chdir`.
+- Config resolves via `AIR_LOCAL_CONFIG`, then the bundled `config.yaml`.
+- Entrypoint flags (`--cwd`, `--state-dir`) land with T12-031.
 
-### T12-023 [ ] — Tests for read-only and denial
-- Read-only run writes nothing; shell denied when not allowed; cwd escape
-  refused.
+### T12-022 [DONE] — No interactive approval
+- `loop.py` has no `input()` and no approval import; `policy` flags decide
+  write/shell access.
+
+### T12-023 [DONE] — Tests for read-only and denial
+- `tests/test_policy.py`, `test_files.py`, `test_shell.py`, `test_scaffold.py`:
+  read-only writes change nothing, shell denied by default, cwd/path escapes
+  refused, protected files refused.
+
 
 ## M3 — Contract and headless entrypoint
 

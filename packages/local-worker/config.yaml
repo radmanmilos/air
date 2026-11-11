@@ -6,7 +6,7 @@ models:
   brain: qwen3.5:4b          # default: vision + tools + thinking
   coder: qwen2.5-coder:7b    # code specialist
   reasoner: deepseek-r1:1.5b  # fast planning/reasoning
-  embed: nomic-embed-text    # memory/RAG (pull in Phase 2)
+  embed: nomic-embed-text    # embeddings
 
 routing:
   default_context: 8192
@@ -14,23 +14,10 @@ routing:
 
 tools:
   shell:
-    require_approval: true
     timeout_seconds: 120
-    allowed_cwd: .
-  files:
-    root: .
   web:
     enabled: true
 
-senses:
-  stt_model: base            # faster-whisper size
-  tts_voice: en_US-lessac-medium
-  sample_rate: 16000
-
-memory:
-  persist_dir: .agent/memory
-  top_k: 6
-
 agent:
   max_steps: 40
-  verbose: true
+  verbose: false

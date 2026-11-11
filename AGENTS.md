@@ -18,14 +18,22 @@ These rules govern every task in this repository. They are mandatory and apply t
 - `npm test`
 - `npm run build`
 - `npm pack --dry-run`
+- `cd packages/local-worker && python -m ruff check .`
+- `cd packages/local-worker && python -m mypy air_local`
+- `cd packages/local-worker && python -m pytest -q`
 - Documentation updated (README, PLAN.md, docs/)
 - Committed and pushed
 
 ## Source of truth
-- Task list: `docs/reviews/archive/tasks_air_8.md`
+- Task list: `docs/reviews/tasks_air_12.md`
 - Reviews: `docs/reviews/{chatGPT,deepseek,grok}_review_7.md`
 - Canonical plan: `PLAN.md`
 - All work in `E:\GitHub\air` only.
+
+## Repository layout
+- `bin/`, `src/`, `tests/` — the AIR TypeScript control plane (CLI + MCP).
+- `packages/local-worker/` — internal Python worker (Ollama transport, tools,
+  scaffolding). `air` is its only entrypoint; there is no `mgai` command.
 
 ## Conventions
 - All configuration, model lists, data live inside `air/`. No imports from other repos.
