@@ -53,7 +53,7 @@ describe('group E: steering and parallel jobs', () => {
           expect(id2).not.toBe(id1);
           await chat.waitForLine(new RegExp(`job ${id1} finished`), 0, 120000);
           await chat.waitForLine(new RegExp(`job ${id2} finished`), 0, 120000);
-          expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+          expect(oracles.gitChangedFiles(sandbox.repoDir)).toEqual([]);
         } finally {
           await chat.quit().catch(() => {});
           sandbox.cleanup();

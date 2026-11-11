@@ -73,7 +73,8 @@ const ANSI = /\x1b\[[0-9;]*[a-zA-Z]/g;
         const timer = setTimeout(() => {
           const idx = waiters.findIndex((w) => w.resolve === resolve);
           if (idx >= 0) waiters.splice(idx, 1);
-          reject(new Error(`waitForLine timeout after ${timeoutMs}ms`));
+          const tail = lines.slice(-12).map((l) => `  ${l.t}ms ${l.line}`).join('\n');
+          reject(new Error(`waitForLine timeout after ${timeoutMs}ms for ${re}\nlast lines:\n${tail}`));
         }, timeoutMs);
         waiters.push({ re, afterMs, resolve, reject, timer });
       });

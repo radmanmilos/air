@@ -73,6 +73,36 @@ describe('oracles', () => {
     expect(changed).toContain('b.txt');
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('gitChangedFiles keeps the full name of a modified tracked file', () => {
+    // Regression: trimming the raw porcelain output dropped the first status
+    // column of line one, so "Program.cs" was reported as "rogram.cs".
+    const dir = mkdtempSync(join(tmpdir(), 'oracle-'));
+    execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.name', 'test'], { cwd: dir, stdio: 'ignore' });
+    writeFileSync(join(dir, 'Program.cs'), 'Console.WriteLine("Hello");\n');
+    writeFileSync(join(dir, 'README.md'), '# Test Project\n');
+    execFileSync('git', ['add', '-A'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-m', 'init'], { cwd: dir, stdio: 'ignore' });
+    writeFileSync(join(dir, 'Program.cs'), 'Console.WriteLine("Bye");\n');
+    writeFileSync(join(dir, 'README.md'), '# Changed\n');
+    expect(oracles.gitChangedFiles(dir)).toEqual(['Program.cs', 'README.md']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('gitChangedFiles reports the destination of a rename', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'oracle-'));
+    execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.name', 'test'], { cwd: dir, stdio: 'ignore' });
+    writeFileSync(join(dir, 'old.txt'), 'hello');
+    execFileSync('git', ['add', '-A'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['commit', '-m', 'init'], { cwd: dir, stdio: 'ignore' });
+    execFileSync('git', ['mv', 'old.txt', 'new.txt'], { cwd: dir, stdio: 'ignore' });
+    expect(oracles.gitChangedFiles(dir)).toEqual(['new.txt']);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe('noOrphans', () => {

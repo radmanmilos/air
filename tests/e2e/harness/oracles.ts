@@ -10,11 +10,19 @@ export const oracles = {
       return out.trim() === '';
     } catch { return false; }
   },
-  gitChangedFiles(dir: string, base?: string): string[] {
-    try {
-      const out = execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
-      return out.trim().split('\n').filter(Boolean).map(line => line.slice(3).trim());
-    } catch { return []; }
+  gitChangedFiles(dir: string): string[] {
+    const out = execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
+    return out
+      .split(/\r?\n/)
+      .filter(Boolean)
+      // Lines are `XY <path>`. Never trim the raw output first: the first line's
+      // leading status column is usually a space, and trimming it eats the
+      // first character of the filename ("Program.cs" -> "rogram.cs").
+      .map((line) => {
+        const path = line.slice(3).trim();
+        const arrow = path.indexOf(' -> ');
+        return arrow >= 0 ? path.slice(arrow + 4) : path;
+      });
   },
   fileExists(dir: string, path: string): boolean {
     return existsSync(join(dir, path));

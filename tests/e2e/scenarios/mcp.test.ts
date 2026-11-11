@@ -49,7 +49,7 @@ describe('real: MCP run_task / get_task_status / cancel_task', () => {
         const parsed = st?.result?.content?.[0]?.text ? JSON.parse(st.result.content[0].text) : st;
         expect(parsed?.runId ?? parsed?.id ?? st).toBeDefined();
 
-        expect(oracles.gitClean(sandbox.repoDir)).toBe(true);
+        expect(oracles.gitChangedFiles(sandbox.repoDir)).toEqual([]);
       } finally {
         client.close();
         sandbox.cleanup();

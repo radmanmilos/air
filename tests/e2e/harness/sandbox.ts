@@ -56,6 +56,20 @@ function verifyFixtureLock(fixturePath: string): void {
   }
 }
 
+// Establish a deterministic baseline commit when the copied fixture has no git
+// repository of its own. Fixtures are read-only inputs; the sandbox owns git
+// state. This keeps a fresh clone (no stray fixture `.git`) behaving exactly
+// like a developer machine, and it never touches the shared fixture directory.
+function ensureGitBaseline(repoDir: string): void {
+  if (existsSync(join(repoDir, '.git', 'HEAD'))) return;
+  const identity = ['-c', 'user.name=air-e2e', '-c', 'user.email=air-e2e@example.invalid'];
+  const git = (args: string[]) =>
+    execFileSync('git', [...identity, ...args], { cwd: repoDir, stdio: 'pipe' });
+  git(['init']);
+  git(['add', '-A']);
+  git(['commit', '-m', 'baseline']);
+}
+
 export function createSandbox(fixturePath: string, marker?: string): Sandbox {
   verifyFixtureLock(fixturePath);
   const runMarker = marker ?? `air-e2e-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -69,6 +83,7 @@ export function createSandbox(fixturePath: string, marker?: string): Sandbox {
   mkdirSync(stateDir, { recursive: true });
   // Copy fixture into repo/
   cpSync(fixturePath, repoDir, { recursive: true });
+  ensureGitBaseline(repoDir);
   const fakeExecDir = join(process.cwd(), 'tests', 'e2e', 'harness', 'fake-executors');
   const env: Record<string, string> = {
     AIR_CACHE_DIR: cacheDir,
@@ -93,6 +108,7 @@ export function createSandbox(fixturePath: string, marker?: string): Sandbox {
           rmSync(repoDir, { recursive: true, force: true });
           mkdirSync(repoDir, { recursive: true });
           cpSync(fixturePath, repoDir, { recursive: true });
+          ensureGitBaseline(repoDir);
           return;
         } catch {
           const start = Date.now();

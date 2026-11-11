@@ -9,8 +9,7 @@ import { writeReport, type ScenarioResult } from '../harness/report';
 import { preflight, hasDotnet } from '../harness/preflight';
 import { retry } from '../harness/retry';
 import { join } from 'node:path';
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 
 const runResults: ScenarioResult[] = [];
 const runId = `e2e-${Date.now()}`;
@@ -27,20 +26,10 @@ afterAll(() => {
 });
 
 function fixture(): string {
-  const f = join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
-  mkdirSync(f, { recursive: true });
-  writeFileSync(join(f, 'README.md'), '# Test Project\n');
-  writeFileSync(join(f, 'Program.cs'), 'Console.WriteLine("Hello");\n');
-  const git = (args: string[]) => execFileSync('git', args, { cwd: f, stdio: 'pipe' });
-  if (!existsSync(join(f, '.git', 'HEAD'))) {
-    git(['-c', 'user.name=test', '-c', 'user.email=test@test', 'init']);
-    git(['-c', 'user.name=test', '-c', 'user.email=test@test', 'add', '-A']);
-    git(['-c', 'user.name=test', '-c', 'user.email=test@test', 'commit', '-m', 'baseline']);
-  } else {
-    git(['-c', 'user.name=test', '-c', 'user.email=test@test', 'checkout', '--', '.']);
-    git(['-c', 'user.name=test', '-c', 'user.email=test@test', 'clean', '-fd']);
-  }
-  return f;
+  // Read-only input. Never write into the shared fixture directory: other test
+  // files copy it concurrently, and a copy taken mid-write lands dirty (which
+  // silently turns write jobs into dirty-tree refusals).
+  return join(process.cwd(), 'tests', 'e2e', 'fixtures', 'minimal');
 }
 
 function chatEnv(sandbox: any, extra: Record<string, string> = {}): Record<string, string> {
