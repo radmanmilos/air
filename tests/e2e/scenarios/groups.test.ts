@@ -45,7 +45,10 @@ describe('group E: steering and parallel jobs', () => {
           const m1 = await chat.waitForLine(/Started job (\S+)/, 0, 20000);
           const id1 = m1.line.match(/Started job (\S+)/)![1];
           chat.say('/run add a second comment');
-          const m2 = await chat.waitForLine(/Started job (\S+)/, 0, 20000);
+          // waitForLine's second argument is a time offset, not a line index.
+          // Search strictly after the first "Started job" line, otherwise the
+          // harness re-matches the same line and id1 === id2 by construction.
+          const m2 = await chat.waitForLine(/Started job (\S+)/, m1.t + 1, 20000);
           const id2 = m2.line.match(/Started job (\S+)/)![1];
           expect(id2).not.toBe(id1);
           await chat.waitForLine(new RegExp(`job ${id1} finished`), 0, 120000);
@@ -134,8 +137,14 @@ describe('group F: persistence and resume', () => {
         const chat = startChat(env, sandbox.repoDir);
         try {
           await chat.waitForLine(/air chat \(conversation (\S+)/, 0, 10000);
-          const m = chat.lines().find((l) => /air chat \(conversation/.test(l.line))?.line.match(/conversation (run-[A-Za-z0-9-]+)/);
+          // Conversation ids are UUIDs (src/conversation/index.ts assertId),
+          // not run ids. Extract the UUID so the resume path is exercised.
+          const banner = chat.lines().find((l) => /air chat \(conversation/.test(l.line));
+          const m = banner?.line.match(
+            /conversation ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+          );
           convId = m?.[1] ?? '';
+          expect(convId).not.toBe('');
           chat.say('persistence probe alpha');
           await chat.waitForLine(/air: /, 0, 20000);
           await chat.quit();

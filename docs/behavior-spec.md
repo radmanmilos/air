@@ -66,11 +66,17 @@ CLI but not documented here, the conformance test in
 - When `air export [--out <file>]` is run,
 - Then it writes the orchestrator session log to a JSON file.
 
+### `air merge <jobId>`
+- Given a completed job with a recorded worktree,
+- When `air merge <jobId>` is run,
+- Then it applies the job's worktree into the current branch and reports the
+  result. Jobs without worktree state are refused with a non-zero exit.
+
 ### `air commands`
 - Given a request for side-panel help,
 - When `air commands` is run,
 - Then it lists available slash commands (/run, /status, /dashboard, /export,
-  /models, /verify, /mcp).
+  /models, /verify, /merge, /mcp).
 - Given a task description,
 - When `air route-test --explain` is run,
 - Then it prints the routing reasoning (classification, candidates considered

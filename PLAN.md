@@ -375,18 +375,17 @@ applied. Conflicts were resolved as follows:
 - **README honesty (G3-15):** README lists only implemented adapters (aider,
   goose, mock-for-tests) and documents known limitations.
 
-## Current state (2026-11-04, review 7)
-- Conversation decision loop (`src/conversation/decide.ts`), job completion→inject, free-only gate, MCP parity, storage hardening, worktree create/apply, health/concurrency/version/verify hardening, compaction, voice spec, result-compiler richness shipped.
-- Many modules still experimental scaffolding; README/PLAN reflect implemented vs planned.
-
-- 39 test files, 217 tests passing.
-- `npm run typecheck`, `npm run typecheck:test`, `npm run build`,
-  `npm run lint`, `npm test` and `npm pack --dry-run` all green.
-- CLI verified: `air run`, `route-test --explain`, `status --json`,
-  `adapters list/install/upgrade/uninstall/status`, `verify`, `air mcp`,
-  `air models`, `air resume`, `air dashboard`.
-- Phase 0 (Orchestrator wiring) and Phase 1 (Free AI Adapter Catalog) complete.
-- Pushed to `radmanmilos/air` on `main`.
+## Current state (2026-11-11)
+- M0 truth pass: version strings unified at 0.2.0 (`src/index.ts` is the
+  source), README/`air commands` document `air merge`, adapter verification
+  table matches `src/adapters/registry.ts`, and the `--allow-paid` claim was
+  removed (not implemented).
+- E2E fixes: E-04 now searches after the first "Started job" line instead of
+  re-matching it; F-02 extracts the UUID conversation id (the store rejects
+  anything else).
+- Active task list: `docs/reviews/tasks_air_12.md` (monorepo absorption of
+  MakeingGoodAIs as `packages/local-worker`).
+- `npm test` is green (deterministic suite; live scenarios remain gated).
 
 ## Adapters
 
@@ -398,10 +397,17 @@ applied. Conflicts were resolved as follows:
 | goose | `goose` | `goose run --text` | 1.57.0 |
 | opencode | `opencode` | `run <prompt> --auto` | 2.2.5 |
 | kilocode | `kilocode` | `run <prompt> --auto` | 7.5.16 |
-| codex | `codex` | `exec --skip-git-repo-check <prompt>` | 0.166.0 |
-| github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` | 2.102.0 |
+| ollama | `ollama` | `run <model> <prompt>` | runtime |
 
-Only aider and goose are CI-smoke-test verified and eligible for routing. opencode, kilocode, codex, and github-copilot are unverified spikes visible in `air status` but never routed.
+### Unverified
+
+| Adapter | Executable | Headless |
+|---|---|---|
+| codex | `codex` | `exec --skip-git-repo-check <prompt>` |
+| github-copilot | `gh` | `copilot -- -p <prompt> --allow-all-tools` |
+
+Verified adapters are eligible for routing when installed. Unverified adapters
+are visible in `air status` but never routed.
 ## New modules (Reviews 6)
 - src/conversation/ (ConversationSession store, actions schema, injectResult)
 - src/planner/ (lightweight delegation planner)

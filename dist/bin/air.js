@@ -14,11 +14,12 @@ import { startMcp } from '../src/mcp/server.js';
 import { buildModelCatalog, formatModelCatalog, formatBestModel } from '../src/router/catalog.js';
 import { EXIT_CODES } from '../src/types/exit-codes.js';
 import { redact } from '../src/security/redact.js';
+import { version as AIR_VERSION } from '../src/index.js';
 const program = new Command();
 program
     .name('air')
     .description('Unified AI tool orchestrator')
-    .version('0.2.0')
+    .version(AIR_VERSION)
     .option('--dev', 'Developer mode: verbose diagnostics and full logs');
 async function listAdapters(config) {
     // Production registry: real adapters only, discovered from PATH.
@@ -146,7 +147,7 @@ function showStatus(options) {
         const snap = tracker.snapshot();
         const data = {
             command: 'status',
-            version: '0.1.0',
+            version: AIR_VERSION,
             tools: adapterStatus(),
             cooldowns: snap.cooldowns.map((c) => ({
                 provider: c.provider,
@@ -357,6 +358,7 @@ program
     console.log('  /export            Export session log');
     console.log('  /models            List models');
     console.log('  /verify <cmd...>   Run verification');
+    console.log('  /merge <jobId>     Apply a completed job worktree');
     console.log('  /mcp               Start MCP server');
     console.log('Type "/" then a command, or run "air <command>".');
 });

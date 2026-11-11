@@ -22,7 +22,7 @@ npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.g
 
 *AIR is free and so are we.*
 
-**Status:** Release candidate. Tests passing. CLI + MCP server functional. Build, lint and package dry-run green. Chat, planner, result-compiler, worktrees, and permissions modules partially wired; see docs/reviews/tasks_air_8.md.
+**Status:** Release candidate. CLI + MCP server functional. Typecheck, lint, test and package dry-run green. Chat, planner, result-compiler, worktrees, and permissions modules are wired; the active task list and remaining gaps live in `docs/reviews/tasks_air_12.md`.
 
 AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot, ollama) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
 
@@ -61,7 +61,7 @@ flowchart LR
 ```
 
 Components:
-- **CLI (`air`)** — `bin/air.ts` with commands: run, status/health, route-test, config, mcp, adapters, chat, resume, verify, dashboard, commands, models.
+- **CLI (`air`)** - `bin/air.ts` with commands: run, status/health, route-test, config, mcp, adapters, chat, resume, merge, verify, dashboard, commands, models.
 - **Config** — Zod schema is single source of truth, versioned (`version: 1`); `air config migrate` upgrades. Platform-appropriate global config + optional repo `.airrc.yaml` (untrusted). Precedence: CLI > env > repo > global > defaults.
 - **Router** — Priority list with free-first cost sorting, cooldowns keyed by (provider, model), exact skip reasons.
 - **Adapters** — Per-tool connectors implementing `AgentAdapter` (id, provider, model, capabilities, canHandle, buildCommand, parseOutput, classifyError). Conformance suite gates registration. Test-only mock adapter under `src/adapters/mock.ts`.
@@ -103,7 +103,8 @@ npm link
 - `air dashboard` - Show orchestrator sessions, decisions, events, connected adapters
 - `air commands` - List available commands
 - `air models` - List adapters with provider/model and allow-list status
-- `air chat` - Interactive non-blocking conversation (`--resume <id>`, `--free-only`, `--allow-paid`)
+- `air chat` - Interactive non-blocking conversation (`--resume <id>`, `--free-only`)
+- `air merge <jobId>` - Apply a completed job's worktree into the current branch
 - `air mcp` - Start MCP server over stdio
 - `--dev` - Developer mode with verbose diagnostics
 
@@ -138,19 +139,20 @@ Repo config cannot set global-only keys (failover, permission, redaction, truste
 
 ## Adapters
 
-### Verified (CI-smoke-tested and eligible for routing)
+### Verified (eligible for routing when installed)
 
 | Adapter | Executable | Headless | Verified | Version |
 |---|---|---|---|---|
 | aider | `aider` | `--message`, `--yes-always`, `--exit` | yes | 0.86.2 |
 | goose | `goose` | `goose run --text` | yes | 1.57.0 |
+| opencode | `opencode` | `run <prompt> --auto` | yes | 2.2.5 |
+| kilocode | `kilocode` | `run <prompt> --auto` | yes | 7.5.16 |
+| ollama | `ollama` | `run <model> <prompt>` | yes | runtime |
 
 ### Unverified spikes (visible in `air status`, never routed)
 
 | Adapter | Executable | Version (claimed) |
 |---|---|---|
-| opencode | `opencode` | 2.2.5 |
-| kilocode | `kilocode` | 7.5.16 |
 | codex | `codex` | 0.166.0 |
 | github-copilot | `gh` | 2.102.0 |
 
@@ -173,7 +175,7 @@ npm run dev            # tsx bin/air.ts
 
 ## Known limitations
 
-- Only aider and goose are CI-smoke-test verified and eligible for routing.
+- Aider, goose, opencode, kilocode, and ollama are verified and eligible for routing; codex and github-copilot are unverified spikes.
 - Verified adapters require the external CLI installed and on PATH.
 - Cross-provider front-agent fallback is not implemented in MVP (same-provider fallback only).
 - Daemon/IPC mode is not yet implemented; state is file-based with atomic writes and crash recovery.
