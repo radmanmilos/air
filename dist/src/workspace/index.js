@@ -7,16 +7,58 @@ import { paths } from '../config/paths.js';
 function git(cwd, args) {
     return execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
 }
+function sleepSync(ms) {
+    // Synchronous backoff; Node permits Atomics.wait on the main thread.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+function branchExists(cwd, branch) {
+    try {
+        git(cwd, ['rev-parse', '--verify', branch]);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 export function createWorktree(jobId, sourceCwd) {
-    const sourceHead = git(sourceCwd, ['rev-parse', 'HEAD']);
+    let sourceHead;
+    try {
+        sourceHead = git(sourceCwd, ['rev-parse', 'HEAD']);
+    }
+    catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        throw new Error(`failed to create worktree: ${sourceCwd} is not a usable git repository (${detail})`);
+    }
     const branch = `air/${jobId}`;
     const worktreePath = join(paths.cacheDir, 'worktrees', jobId);
     mkdirSync(join(paths.cacheDir, 'worktrees'), { recursive: true });
     if (existsSync(worktreePath)) {
-        // Reuse existing worktree.
+        return { jobId, sourceCwd, worktreePath, branch, sourceHead };
     }
-    else {
-        git(sourceCwd, ['worktree', 'add', '-b', branch, worktreePath, sourceHead]);
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const args = branchExists(sourceCwd, branch)
+                ? ['worktree', 'add', worktreePath, branch]
+                : ['worktree', 'add', '-b', branch, worktreePath, sourceHead];
+            git(sourceCwd, args);
+            lastError = null;
+            break;
+        }
+        catch (err) {
+            lastError = err;
+            // A stale worktree registration can block the next add; prune and retry.
+            try {
+                git(sourceCwd, ['worktree', 'prune']);
+            }
+            catch { /* best-effort */ }
+            if (attempt < 3)
+                sleepSync(100 * attempt);
+        }
+    }
+    if (!existsSync(worktreePath)) {
+        const detail = lastError instanceof Error ? lastError.message : String(lastError);
+        throw new Error(`failed to create worktree ${worktreePath}: ${detail}`);
     }
     return { jobId, sourceCwd, worktreePath, branch, sourceHead };
 }

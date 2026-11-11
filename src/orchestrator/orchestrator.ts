@@ -115,6 +115,8 @@ export class Orchestrator {
 
   private persist(): void {
     try {
+      // Fire-and-forget, but never leave a rejected promise unhandled: a lock
+      // write can fail (for example when the cache dir disappears).
       void lockedReadModifyWrite<any>(
         'orchestrator',
         this.logFile,
@@ -128,7 +130,7 @@ export class Orchestrator {
           }
           return { sessions: [...byId.values()], events: mergedEvents };
         },
-      );
+      ).catch(() => { /* best-effort */ });
     } catch { /* best-effort */ }
   }
 
@@ -217,7 +219,15 @@ export class Orchestrator {
     const { createWorktree } = await import('../workspace');
     let worktreeInfo: any = null;
     if (isWriteTask) {
-      try { worktreeInfo = createWorktree(runId, cwd); } catch { worktreeInfo = null; }
+      try {
+        worktreeInfo = createWorktree(runId, cwd);
+      } catch (err: any) {
+        const detail = String(err?.message ?? err);
+        this.log('worktree_failed', detail);
+        throw new Error(
+          `Workspace isolation failed: ${detail}. Refusing to run a write task in the source tree.`,
+        );
+      }
     }
     const execCwd = worktreeInfo ? worktreeInfo.worktreePath : cwd;
 

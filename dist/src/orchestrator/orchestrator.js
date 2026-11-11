@@ -60,6 +60,8 @@ export class Orchestrator {
     }
     persist() {
         try {
+            // Fire-and-forget, but never leave a rejected promise unhandled: a lock
+            // write can fail (for example when the cache dir disappears).
             void lockedReadModifyWrite('orchestrator', this.logFile, async (current) => {
                 const base = current ?? { sessions: [], events: [] };
                 const byId = new Map((base.sessions ?? []).map((s) => [s.runId, s]));
@@ -71,7 +73,7 @@ export class Orchestrator {
                         mergedEvents.push(e);
                 }
                 return { sessions: [...byId.values()], events: mergedEvents };
-            });
+            }).catch(() => { });
         }
         catch { /* best-effort */ }
     }
@@ -158,8 +160,10 @@ export class Orchestrator {
             try {
                 worktreeInfo = createWorktree(runId, cwd);
             }
-            catch {
-                worktreeInfo = null;
+            catch (err) {
+                const detail = String(err?.message ?? err);
+                this.log('worktree_failed', detail);
+                throw new Error(`Workspace isolation failed: ${detail}. Refusing to run a write task in the source tree.`);
             }
         }
         const execCwd = worktreeInfo ? worktreeInfo.worktreePath : cwd;
