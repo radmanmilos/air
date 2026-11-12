@@ -1,7 +1,7 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
 **Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)  
-**Status:** L0 IN PROGRESS / implementation not started  
+**Status:** L0 IN PROGRESS / L1 provider vertical slice in progress  
 **Created:** 2026-11-12  
 **Baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5  
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
@@ -61,8 +61,8 @@
 ### L0-03 — Freeze provider, role, config and contract boundaries
 
 - Status: IN_PROGRESS
-- Owner: integration agent; independent reviewer required
-- Proposal recorded in [L0 baseline investigation](../architecture/local-first-l0-baseline.md): global-only `models` config section; seven initial roles; typed provider-neutral model API; versioned worker contract; one active generative model by default. [Independent AI review assignment](ai-review-prompt_local-first-l0.md) is ready; awaiting reviewer findings/acceptance.
+- Owner: integration agent; independent reviewer still required
+- Integration-owner review completed 2026-11-12; disposition and explicit non-independent status recorded in [L0 baseline investigation](../architecture/local-first-l0-baseline.md). The global-only model-config boundary, seven logical roles, provider/adapter separation, typed provider API, canonical error taxonomy, and conservative one-generative-model default are accepted as the implementation direction. Exact config-v2 fields/migration and worker contract-v2 remain unfrozen until their compatibility tests are designed. No independent AI review has been supplied; the review assignment remains open.
 - Scope: settle provider interface, model registry record, role names, role request/response contracts, config v2 shape, migration behavior, resource policy, error taxonomy, worker request contract and compatibility strategy.
 - Files: blueprint; src/config/schema.ts; src/config/loader.ts; migration module; src/types/*; contracts/job.schema.json; Python contract.
 - Acceptance: decisions and rejected alternatives recorded in blueprint; one source of truth for effective configuration; TS/Python contract compatibility test plan.
@@ -86,11 +86,11 @@
 - Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
 - Base commit: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
 - Working branch: `work/local-first-l0-baseline`.
-- Documentation/fixture catalog commits are present on this branch; no source implementation has started. The authoritative current branch head is the live `head.sha` on [PR #1](https://github.com/radmanmilos/air/pull/1); re-check it before taking over.
+- Documentation/fixture catalog and first provider-runtime implementation commits are present on this branch. The authoritative current branch head is the live `head.sha` on [PR #1](https://github.com/radmanmilos/air/pull/1); re-check it before taking over.
 - Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
-- L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 decisions await independent review. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases) and proposed thresholds; concrete payloads/corpora for some suites and the evaluation runner remain outstanding.
-- Next: complete executable fixture payloads and evaluation harness; request independent AI review of provider/config/contract/security decisions; freeze L1/L2 interfaces; then begin the first Ollama coordinator vertical slice.
-- PR #1 is ready for review. CI for the latest PR head was queued at last poll; use the run attached to the current PR head SHA and do not infer success from runs on earlier commits. No tests were run locally because no clone/worktree was available to this agent.
+- L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 has an integration-owner disposition but still lacks independent review and exact config/worker migration tests. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases); executable payloads/corpora and the evaluation runner remain outstanding.
+- L1 provider API/Ollama slice is in progress on this same feature branch. It is not wired into CLI/MCP or the Python worker; no model-role config exists yet. No local tests were run because no clone/worktree is available in this session. Re-check GitHub CI for the exact current PR head.
+- Next: validate the provider implementation in CI, complete provider contract/failure cases, then add concrete evaluation payloads and a temporary-workspace harness. Keep coordinator/role config work behind their own tests and explicit review.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
@@ -103,16 +103,18 @@
 - Acceptance: contract is provider-neutral and does not assume every provider supports every capability.
 
 ### L1-02 — Implement Ollama provider
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: `src/models/providers/ollama.ts` implements native fetch transport for chat/tool calls, embeddings, health, installed/model metadata and optional running-model diagnostics. It does not start Ollama or pull models. See [model provider runtime](../adapters/model-providers.md).
 - Depends on: L1-01
 - Scope: wrap/refactor existing Ollama transport behind provider API; support chat, tool calls, structured output where supported, embeddings, tags/model info and health.
 - Likely files: src/models/providers/ollama.ts; packages/local-worker/air_local/ollama.py only if a shared worker concern requires it.
 - Acceptance: fake-provider unit tests plus gated live Ollama integration; consistent error taxonomy.
 
 ### L1-03 — Provider conformance and failure tests
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: `tests/models/ollama.test.ts` covers chat/tool-call mapping, embeddings, discovery, health/offline behavior, missing model, rate limiting, cancellation, timeout and malformed responses. Tests have not been run locally; exact-head GitHub CI is required before marking DONE.
 - Depends on: L1-01, L1-02
 - Scope: provider conformance suite; timeout, cancellation, offline, unsupported capability, malformed response and rate-limit behavior.
 - Acceptance: deterministic tests do not require a live Ollama service.
