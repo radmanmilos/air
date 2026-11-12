@@ -1,6 +1,6 @@
 # AIR Local-First Intelligence — Architecture and Implementation Blueprint
 
-**Status:** Proposed implementation blueprint; ready for cross-agent review  
+**Status:** L0 baseline documented; integration-owner boundary review recorded; L1 provider runtime implementation in progress. Independent review remains outstanding.  
 **Prepared:** 2026-11-12  
 **Repository baseline inspected:** main at 6fe3222cd6fcacbe8293b86a330a5e3138686006  
 **Purpose:** Make AIR's own intelligence local-first and model-driven while preserving deterministic control, safety, portability, and optional external providers.
@@ -829,12 +829,17 @@ The following recommendations are recorded in [the L0 baseline investigation](lo
 - Replace the legacy `ChatProvider.complete() -> string` seam with a typed provider-neutral API that represents tool calls, structured output, embeddings, capability declarations, cancellation and canonical model-provider errors.
 - Extend the shared worker contract only through an explicit versioned compatibility path; TypeScript resolves the role/model and the Python worker must not independently choose AIR roles.
 
-## 18. Immediate next step
+## 18. Immediate implementation sequence
 
-Start with **Phase L0** and create/maintain the active ledger in docs/reviews/tasks_air_13.md. Do not begin broad implementation until:
-- current branch/CI baseline is freshly verified;
-- end-to-end request path is mapped against live code;
-- provider, role, config and job-contract boundaries are agreed;
-- work packages are assigned with non-overlapping file ownership.
+The L0 baseline and request lifecycle map are recorded in docs/architecture/local-first-l0-baseline.md; the active work state is tracked in docs/reviews/tasks_air_13.md. The integration owner has reviewed and accepted the provider/role/config/control-plane boundaries as an implementation direction. This is not independent review, and exact config-v2 and worker-v2 compatibility contracts remain open.
 
-The first implementation vertical slice should be deliberately small: **a local Ollama-backed coordinator that can answer or emit one validated spawn_job action, with deterministic fallback and tests, while leaving existing execution and permission control intact.** Expand to LLM planning, role-aware coding and independent review only after that slice is stable.
+The first isolated L1 package is the provider-neutral TypeScript API and Ollama transport. It is intentionally not wired to CLI/MCP, role configuration, the Python worker or task execution. Validate it in exact-head CI before proceeding.
+
+Next sequence:
+1. Finish and validate L1 provider contracts, Ollama behavior and deterministic failure tests.
+2. Complete concrete evaluation payloads and a temporary-workspace harness; add the repeatable runner only after the provider API stabilizes.
+3. Obtain independent review of global-only config, role assignments, error taxonomy, provider API and worker versioning before L2 config/worker changes.
+4. Implement L2 config migration, model registry and role resolver with v1 preservation and repo-config trust tests.
+5. Build the first local Ollama-backed coordinator that can answer or propose one validated spawn_job action. Keep all dispatch, permissions, process lifecycle and success decisions deterministic.
+
+Do not add automatic model downloads, hosted fallback, or unreviewed worker-contract fields as part of the provider package.
