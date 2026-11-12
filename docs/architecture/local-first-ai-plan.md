@@ -83,6 +83,22 @@ The following describes code inspected at the baseline commit, not the target de
 - AGENTS.md contains an inconsistency: its six rules refer to docs/reviews/tasks_air_6.md, while its source-of-truth section and README identify docs/reviews/tasks_air_12.md. The active implementation ledger created alongside this blueprint should resolve this by becoming the explicit next task ledger; do not silently edit historical task ledgers.
 - At inspection time the latest commit's combined status endpoint returned no status entries, and the connector's commit-workflow wrapper returned no runs (it filters to pull-request-triggered runs). Therefore the latest commit's CI result was **not independently verified** in this task. Earlier task-ledger claims of green CI are historical claims, not proof for current HEAD.
 
+
+### 3.2 L0 live-code verification
+
+The baseline table above is a high-level summary. The detailed request call graph, exact current call sites, CLI/MCP differences, existing test coverage, recommended shared contracts and integration boundaries were verified at commit \`35c7300569df2568dbd2cec97a4f6cc232533cc5\` and are recorded in [the L0 baseline investigation](local-first-l0-baseline.md).
+
+Important refinements from that inspection:
+
+- CLI \`air chat\` does have a free-form answer path, but it is not a model-driven coordinator: \`decide()\` remains regex-based. The answer brain tries KiloCode and OpenCode before Ollama; Ollama is only considered when \`AIR_BRAIN_MODEL_OLLAMA\` is set.
+- MCP \`chat_send\` does not call that answer brain. It returns a fixed acknowledgement for \`answer\` actions and its \`cancel_job\` branch currently only reports that cancellation was requested.
+- The existing \`ChatProvider\` interface is a mock-tested seam only; it is not used by either conversation entrypoint and is too narrow for role-based tool/structured-output/embedding requests.
+- The Python Ollama client drives the bundled worker's ReAct loop. It is not yet the provider API for AIR's TypeScript coordinator/planner/reviewer roles.
+- CLI and MCP share the decision function but not a single conversation service. The MCP spawn path can save a stale in-memory conversation object after appending the user message.
+- Current tests exercise CLI chat scenarios and MCP task tools, but do not prove production Ollama coordinator behavior or full \`chat_send\` parity.
+
+See the baseline investigation for exact paths, call graph, current test evidence and recommended design decisions. These findings supersede any broader wording above that could be read as saying a local-first coordinator is already wired.
+
 ## 4. Reference hardware and model starting point
 
 ### 4.1 Reference development profile
@@ -117,6 +133,8 @@ Assignments are provisional. A model's disk download size is not its total runti
 - granite4:3b: candidate for structured instructions and tool-call reliability.
 - embeddinggemma:300m: comparison candidate for embeddings.
 - Other Ollama models may be added by users; AIR must not hardcode a closed model list.
+
+The repeatable fixture matrix, metrics, thresholds and reference-hardware protocol are specified in [the local-first evaluation plan](local-first-evaluation.md). Fixtures must be committed before model comparisons; the thresholds are proposed gates, not benchmark results.
 
 Useful upstream references (tags and capabilities can change; re-check before implementation and release):
 
@@ -798,6 +816,18 @@ A work package is complete only when:
 7. Which Desert Ant utility (if any) has a concrete user-facing requirement and acceptable Windows/runtime/license footprint.
 
 Do not block L1/L2 on optional Desert Ant or hosted-provider choices.
+
+### 17.1 Integration-owner recommendations for L0 review
+
+The following recommendations are recorded in [the L0 baseline investigation](local-first-l0-baseline.md). They are proposals until independently reviewed and accepted in the active ledger:
+
+- Keep role/provider assignments in the existing global AIR config under a new \`models\` section; treat that section as global-only and ignore it in repository \`.airrc.yaml\`. Never let an untrusted repository choose a user's model, enable external egress or supply provider secrets.
+- Use the initial roles \`coordinator\`, \`planner\`, \`coder\`, \`reviewer\`, \`reasoner\`, \`summarizer\` and \`embeddings\`. Merge task analysis into \`planner\` until evaluations justify a separate role.
+- Keep reviewer output advisory in the first coordinator vertical slice. Add risk-tiered review only after seeded-defect evaluation; deterministic process/test/workspace evidence remains authoritative.
+- Default to one active generative model and serialized role switching. Probe Ollama installed/running model state where supported; host GPU/VRAM metrics remain best-effort and unknown values stay unknown.
+- Defer semantic retrieval, hosted providers and Desert Ant utilities until local Ollama behavior is stable and a measured requirement exists.
+- Replace the legacy \`ChatProvider.complete() -> string\` seam with a typed provider-neutral API that represents tool calls, structured output, embeddings, capability declarations, cancellation and canonical model-provider errors.
+- Extend the shared worker contract only through an explicit versioned compatibility path; TypeScript resolves the role/model and the Python worker must not independently choose AIR roles.
 
 ## 18. Immediate next step
 
