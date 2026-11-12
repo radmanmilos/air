@@ -62,7 +62,7 @@
 
 - Status: IN_PROGRESS
 - Owner: integration agent; independent reviewer required
-- Proposal recorded in [L0 baseline investigation](../architecture/local-first-l0-baseline.md): global-only `models` config section; seven initial roles; typed provider-neutral model API; versioned worker contract; one active generative model by default. Awaiting independent review/acceptance.
+- Proposal recorded in [L0 baseline investigation](../architecture/local-first-l0-baseline.md): global-only `models` config section; seven initial roles; typed provider-neutral model API; versioned worker contract; one active generative model by default. [Independent AI review assignment](ai-review-prompt_local-first-l0.md) is ready; awaiting reviewer findings/acceptance.
 - Scope: settle provider interface, model registry record, role names, role request/response contracts, config v2 shape, migration behavior, resource policy, error taxonomy, worker request contract and compatibility strategy.
 - Files: blueprint; src/config/schema.ts; src/config/loader.ts; migration module; src/types/*; contracts/job.schema.json; Python contract.
 - Acceptance: decisions and rejected alternatives recorded in blueprint; one source of truth for effective configuration; TS/Python contract compatibility test plan.
@@ -86,11 +86,11 @@
 - Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
 - Base commit: \`35c7300569df2568dbd2cec97a4f6cc232533cc5\`.
 - Working branch: \`work/local-first-l0-baseline\`.
-- Documentation/fixture catalog commits are present on this branch; no source implementation has started. Current branch head at handoff: `fc78a09e97fcedae2f7a8048e16d34fd621b34d6`.
+- Documentation/fixture catalog commits are present on this branch; no source implementation has started. Current branch head at handoff: `517b86f7d4afc3467afb699b6af3b0339f3cc8b8`.
 - Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
 - L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 decisions await independent review. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases) and proposed thresholds; concrete payloads/corpora for some suites and the evaluation runner remain outstanding.
 - Next: complete executable fixture payloads and evaluation harness; request independent AI review of provider/config/contract/security decisions; freeze L1/L2 interfaces; then begin the first Ollama coordinator vertical slice.
-- PR #1 is ready for review; CI run [43219955351](https://github.com/radmanmilos/air/actions/runs/43219955351) was queued for the latest branch head at last poll. No tests were run locally because no clone/worktree was available to this agent.
+- PR #1 is ready for review; CI runs [43219955351](https://github.com/radmanmilos/air/actions/runs/43219955351) and [43219839583](https://github.com/radmanmilos/air/actions/runs/43219839583) were still in progress for earlier PR heads at last poll. Re-check CI for the latest head before merge. No tests were run locally because no clone/worktree was available to this agent.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
