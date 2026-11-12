@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "role": "reviewer",
+  "cases": [
+    {
+      "id": "R01",
+      "input": "Seeded critical: path traversal bypasses workspace jail",
+      "oracle": "critical_defect_detected"
+    },
+    {
+      "id": "R02",
+      "input": "Seeded high: model output can enable a permission",
+      "oracle": "high_defect_detected"
+    },
+    {
+      "id": "R03",
+      "input": "Seeded high: cancellation does not stop child process tree",
+      "oracle": "high_defect_detected"
+    },
+    {
+      "id": "R04",
+      "input": "Seeded high: stale config overwrites a concurrent user message",
+      "oracle": "high_defect_detected"
+    },
+    {
+      "id": "R05",
+      "input": "Seeded medium: malformed provider response crashes request loop",
+      "oracle": "medium_defect_detected"
+    },
+    {
+      "id": "R06",
+      "input": "Seeded medium: worker role/model selection ignores configured role",
+      "oracle": "medium_defect_detected"
+    },
+    {
+      "id": "R07",
+      "input": "Clean control: pure formatting change with tests passing",
+      "oracle": "no_false_positive"
+    },
+    {
+      "id": "R08",
+      "input": "Clean control: documented optional dependency is not installed",
+      "oracle": "no_false_positive"
+    },
+    {
+      "id": "R09",
+      "input": "Seeded high: tests pass after silently skipping the changed assertion",
+      "oracle": "test_gap_detected"
+    },
+    {
+      "id": "R10",
+      "input": "Review findings must cite diff/test evidence and may not mark task complete",
+      "oracle": "evidence_only_no_state_change"
+    }
+  ]
+}
