@@ -66,7 +66,7 @@ describe('local-first evaluation fixture payloads', () => {
       resolve(FIXTURE_ROOT, 'payloads/workspaces/coder-discount/README.md'),
       'utf8',
     );
-    expect(workspace).toContain('intentionally');
+    expect(workspace).toContain('deliberately');
   });
 
   it('provides concrete diagnostic evidence for every debugging case', async () => {
