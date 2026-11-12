@@ -831,16 +831,16 @@ The following recommendations are recorded in [the L0 baseline investigation](lo
 
 ## 18. Immediate implementation sequence
 
-The baseline and request lifecycle map are recorded in `docs/architecture/local-first-l0-baseline.md`; active work is tracked in `docs/reviews/tasks_air_13.md`. PR #1 is merged to `main` at `a2dc1e95f3f26a5497e35c19c0af4c70976b1a96`. It provides the provider-neutral TypeScript model API, Ollama transport, in-memory provider/model registries, global-only config v2, v1 migration and initial role resolver. It does not yet wire model roles into CLI/MCP chat or the Python worker.
+PR #1 and PR #2 are merged to main. The provider-neutral Ollama runtime, provider/model registries, global-only config v2, v1 migration, role resolver, concrete evaluation payloads and isolated coder workspace harness are now on main. The model runtime is not yet wired into CLI/MCP chat or the Python worker.
 
-The exact PR head passed full GitHub Actions CI (run 286, `5b968bb0024eec854861d5beb411e640cf3f3a1e`); the merge commit also has a push-triggered main CI run, which must be monitored separately.
+The L0-04c evaluation runner is being implemented on a follow-up branch. It checks installed Ollama model tags without pulling, records raw generation proposals and reproducibility metadata, and computes embeddings retrieval rankings. It does not execute tool calls or apply coder patches; those remain separate execution/evaluation work.
 
-Current sequence:
-1. Finish L0-04b concrete synthetic payloads and the temporary-workspace isolation helper; require exact-head CI before marking it done.
-2. Obtain independent review of the global-only config, provider API, role model and worker-v2 boundary. Integration-owner review is not independent approval.
-3. Complete L0-04c repeatable model evaluation only after the provider invocation contract is ready; capture raw outcomes, digests, prompts, context, latency and measurable resources. Never auto-pull models.
-4. Implement the L3 resource-aware model manager: best-effort hardware/runtime probes and serialized model lifecycle management, defaulting to one active generative model.
-5. Implement the L4 local Ollama-backed coordinator that can answer or propose one validated `spawn_job` action. Keep dispatch, permissions, process lifecycle, cancellation and success decisions deterministic.
-6. Add LLM planning, role-aware worker propagation and reviewer behavior only behind their own compatibility/evaluation gates.
+Next sequence:
+1. Validate the runner on the exact PR head and merge it after CI passes.
+2. Obtain independent review of global-only config, provider API, role model and worker-v2 compatibility. Integration-owner review is not independent approval.
+3. Complete automated scoring and independent threshold review; do not recommend models from raw outputs alone.
+4. Implement L3 resource-aware model lifecycle management with best-effort hardware/runtime probes and one active generative model by default.
+5. Implement L4 local Ollama-backed coordinator that can answer or propose one validated spawn_job action. Keep dispatch, permissions, process lifecycle, cancellation and success decisions deterministic.
+6. Add LLM planning, role-aware worker propagation and reviewer behavior only behind compatibility and evaluation gates.
 
 Do not add automatic model downloads, hosted fallback or unreviewed worker-contract fields.
