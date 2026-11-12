@@ -34,8 +34,12 @@ describe('resolveModelRole', () => {
         providers: { ollama: { enabled: false } },
       },
     });
-    expect(() => resolveModelRole(config, 'coordinator')).toThrow(
-      expect.objectContaining({ code: 'PROVIDER_UNAVAILABLE' }),
-    );
+    let caught: unknown;
+    try {
+      resolveModelRole(config, 'coordinator');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
   });
 });
