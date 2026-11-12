@@ -352,7 +352,7 @@ export class OllamaProvider implements ModelProvider {
     return result;
   }
 
-  private async request<T extends Record<string, unknown>>(
+  private async request<T extends object>(
     path: string,
     init: RequestInit,
     timeoutMs = this.defaultTimeoutMs,
