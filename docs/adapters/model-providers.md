@@ -46,7 +46,7 @@ External abort signals map to \`CANCELLED\`; the provider's own deadline maps to
 ## Current limitations / next work
 
 - No config/role resolver or provider registry yet; callers construct \`OllamaProvider\` explicitly.
-- No streaming API, structured-output capability negotiation, provider conformance abstraction, or live-Ollama CI.
+- No streaming API, provider-independent conformance suite, persistent model inventory, resource scheduler, or live-Ollama CI. Capability absence remains unknown rather than guessed.
 - The provider does not own model provisioning or daemon lifecycle.
 - The legacy \`src/conversation/chat-provider.ts\` mock seam remains in place until the coordinator migration replaces it.
 - Add cross-provider conformance tests before a second provider is introduced.
