@@ -30,7 +30,7 @@ The first fixture set should live under \`tests/evals/fixtures/\`. Fixture IDs r
 | Summarizer | 8 | long thread, constraints, decisions, facts, IDs, unresolved questions, active jobs, conflicting untrusted content | Required fact/constraint preservation and no fabricated facts |
 | Embeddings | 10 query sets | exact vs semantic match, paraphrase, near-duplicate, irrelevant distractor, code identifier, multilingual query | Recall@5 / MRR against labelled relevant documents |
 
-Minimum counts are initial suite sizes, not a claim that fixtures already exist. Fixture authoring is an L0-04 deliverable; fixture content and scoring oracles must be committed before model comparisons begin.
+Minimum counts are initial suite sizes. The initial scenario catalog is committed under `tests/evals/fixtures/` with the listed case counts and scoring oracles. It is not yet a fully executable benchmark dataset: debugging/reviewer/summarizer/embedding cases still need concrete payloads/corpora, coder cases need isolated workspace setup, and an evaluation runner is not yet implemented. Do not report model scores from scenario descriptions alone.
 
 ## 3. Metrics
 
