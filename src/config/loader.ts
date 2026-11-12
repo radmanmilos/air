@@ -51,6 +51,9 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
     if (parsed.success) {
       // Strip global-only keys from repo config (security: repo cannot set them).
       const repoData = { ...parsed.data } as Record<string, unknown>;
+      // The version identifies the repo file schema; it is not an effective
+      // runtime setting and must not override the global config version.
+      delete repoData.version;
       const stripped: string[] = [];
       for (const key of GLOBAL_ONLY_KEYS) {
         if (key in repoData) {
