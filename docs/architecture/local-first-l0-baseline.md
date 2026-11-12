@@ -185,7 +185,7 @@ This is a design proposal only. It must be converted into strict Zod types and a
 
 ### 5.3 Worker contract direction
 
-Keep the canonical shared contract. A future contract version should carry the resolved execution role and resolved model identity into the local worker, while the TypeScript control plane remains the source of role/provider selection. The Python worker must not independently re-resolve AIR roles. Maintain v1 compatibility or provide a tested migration/version negotiation path; the current schema rejects unknown fields, so an unversioned additive change is not safe.
+Keep the canonical shared contract. A future contract version should carry the resolved execution role, provider/model identity and the provider settings needed by the worker (at minimum Ollama base URL and keep-alive policy), while the TypeScript control plane remains the source of role/provider selection. The Python worker must not independently re-resolve AIR roles. Prefer passing resolved per-run provider settings in the versioned request (or a generated per-run worker config) over keeping a second authoritative model/provider configuration in `packages/local-worker/config.yaml`. The worker config should retain worker-only tool/agent settings; its model slots become compatibility defaults during migration and are removed only after the new contract is proven. Maintain v1 compatibility or provide a tested migration/version negotiation path; the current schema rejects unknown fields, so an unversioned additive change is not safe.
 
 ## 6. Handoff and implementation boundaries
 
