@@ -38,6 +38,10 @@ interface Job {
 }
 
 export const jobs = new Map<string, Job>();
+// Track orchestrators created by MCP chat_send so cancel_job can cancel them.
+const chatJobOrchs = new Map<string, Orchestrator>();
+// Track owning conversation for MCP chat jobs to enforce isolation.
+const chatJobConversations = new Map<string, string>();
 
 // Backward-compatible exports for in-process job lifecycle tests.
 // These operate on Job-compatible objects and are not used by the MCP
@@ -261,7 +265,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
 
       const { config } = await loadConfig({ cwd });
       let mcpAdapters: any[] | undefined;
-      if (process.env.AIR_MOCK_ADAPTER) {
+      if (process.env.AIR_MOCK_ADAPTER === '1') {
         const { MockAdapter } = await import('../adapters/mock');
         mcpAdapters = [new MockAdapter()];
       }
@@ -357,7 +361,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       const cwd = args.cwd ?? process.cwd();
       const { config } = await loadConfig({ cwd });
       const orch = new Orchestrator({
-        adapters: process.env.AIR_MOCK_ADAPTER ? (() => {
+        adapters: process.env.AIR_MOCK_ADAPTER === '1' ? (() => {
           const { MockAdapter } = require('../adapters/mock');
           return [new MockAdapter()];
         })() : undefined,
@@ -436,13 +440,27 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
     async (args: any) => {
       const job = jobs.get(args.runId);
       if (!job) return { content: [{ type: 'text', text: `Unknown runId: ${args.runId}` }] };
+
+      const st = await readTaskState(args.runId);
+      if (st && (st.state === 'COMPLETED' || st.state === 'FAILED' || st.state === 'CANCELLED')) {
+        if (st) job.state = st;
+        return { content: [{ type: 'text', text: `Job ${args.runId} is not running (${st.state}).` }] };
+      }
+
       job.controller.abort();
       try { await job.promise; } catch { /* noop */ }
       const fresh = await readTaskState(args.runId);
-      if (fresh) job.state = fresh;
-      if (job.state.state !== 'CANCELLED') job.state.state = 'CANCELLED';
-      await writeTaskState(job.state).catch(() => {});
-      return { content: [{ type: 'text', text: `Cancelled ${args.runId}.` }] };
+      if (fresh) {
+        job.state = fresh;
+        if (fresh.state === 'COMPLETED' || fresh.state === 'FAILED') {
+          return { content: [{ type: 'text', text: `Job ${args.runId} is not running (${fresh.state}).` }] };
+        }
+        if (fresh.state === 'CANCELLED') {
+          return { content: [{ type: 'text', text: `Cancelled ${args.runId}.` }] };
+        }
+        return { content: [{ type: 'text', text: `Cancellation unconfirmed for ${args.runId} (state=${fresh.state}).` }] };
+      }
+      return { content: [{ type: 'text', text: `Cancellation unconfirmed for ${args.runId}.` }] };
     },
   );
 
@@ -609,6 +627,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       inputSchema: {
         conversationId: z.string().optional().describe('Conversation id (creates one if omitted)'),
         message: z.string().describe('User message'),
+        cwd: z.string().optional().describe('Working directory for spawned jobs'),
       },
     },
     async (args: any) => {
@@ -623,18 +642,45 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       for (const a of actions) {
         if (a.type === 'spawn_job') {
           // Start job in background via orchestrator; link to conversation.
+          const spawnCwd = args.cwd ?? process.cwd();
           const { loadConfig } = await import('../config/loader');
-          const { config } = await loadConfig({ cwd: process.cwd() });
+          const { config } = await loadConfig({ cwd: spawnCwd });
           const { Orchestrator } = await import('../orchestrator/orchestrator');
-          const orch = new Orchestrator({ config, mcpMode: true });
+          // AIR_MOCK_ADAPTER is a test-only seam: it injects MockAdapter and bypasses
+          // chat freeOnly routing so deterministic mock runs can exercise the real
+          // spawn/cancel path. It must not be set in production; non-mock spawns keep
+          // the conversation/user freeOnly preference.
+          const mockAdapterMode = process.env.AIR_MOCK_ADAPTER === '1';
+          let mcpAdapters: any[] | undefined;
+          if (mockAdapterMode) {
+            const { MockAdapter } = await import('../adapters/mock');
+            mcpAdapters = [new MockAdapter()];
+          }
+          const orch = new Orchestrator({ adapters: mcpAdapters, config, mcpMode: true });
           const contextParts = [a.goal];
           if (conv.summary) contextParts.push(`Context summary: ${conv.summary}`);
           if (conv.facts && conv.facts.length > 0) contextParts.push(`Facts: ${conv.facts.join('; ')}`);
           const enriched = contextParts.join('\n');
           const plan = planFromRequest(enriched, a.hints ?? {});
           const item = plan.workItems[0];
-          const session = await orch.start(item.objective, process.cwd(), { mode: 'auto', freeOnly: conv.userPreferences.freeOnly, readOnly: a.hints?.requiresWrite === false });
-          await mutateConversation(conv.id, (c) => { c.activeWorkIds.push(session.runId); });
+          let session: any;
+          try {
+            session = await orch.start(item.objective, spawnCwd, { mode: 'auto', freeOnly: mockAdapterMode ? false : conv.userPreferences.freeOnly, readOnly: a.hints?.requiresWrite === false });
+          } catch (err: any) {
+            replies.push(`Failed to start job: ${String(err?.message || err)}`);
+            continue;
+          }
+          chatJobOrchs.set(session.runId, orch);
+          chatJobConversations.set(session.runId, conv.id);
+          try {
+            await mutateConversation(conv.id, (c) => { c.activeWorkIds.push(session.runId); });
+          } catch (err) {
+            chatJobOrchs.delete(session.runId);
+            chatJobConversations.delete(session.runId);
+            try { await orch.cancel(session.runId); } catch { /* noop */ }
+            try { await orch.waitFor(session.runId); } catch { /* noop */ }
+            throw err;
+          }
           replies.push(`Started job ${session.runId}.`);
           // Background completion inject.
           (async () => {
@@ -660,7 +706,11 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
               const summary = compileJobResult(facts as any);
               await injectResult(conv!.id, summary, session.runId);
               await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== session.runId); });
-            } catch { /* noop */ }
+            } catch { /* noop */ } finally {
+              // Remove handle after terminal handling; safe if cancel already removed it.
+              chatJobOrchs.delete(session.runId);
+              chatJobConversations.delete(session.runId);
+            }
           })();
         } else if (a.type === 'answer') {
           await appendMessage(conv.id, { role: 'assistant', content: 'Acknowledged.' });
@@ -672,7 +722,109 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
           const fresh = loadConversation(conv.id);
           replies.push(`messages=${fresh?.messages.length ?? 0} active=${(fresh?.activeWorkIds ?? []).join(',')}`);
         } else if (a.type === 'cancel_job') {
-          replies.push(`Cancel requested for ${a.jobId}.`);
+          const jobId = a.jobId;
+          const ownerConvId = chatJobConversations.get(jobId);
+          if (ownerConvId && ownerConvId !== conv.id) {
+            replies.push(`Job ${jobId} does not belong to this conversation.`);
+            continue;
+          }
+          // If tracked by another conversation but handle gone, treat as inaccessible/unknown to this caller.
+          if (!ownerConvId && chatJobOrchs.has(jobId)) {
+            replies.push(`Job ${jobId} does not belong to this conversation.`);
+            continue;
+          }
+          // If it belongs to another conversation according to that conversation's active list, block.
+          if (!ownerConvId) {
+            // best-effort cross-conversation guard: do not cancel unknown-to-this-conversation ids that look foreign by missing from this conv and having another owner impossible to prove; rely on handle ownership above. Unknown handled below.
+          }
+          const orch = chatJobOrchs.get(jobId);
+          const job = jobs.get(jobId);
+
+          // First check persisted state (race-safe with completion)
+          let st = await readTaskState(jobId);
+          if (st && (st.state === 'COMPLETED' || st.state === 'FAILED')) {
+            chatJobOrchs.delete(jobId);
+            chatJobConversations.delete(jobId);
+            await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+            replies.push(`Job ${jobId} is not running (${st.state}).`);
+          } else if (st && st.state === 'CANCELLED') {
+            chatJobOrchs.delete(jobId);
+            chatJobConversations.delete(jobId);
+            await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+            replies.push(`Job ${jobId} is not running (CANCELLED).`);
+          } else if (orch) {
+            let cancelErr: any = null;
+            try {
+              await orch.cancel(jobId);
+            } catch (err) {
+              cancelErr = err;
+            }
+            try {
+              await orch.waitFor(jobId);
+            } catch { /* ignore wait errors */ }
+
+            chatJobOrchs.delete(jobId);
+            chatJobConversations.delete(jobId);
+
+            const fresh = await readTaskState(jobId);
+            if (fresh) {
+              if (fresh.state === 'COMPLETED' || fresh.state === 'FAILED') {
+                await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                replies.push(`Job ${jobId} is not running (${fresh.state}).`);
+              } else if (fresh.state === 'CANCELLED') {
+                await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                replies.push(`Cancelled ${jobId}.`);
+              } else if (cancelErr) {
+                await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                replies.push(`Cancellation failed for ${jobId}: ${String(cancelErr.message || cancelErr)}`);
+              } else {
+                // Could not confirm cancellation - do not fabricate state
+                await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                replies.push(`Cancellation unconfirmed for ${jobId} (state=${fresh.state}).`);
+              }
+            } else {
+              if (cancelErr) {
+                await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                replies.push(`Cancellation failed for ${jobId}: ${String(cancelErr.message || cancelErr)}`);
+              } else {
+                await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                replies.push(`Cancellation unconfirmed for ${jobId}.`);
+              }
+            }
+          } else if (job) {
+            // Global in-process jobs map is not conversation-scoped; refuse to cancel by id from chat.
+            if (!conv.activeWorkIds.includes(jobId)) {
+              replies.push(`Job ${jobId} does not belong to this conversation.`);
+            } else {
+              job.controller.abort();
+              try {
+                await job.promise;
+              } catch { /* noop */ }
+              const fresh = await readTaskState(jobId);
+              if (fresh) {
+                job.state = fresh;
+                if (fresh.state === 'COMPLETED' || fresh.state === 'FAILED') {
+                  await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                  replies.push(`Job ${jobId} is not running (${fresh.state}).`);
+                } else if (fresh.state === 'CANCELLED') {
+                  await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                  replies.push(`Cancelled ${jobId}.`);
+                } else {
+                  // Cannot confirm cancellation - do not overwrite
+                  await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                  replies.push(`Cancellation unconfirmed for ${jobId} (state=${fresh.state}).`);
+                }
+              } else {
+                await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+                replies.push(`Cancellation unconfirmed for ${jobId}.`);
+              }
+            }
+          } else if (!st) {
+            replies.push(`Unknown job ${jobId}.`);
+          } else {
+            await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== jobId); });
+            replies.push(`Cannot cancel job ${jobId}: no active handle (state=${st.state}).`);
+          }
         }
       }
       if (replies.length === 0) replies.push('Acknowledged.');
