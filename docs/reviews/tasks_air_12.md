@@ -3,6 +3,7 @@
 **Source:** plan discussion (2026-11-11)
 **Decision:** monorepo; AIR is the control plane, the retained MGAI subset is an
 internal local worker. `air` is the only user-facing interface.
+**Status:** COMPLETE (2026-11-12) — M0–M5 done; `MakingGoodAIs` decommissioned.
 
 ## Scope rule
 
@@ -170,16 +171,12 @@ Take MGAI's **tools and local model transport**, not its orchestration:
 - `docs/adapters/local.md`, README, `air status`, MCP `list_adapters`,
   `docs/behavior-spec.md` merge/status sections.
 
-### T12-052 [BLOCKED] — Decommission MakeingGoodAIs
-- Done: full history preserved in AIR via the subtree import
-  (`137e0a4 Add 'packages/local-worker/' from commit 'a5e8818'`); MGAI tagged
-  `final-before-absorb` (annotated) and the tag + `master` pushed to
-  `origin` (`refs/tags/final-before-absorb` = `7705c7d` -> `a5e8818`).
-- Blocked: `gh repo delete radmanmilos/MakingGoodAIs --yes` returns
-  `HTTP 403: Must have admin rights ... needs the "delete_repo" scope`.
-  `gh auth refresh -h github.com -s delete_repo` is an interactive device
-  flow and cannot be completed from a headless agent.
-- Unblock (one command after granting scope):
-  `gh auth refresh -h github.com -s delete_repo && gh repo delete radmanmilos/MakingGoodAIs --yes`
-- The local clone at `E:\GitHub\MakeingGoodAIs` and the AIR subtree both retain
-  the full history, so nothing is lost if deletion is never performed.
+### T12-052 [DONE] — Decommission MakeingGoodAIs
+- Full history preserved in AIR via the subtree import
+  (`137e0a4 Add 'packages/local-worker/' from commit 'a5e8818'`).
+- MGAI tagged `final-before-absorb` (annotated) and the tag + `master` pushed
+  to `origin` (`refs/tags/final-before-absorb` = `7705c7d` -> `a5e8818`).
+- GitHub repo `radmanmilos/MakingGoodAIs` deleted by the operator
+  (2026-11-12); `gh repo view` now returns "Could not resolve to a Repository".
+- The local clone at `E:\GitHub\MakeingGoodAIs` is left in place; AIR's subtree
+  history is the canonical copy.
