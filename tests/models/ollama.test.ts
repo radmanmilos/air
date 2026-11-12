@@ -126,7 +126,7 @@ describe('OllamaProvider', () => {
 
     const timedOut = new OllamaProvider({
       fetch: vi.fn<typeof fetch>().mockImplementation((_input, init) =>
-        new Promise((_resolve, reject) => {
+        new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
         }),
       ),
