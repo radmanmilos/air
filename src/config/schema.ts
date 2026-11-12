@@ -50,13 +50,13 @@ const ModelsSchema = z.object({
   keepAlive: z.string().min(1).default('5m'),
   providers: z.record(z.string(), ProviderSettingsSchema).default(DEFAULT_MODEL_PROVIDERS),
   roles: z.object({
-    coordinator: RoleAssignmentSchema,
-    planner: RoleAssignmentSchema,
-    coder: RoleAssignmentSchema,
-    reviewer: RoleAssignmentSchema,
-    reasoner: RoleAssignmentSchema,
-    summarizer: RoleAssignmentSchema,
-    embeddings: RoleAssignmentSchema,
+    coordinator: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.coordinator),
+    planner: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.planner),
+    coder: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.coder),
+    reviewer: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.reviewer),
+    reasoner: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.reasoner),
+    summarizer: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.summarizer),
+    embeddings: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.embeddings),
   }).default(DEFAULT_MODEL_ROLES),
 });
 
