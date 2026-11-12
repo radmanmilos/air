@@ -17,7 +17,7 @@
 
 ## 2. Fixture matrix
 
-The first fixture set should live under \`tests/evals/fixtures/\`. Fixture IDs remain stable so results can be compared across model revisions.
+The first fixture set should live under `tests/evals/fixtures/`. Fixture IDs remain stable so results can be compared across model revisions.
 
 | Suite | Minimum fixtures | Coverage | Expected oracle |
 |---|---:|---|---|
@@ -85,7 +85,7 @@ Each model report must include:
 - Repetitions, pass counts, schema-valid rate and safety violations
 - Role-specific quality metrics
 - p50/p95 latency and tokens/sec if reliable
-- Peak RAM/VRAM or explicit \`unknown\`
+- Peak RAM/VRAM or explicit `unknown`
 - Model load/switch/unload timings
 - Known failure patterns and example fixture IDs
 - Recommendation: RECOMMENDED / EXPERIMENTAL / NOT SUITABLE, with rationale
@@ -95,9 +95,9 @@ Do not call a model "best" from one successful prompt. Do not automatically inst
 ## 7. Initial model candidates
 
 Benchmark, do not assume:
-- Coordinator/planner/reviewer: \`qwen3.5:4b\`, compare \`qwen3:4b\` and \`granite4:3b\`.
-- Coder: \`qwen2.5-coder:7b\`; include a smaller candidate if it is available and performs adequately.
-- Reasoner: \`deepseek-r1:1.5b\`; evaluate whether it adds value over the coordinator.
-- Embeddings: \`nomic-embed-text\`, compare \`embeddinggemma:300m\`.
+- Coordinator/planner/reviewer: `qwen3.5:4b`, compare `qwen3:4b` and `granite4:3b`.
+- Coder: `qwen2.5-coder:7b`; include a smaller candidate if it is available and performs adequately.
+- Reasoner: `deepseek-r1:1.5b`; evaluate whether it adds value over the coordinator.
+- Embeddings: `nomic-embed-text`, compare `embeddinggemma:300m`.
 
 All assignments remain provisional until the suite is executed on the reference machine.
