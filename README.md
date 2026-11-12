@@ -124,7 +124,7 @@ nothing to install separately.
 - `air commands` - List available commands
 - `air models` - List adapters with provider/model and allow-list status
 - `air chat` - Interactive non-blocking conversation (`--resume <id>`, `--free-only`)
-- `air merge <jobId>` - Apply a completed job's worktree into the current branch
+- `air merge <jobId>` - Preview a completed job's worktree (read-only); add `--apply` to merge it into the current branch
 - `air setup local` - Provision the internal local worker (`--force`, `--json`)
 - `air doctor` - Check whether a local job can run (`--offline`, `--json`)
 - `air mcp` - Start MCP server over stdio

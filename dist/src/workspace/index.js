@@ -70,6 +70,33 @@ export function worktreeDiff(info) {
         return '';
     }
 }
+/**
+ * Describe what `applyWorktree` would bring into the source branch without
+ * changing anything. Tracked edits (staged or not) and untracked files are
+ * listed; no commit, merge, or checkout is performed.
+ */
+export function previewWorktree(info) {
+    const base = info.sourceHead || 'HEAD';
+    const changed = new Set();
+    const run = (args) => {
+        try {
+            return execFileSync('git', args, { cwd: info.worktreePath, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
+        }
+        catch {
+            return '';
+        }
+    };
+    const diffStat = run(['diff', '--stat', base]);
+    for (const name of run(['diff', '--name-only', base]).split('\n')) {
+        if (name.trim())
+            changed.add(name.trim());
+    }
+    for (const name of run(['ls-files', '--others', '--exclude-standard']).split('\n')) {
+        if (name.trim())
+            changed.add(name.trim());
+    }
+    return { base, changedFiles: [...changed].sort(), diffStat };
+}
 export function applyWorktree(info) {
     try {
         // Commit any uncommitted changes in the worktree first.

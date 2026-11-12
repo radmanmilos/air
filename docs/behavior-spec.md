@@ -70,9 +70,14 @@ CLI but not documented here, the conformance test in
 
 ### `air merge <jobId>`
 - Given a completed job with a recorded worktree,
-- When `air merge <jobId>` is run,
+- When `air merge <jobId>` is run without `--apply`,
+- Then it prints a read-only preview (changed files and `git diff --stat`) and
+  changes nothing; it never merges.
+- When `air merge <jobId> --apply` is run,
 - Then it applies the job's worktree into the current branch and reports the
   result. Jobs without worktree state are refused with a non-zero exit.
+- After a write job succeeds, `air run` prints exactly one next step:
+  `air merge <id> --apply`.
 
 ### `air setup local`
 - Given the internal local worker is not provisioned,

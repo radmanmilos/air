@@ -417,8 +417,11 @@ applied. Conflicts were resolved as follows:
   adapter is registered as verified without an exact-version lockout, its
   availability is the worker's provisioning state, and routing ranks it with
   the free/preferred adapters. `air status` and MCP `list_adapters` include it.
-- Active task list: `docs/reviews/tasks_air_12.md` (M5 remains: explicit apply
-  UX, docs, decommission).
+- M5 apply UX: `air merge <id>` is a read-only preview; `air merge <id> --apply`
+  performs the merge. A successful write job prints one loud next step
+  (`air merge <id> --apply`).
+- Active task list: `docs/reviews/tasks_air_12.md` (M5 remains: decommission
+  MakeingGoodAIs).
 - `npm test` is green (deterministic suite; live scenarios remain gated).
 
 ## Adapters

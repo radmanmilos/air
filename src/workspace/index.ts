@@ -79,6 +79,42 @@ export function worktreeDiff(info: WorktreeInfo): string {
   }
 }
 
+export interface WorktreePreview {
+  /** Base commit the job branched from. */
+  base: string;
+  /** Files the job added or changed, relative to the worktree root. */
+  changedFiles: string[];
+  /** `git diff --stat` output, or '' when there is nothing to show. */
+  diffStat: string;
+}
+
+/**
+ * Describe what `applyWorktree` would bring into the source branch without
+ * changing anything. Tracked edits (staged or not) and untracked files are
+ * listed; no commit, merge, or checkout is performed.
+ */
+export function previewWorktree(info: WorktreeInfo): WorktreePreview {
+  const base = info.sourceHead || 'HEAD';
+  const changed = new Set<string>();
+  const run = (args: string[]): string => {
+    try {
+      return execFileSync('git', args, { cwd: info.worktreePath, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
+    } catch {
+      return '';
+    }
+  };
+
+  const diffStat = run(['diff', '--stat', base]);
+  for (const name of run(['diff', '--name-only', base]).split('\n')) {
+    if (name.trim()) changed.add(name.trim());
+  }
+  for (const name of run(['ls-files', '--others', '--exclude-standard']).split('\n')) {
+    if (name.trim()) changed.add(name.trim());
+  }
+
+  return { base, changedFiles: [...changed].sort(), diffStat };
+}
+
 export function applyWorktree(info: WorktreeInfo): { ok: boolean; message: string } {
   try {
     // Commit any uncommitted changes in the worktree first.

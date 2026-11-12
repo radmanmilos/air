@@ -324,6 +324,7 @@ export class Orchestrator {
         worktreePath: worktreeInfo?.worktreePath,
         worktreeBranch: worktreeInfo?.branch,
         sourceCwd: worktreeInfo ? cwd : undefined,
+        sourceHead: worktreeInfo?.sourceHead,
       };
       await writeTaskState(state);
       trace({ runId, event: 'router_pick', chosen: chosen.id, skips: decision.skips, hops });

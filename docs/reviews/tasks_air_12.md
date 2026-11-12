@@ -158,12 +158,17 @@ Take MGAI's **tools and local model transport**, not its orchestration:
 
 ## M5 — Apply UX, docs, decommission
 
-### T12-050 [ ] — Explicit apply
-- After a write job, print one loud next step with `air merge <id>`; `--apply`
-  opt-in only.
+### T12-050 [DONE] — Explicit apply
+- `air merge <id>` is now a read-only preview (changed files + `git diff --stat`)
+  and changes nothing; `air merge <id> --apply` performs the merge.
+- After a write job (`SUCCEEDED_WITH_CHANGES`), `air run` prints one loud next
+  step: `Next: air merge <id> --apply`, with a preview hint.
+- `previewWorktree` added to `src/workspace`; `sourceHead` is recorded in task
+  state so the preview has a base.
 
-### T12-051 [ ] — Documentation
-- `docs/adapters/local.md`, README, `air status`, MCP `list_adapters`.
+### T12-051 [DONE] — Documentation
+- `docs/adapters/local.md`, README, `air status`, MCP `list_adapters`,
+  `docs/behavior-spec.md` merge/status sections.
 
 ### T12-052 [ ] — Decommission MakeingGoodAIs
 - Tag `final-before-absorb`, push the subtree, then delete the GitHub repo.

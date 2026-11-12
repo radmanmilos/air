@@ -28,6 +28,13 @@ export interface TaskState {
         category: string;
         message: string;
     };
+    /** Real git worktree allocated for a write job (isolation, T-030). */
+    worktreePath?: string;
+    worktreeBranch?: string;
+    /** Source repository the worktree was branched from. */
+    sourceCwd?: string;
+    /** Source HEAD the worktree branched from; used by `air merge` preview. */
+    sourceHead?: string;
     delta?: {
         staged: string[];
         unstaged: string[];

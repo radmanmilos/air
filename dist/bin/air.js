@@ -37,6 +37,15 @@ function orchestratorFor(config, cacheDir) {
         cacheDir,
     });
 }
+/**
+ * After a write job succeeds, print exactly one loud next step. The worktree is
+ * isolated, so nothing has reached the user's branch yet; applying it is an
+ * explicit, opt-in action (`air merge <id> --apply`).
+ */
+function printApplyNextStep(runId) {
+    console.log(chalk.bold.cyan(`Next: air merge ${runId} --apply`));
+    console.log(chalk.gray(`Preview first with: air merge ${runId}`));
+}
 async function runAction(task, options) {
     if (process.argv.includes('--dev'))
         process.env.AIR_DEV = '1';
@@ -73,6 +82,10 @@ async function runAction(task, options) {
             const st = await readTaskState(s.runId);
             return st?.result ?? s.result ?? 'FAILED';
         }));
+        for (let i = 0; i < results.length; i++) {
+            if (results[i] === 'SUCCEEDED_WITH_CHANGES')
+                printApplyNextStep(sessions[i].runId);
+        }
         if (results.includes('CANCELLED'))
             process.exit(EXIT_CODES.USER_CANCELLED);
         if (results.includes('FAILED'))
@@ -118,6 +131,9 @@ async function runAction(task, options) {
         }
         if (s.result === 'SUCCEEDED_WITH_CHANGES' || s.result === 'SUCCEEDED_READ_ONLY') {
             console.log(chalk.green(`Succeeded (${s.result}).`));
+            if (s.result === 'SUCCEEDED_WITH_CHANGES') {
+                printApplyNextStep(session.runId);
+            }
             process.exit(EXIT_CODES.SUCCESS);
         }
         // FAILED or unknown
@@ -369,7 +385,7 @@ program
     console.log('  /export            Export session log');
     console.log('  /models            List models');
     console.log('  /verify <cmd...>   Run verification');
-    console.log('  /merge <jobId>     Apply a completed job worktree');
+    console.log('  /merge <jobId>     Preview a completed job worktree (add --apply to merge)');
     console.log('  /setup local       Provision the internal local worker');
     console.log('  /doctor            Check whether a local job can run');
     console.log('  /mcp               Start MCP server');
@@ -812,17 +828,36 @@ program
 });
 program
     .command('merge')
-    .description('Apply a completed job worktree into the current branch')
+    .description('Preview or apply a completed job worktree into the current branch')
     .argument('<jobId>', 'Job run id')
-    .action(async (jobId) => {
+    .option('--apply', 'Actually merge the worktree (default is a read-only preview)')
+    .action(async (jobId, options) => {
     const { readTaskState } = await import('../src/execution/task-state.js');
     const st = await readTaskState(jobId);
     if (!st || !st.worktreePath || !st.sourceCwd) {
         console.log(chalk.red('No worktree info for job.'));
         process.exit(1);
     }
-    const { applyWorktree } = await import('../src/workspace/index.js');
-    const info = { jobId, sourceCwd: st.sourceCwd, worktreePath: st.worktreePath, branch: st.worktreeBranch, sourceHead: '' };
+    const { applyWorktree, previewWorktree } = await import('../src/workspace/index.js');
+    const info = {
+        jobId,
+        sourceCwd: st.sourceCwd,
+        worktreePath: st.worktreePath,
+        branch: st.worktreeBranch,
+        sourceHead: st.sourceHead ?? '',
+    };
+    if (!options.apply) {
+        const preview = previewWorktree(info);
+        console.log(chalk.cyan(`air merge ${jobId} (preview)`));
+        if (preview.changedFiles.length === 0) {
+            console.log(chalk.yellow('No changes to apply.'));
+        }
+        else {
+            console.log(preview.diffStat || preview.changedFiles.map((f) => `  ${f}`).join('\n'));
+        }
+        console.log(chalk.bold(`Nothing was changed. Re-run with --apply to merge into ${st.sourceCwd}.`));
+        process.exit(0);
+    }
     const res = applyWorktree(info);
     console.log(res.ok ? chalk.green(res.message) : chalk.red(res.message));
     process.exit(res.ok ? 0 : 1);
