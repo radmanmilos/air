@@ -27,7 +27,7 @@ These rules govern every task in this repository. They are mandatory and apply t
 ## Source of truth
 - Active local-first intelligence ledger: `docs/reviews/tasks_air_13.md`
 - Local-first architecture blueprint: `docs/architecture/local-first-ai-plan.md`
-- Previous completed task ledger: `docs/reviews/tasks_air_13.md`
+- Previous completed task ledger: `docs/reviews/tasks_air_12.md`
 - Historical reviews: `docs/reviews/archive/`
 - Canonical product plan: `PLAN.md`
 - All work in `E:\GitHub\air` only.
