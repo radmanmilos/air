@@ -34,6 +34,7 @@
         "mutation:check": "node scripts/mutation-check.mjs",
         "e2e:det": "vitest run tests/e2e",
         "e2e:live": "vitest run --config vitest.live.config.ts",
+        "eval:models": "tsx scripts/eval-models.ts",
         "postbuild": "node scripts/fix-imports.mjs",
         "prebuild": "node -e \"require('fs').rmSync('dist', {recursive:true, force:true})\"",
         "typecheck": "tsc --noEmit",
