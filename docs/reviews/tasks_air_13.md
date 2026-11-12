@@ -87,12 +87,12 @@
 - Integration owner: ChatGPT; independent architecture review has not been supplied.
 - Historical baseline: 35c7300569df2568dbd2cec97a4f6cc232533cc5.
 - PR #1 merged to main at a2dc1e95f3f26a5497e35c19c0af4c70976b1a96; exact-head CI run 286 and main push run 287 passed.
-- PR #2 merged to main at 5f82d98cae74b0d2be4360c9b451b708b5a436dc; exact-head CI runs 297 and 298 passed on 4d877676a4865cbb2f402f4d040917f08ae65bfe. Main push CI run 299 is being monitored.
+- PR #2 merged to main at 5f82d98cae74b0d2be4360c9b451b708b5a436dc; exact-head CI runs 297 and 298 passed on 4d877676a4865cbb2f402f4d040917f08ae65bfe. Main push CI [run 299](https://github.com/radmanmilos/air/actions/runs/43253903400) completed successfully on merge commit 5f82d98cae74b0d2be4360c9b451b708b5a436dc.
 - Merged implementation: provider-neutral TypeScript model API, Ollama chat/tool/embedding transport, health/model discovery, provider registry, in-memory model inventory, global-only config v2, v1 migration, no-fallback role resolver, concrete synthetic eval payloads, coder workspace fixture and isolated workspace helper.
 - Important boundary: the model runtime/role resolver is not wired into CLI/MCP chat or the Python worker. The worker still uses worker-local model slots. No job-contract v1 changes were included.
 - L0-03 remains IN_PROGRESS: integration-owner decisions are recorded, but independent review and exact worker-v2 compatibility design remain open.
 - L0-04a and L0-04b are DONE. L0-04c runner is IN_PROGRESS; L0-04d independent scoring review remains TODO.
-- Current follow-up branch: work/local-first-eval-runner, based on main merge commit 5f82d98cae74b0d2be4360c9b451b708b5a436dc. First implementation commit: 1fc6af8ffa2ffcfc939841090809ac94880210b3.
+- Current follow-up branch: work/local-first-eval-runner, based on main merge commit 5f82d98cae74b0d2be4360c9b451b708b5a436dc. Current head before PR creation: 6b6cda3d77617a084d58d28ebb174810c462603d. It contains the runner, CLI entry point, parser/prompt/ranking tests and runtime metadata capture.
 - No local tests were run because no clone/worktree is available. CI on the exact follow-up PR head is required.
 - Next: validate runner tests in GitHub CI, open PR #3, merge after exact-head CI passes, then proceed to resource management and coordinator vertical slice after independent architecture review.
 
@@ -390,7 +390,7 @@ Copy this into the PR description or update the relevant package entry at the en
 
 | Phase | Integrated commit / PR | CI evidence | Reviewer | Completion date |
 |---|---|---|---|---|
-| L0 | PR #1 (partial baseline) | CI run 286 passed; main push run 287 pending at handoff | Integration owner; independent review open | 2026-11-12 |
+| L0 | PR #1 and PR #2 merged | PR runs 286, 297 and 298 passed; main push runs 287 and 299 passed | Integration owner; independent review open | 2026-11-12 |
 | L1 | PR #1 foundation merged at a2dc1e95 | CI run 286 passed | Integration owner; independent review open | 2026-11-12 |
 | L2 | PR #1 config/registry foundation merged at a2dc1e95 | CI run 286 passed | Integration owner; independent review open | 2026-11-12 |
 | L3 | — | — | — | — |

@@ -147,7 +147,7 @@ Supported suites: coordinator, planner, tool-calling, coder, debugging, reviewer
 
 Embeddings runs batch the synthetic corpus and queries, rank documents by cosine similarity, and record Recall@5/MRR against labelled expected document IDs. An empty expected set is recorded as a no-match control; it is not silently treated as a successful retrieval.
 
-Results are newline-delimited JSON written under results/evals/ by default (already ignored by git). Each run records provider/model tag and digest when available, Ollama version, prompt version, requested context, repetition counts, host OS/CPU/RAM, per-request duration, token usage/rate when reported, sampled process RSS, and explicit unknown GPU/VRAM metrics. A JSONL run header, case/query records and completion record are appended; retain the raw output for later scoring.
+Results are newline-delimited JSON written under results/evals/ by default (already ignored by git). Each run records provider/model tag and digest when available, Ollama version, prompt version, requested context, repetition counts, host OS/CPU/RAM, per-request duration, token usage/rate when reported, sampled process RSS, and best-effort running-model VRAM from Ollama /api/ps when supported. Host free GPU/VRAM remains unknown; reported per-model VRAM is not treated as free capacity. A JSONL run header, case/query records and completion record are appended; retain the raw output for later scoring.
 
 Options include --base-url, --output, --repetitions, --warmups, --context, --timeout-ms and --prompt-version. Defaults are 127.0.0.1:11434, three measured repetitions, one warm-up, 8192 context tokens, 120000 ms timeout and prompt label local-first-eval-v1.
 
