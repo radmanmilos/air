@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModelProviderError } from '../../src/models/types';
 import { OllamaProvider, type OllamaFetch } from '../../src/models/providers/ollama';
 
-type FetchMock = OllamaFetch;
+type FetchMock = Parameters<OllamaFetch>;
 
 function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe('OllamaProvider', () => {
   it('normalizes chat, tool calls, usage and timing', async () => {
-    const fetchMock = vi.fn<FetchMock>().mockResolvedValue(jsonResponse({
+    const fetchMock = vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({
       model: 'qwen3.5:4b',
       message: {
         role: 'assistant',
@@ -53,7 +53,7 @@ describe('OllamaProvider', () => {
   });
 
   it('returns embeddings for one or many inputs', async () => {
-    const fetchMock = vi.fn<FetchMock>().mockResolvedValue(jsonResponse({
+    const fetchMock = vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({
       model: 'nomic-embed-text',
       embeddings: [[0.1, 0.2], [0.3, 0.4]],
     }));
@@ -64,7 +64,7 @@ describe('OllamaProvider', () => {
   });
 
   it('discovers installed and running models without guessing capabilities', async () => {
-    const fetchMock = vi.fn<FetchMock>()
+    const fetchMock = vi.fn<FetchMock, ReturnType<OllamaFetch>>()
       .mockResolvedValueOnce(jsonResponse({
         models: [{ name: 'qwen3.5:4b', digest: 'abc', size: 100, details: { family: 'qwen' } }],
       }))
@@ -81,7 +81,7 @@ describe('OllamaProvider', () => {
 
   it('reports unsupported running-model diagnostics on older runtimes', async () => {
     const provider = new OllamaProvider({
-      fetch: vi.fn<FetchMock>().mockResolvedValue(jsonResponse({ error: 'not found' }, 404)),
+      fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({ error: 'not found' }, 404)),
     });
     await expect(provider.listRunningModels()).rejects.toMatchObject({
       code: 'UNSUPPORTED_CAPABILITY',
@@ -89,7 +89,7 @@ describe('OllamaProvider', () => {
   });
 
   it('reports provider health and handles offline runtime', async () => {
-    const fetchMock = vi.fn<FetchMock>()
+    const fetchMock = vi.fn<FetchMock, ReturnType<OllamaFetch>>()
       .mockResolvedValueOnce(jsonResponse({ version: '0.5.0' }))
       .mockRejectedValueOnce(new TypeError('connection refused'));
     const provider = new OllamaProvider({ fetch: fetchMock });
@@ -99,14 +99,14 @@ describe('OllamaProvider', () => {
 
   it('normalizes missing models and rate limits', async () => {
     const missing = new OllamaProvider({
-      fetch: vi.fn<FetchMock>().mockResolvedValue(jsonResponse({ error: 'model not found' }, 404)),
+      fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({ error: 'model not found' }, 404)),
     });
     await expect(missing.showModel('missing:latest')).rejects.toMatchObject({
       code: 'MODEL_NOT_FOUND',
     });
 
     const limited = new OllamaProvider({
-      fetch: vi.fn<FetchMock>().mockResolvedValue(jsonResponse({ error: 'busy' }, 429)),
+      fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({ error: 'busy' }, 429)),
     });
     await expect(limited.chat({
       model: 'qwen3.5:4b',
@@ -118,7 +118,7 @@ describe('OllamaProvider', () => {
     const cancelled = new AbortController();
     cancelled.abort();
     const provider = new OllamaProvider({
-      fetch: vi.fn<FetchMock>().mockRejectedValue(new Error('aborted')),
+      fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockRejectedValue(new Error('aborted')),
     });
     await expect(provider.chat({
       model: 'qwen3.5:4b',
@@ -127,7 +127,7 @@ describe('OllamaProvider', () => {
     })).rejects.toMatchObject({ code: 'CANCELLED' });
 
     const timedOut = new OllamaProvider({
-      fetch: vi.fn<FetchMock>().mockImplementation((_input, init) =>
+      fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockImplementation((_input, init) =>
         new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
         }),
@@ -143,7 +143,7 @@ describe('OllamaProvider', () => {
   it('rejects invalid endpoint configuration and malformed responses', async () => {
     expect(() => new OllamaProvider({ baseUrl: 'file:///tmp/ollama' })).toThrow(ModelProviderError);
     const invalid = new OllamaProvider({
-      fetch: vi.fn<FetchMock>().mockResolvedValue(new Response('not-json')),
+      fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(new Response('not-json')),
     });
     await expect(invalid.listModels()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
