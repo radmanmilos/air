@@ -45,33 +45,43 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
   }
 
   // 3. Repo config (untrusted)
-  const repoFile = options.cwd ? `${options.cwd}/.airrc.yaml` : '.airrc.yaml';
+  const repoFile = options.cwd ? options.cwd + '/.airrc.yaml' : '.airrc.yaml';
   try {
     const raw = await readFile(repoFile, 'utf8');
-    const parsed = safeParseConfig(parseYamlLike(raw), { strict: options.strict !== false });
-    if (parsed.success) {
-      // Strip global-only keys from repo config (security: repo cannot set them).
-      const repoData = { ...parsed.data } as Record<string, unknown>;
-      // The version identifies the repo file schema; it is not an effective
-      // runtime setting and must not override the global config version.
-      delete repoData.version;
-      const stripped: string[] = [];
+    const parsedInput = parseYamlLike(raw);
+    const repoData = isRecord(parsedInput) ? { ...parsedInput } : parsedInput;
+    const stripped: string[] = [];
+
+    // Remove user-owned settings before validation. Invalid values in a
+    // repository-controlled model/provider section must not prevent safe
+    // project-level settings from loading or trigger provider configuration.
+    if (isRecord(repoData)) {
       for (const key of GLOBAL_ONLY_KEYS) {
         if (key in repoData) {
           delete repoData[key];
           stripped.push(key);
         }
       }
+    }
+
+    const parsed = safeParseConfig(repoData, { strict: options.strict !== false });
+    if (parsed.success) {
+      const effectiveRepoData = { ...parsed.data } as Record<string, unknown>;
+      // The version is schema metadata, not an effective runtime setting.
+      delete effectiveRepoData.version;
+      // Schema defaults are materialized by parsing; strip them too so
+      // omitted global-only fields cannot overwrite the user's global config.
+      for (const key of GLOBAL_ONLY_KEYS) delete effectiveRepoData[key];
+      config = merge(config, effectiveRepoData as Partial<Config>);
       if (stripped.length > 0) {
-        errors.push(`Warning: repo config ${repoFile} cannot set global-only keys (${stripped.join(', ')}); ignored.`);
+        errors.push('Warning: repo config ' + repoFile + ' cannot set global-only keys (' + stripped.join(', ') + '); ignored.');
       }
-      config = merge(config, repoData as Partial<Config>);
     } else {
       errors.push(formatConfigError(parsed.error, repoFile));
     }
   } catch (err: any) {
     if (err?.code !== 'ENOENT') {
-      errors.push(`Could not read/parse ${repoFile}: ${String(err?.message || err)}`);
+      errors.push('Could not read/parse ' + repoFile + ': ' + String(err?.message || err));
     }
   }
 
@@ -116,6 +126,10 @@ function merge(base: Config, override: Partial<Config>): Config {
  *  Uses the `yaml` package when available; falls back to JSON. */
 function parseYamlLike(raw: string): unknown {
   return parse(raw);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function validateConfigFile(file: string): Promise<string[]> {
