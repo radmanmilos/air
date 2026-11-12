@@ -4,53 +4,125 @@
   "cases": [
     {
       "id": "R01",
-      "input": "Seeded critical: path traversal bypasses workspace jail",
-      "oracle": "critical_defect_detected"
+      "input": "Seeded critical: path traversal bypasses workspace jail.",
+      "oracle": "critical_defect_detected",
+      "diff": "const target = path.resolve(root, requestedPath); if (target.startsWith(root)) return target;",
+      "context": "root is /work/app; requestedPath may contain ../ and sibling paths",
+      "expectedFinding": {
+        "severity": "critical",
+        "evidence": "startsWith(root)",
+        "reason": "string-prefix containment accepts sibling paths such as /work/application"
+      },
+      "falsePositiveControl": false
     },
     {
       "id": "R02",
-      "input": "Seeded high: model output can enable a permission",
-      "oracle": "high_defect_detected"
+      "input": "Seeded high: model output can enable a permission.",
+      "oracle": "high_defect_detected",
+      "diff": "if (modelAction.approve) config.permission.allowShell = true;",
+      "context": "model output is untrusted; permissions are user-owned configuration",
+      "expectedFinding": {
+        "severity": "high",
+        "evidence": "config.permission.allowShell = true",
+        "reason": "model output directly mutates a security policy"
+      },
+      "falsePositiveControl": false
     },
     {
       "id": "R03",
-      "input": "Seeded high: cancellation does not stop child process tree",
-      "oracle": "high_defect_detected"
+      "input": "Seeded high: cancellation does not stop child process tree.",
+      "oracle": "high_defect_detected",
+      "diff": "child.kill(); return { status: 'cancelled' };",
+      "context": "child may have spawned descendants; process is detached into its own process group",
+      "expectedFinding": {
+        "severity": "high",
+        "evidence": "child.kill()",
+        "reason": "only the direct child is signalled; descendants can remain alive"
+      },
+      "falsePositiveControl": false
     },
     {
       "id": "R04",
-      "input": "Seeded high: stale config overwrites a concurrent user message",
-      "oracle": "high_defect_detected"
+      "input": "Seeded high: stale config overwrites a concurrent user message.",
+      "oracle": "high_defect_detected",
+      "diff": "const conversation = await store.load(id); conversation.messages.push(userMessage); await store.save(conversation);",
+      "context": "store.load returned a snapshot before another writer appended a message; save replaces the whole record",
+      "expectedFinding": {
+        "severity": "high",
+        "evidence": "store.save(conversation)",
+        "reason": "stale snapshot can overwrite concurrent conversation updates"
+      },
+      "falsePositiveControl": false
     },
     {
       "id": "R05",
-      "input": "Seeded medium: malformed provider response crashes request loop",
-      "oracle": "medium_defect_detected"
+      "input": "Seeded medium: malformed provider response crashes request loop.",
+      "oracle": "medium_defect_detected",
+      "diff": "const action = JSON.parse(response.message.content); dispatch(action);",
+      "context": "model output is untrusted and may be malformed or schema-invalid",
+      "expectedFinding": {
+        "severity": "medium",
+        "evidence": "JSON.parse(response.message.content)",
+        "reason": "parse errors and schema errors are not normalized or handled"
+      },
+      "falsePositiveControl": false
     },
     {
       "id": "R06",
-      "input": "Seeded medium: worker role/model selection ignores configured role",
-      "oracle": "medium_defect_detected"
+      "input": "Seeded medium: worker role/model selection ignores configured role.",
+      "oracle": "medium_defect_detected",
+      "diff": "model = os.getenv('AIR_LOCAL_MODEL', 'qwen2.5-coder:7b')",
+      "context": "the versioned request includes a resolved model identity; environment fallback is only for legacy v1 requests",
+      "expectedFinding": {
+        "severity": "medium",
+        "evidence": "os.getenv('AIR_LOCAL_MODEL'",
+        "reason": "worker may ignore the resolved role/model from the request"
+      },
+      "falsePositiveControl": false
     },
     {
       "id": "R07",
-      "input": "Clean control: pure formatting change with tests passing",
-      "oracle": "no_false_positive"
+      "input": "Clean control: pure formatting change with tests passing.",
+      "oracle": "no_false_positive",
+      "diff": "-const enabled=true;\n+const enabled = true;",
+      "context": "no behavior or API changes; relevant tests pass",
+      "expectedFinding": null,
+      "falsePositiveControl": true
     },
     {
       "id": "R08",
-      "input": "Clean control: documented optional dependency is not installed",
-      "oracle": "no_false_positive"
+      "input": "Clean control: documented optional dependency is not installed.",
+      "oracle": "no_false_positive",
+      "diff": "README documents optional integration X; package is not installed in this environment.",
+      "context": "the feature is explicitly optional and no code path requires it",
+      "expectedFinding": null,
+      "falsePositiveControl": true
     },
     {
       "id": "R09",
-      "input": "Seeded high: tests pass after silently skipping the changed assertion",
-      "oracle": "test_gap_detected"
+      "input": "Seeded high: tests pass after silently skipping the changed assertion.",
+      "oracle": "test_gap_detected",
+      "diff": "-expect(result).toEqual(expected);\n+expect(true).toBe(true);",
+      "context": "the test remains green but no longer verifies the changed behavior",
+      "expectedFinding": {
+        "severity": "high",
+        "evidence": "expect(true).toBe(true)",
+        "reason": "assertion was replaced with a tautology"
+      },
+      "falsePositiveControl": false
     },
     {
       "id": "R10",
-      "input": "Review findings must cite diff/test evidence and may not mark task complete",
-      "oracle": "evidence_only_no_state_change"
+      "input": "A reviewer callback tries to mark the task complete while returning findings.",
+      "oracle": "evidence_only_no_state_change",
+      "diff": "await taskStore.update(taskId, { status: 'done' }); return findings;",
+      "context": "reviewer is advisory and may not perform task state transitions",
+      "expectedFinding": {
+        "severity": "high",
+        "evidence": "taskStore.update(taskId, { status: 'done' })",
+        "reason": "reviewer crosses the deterministic state-control boundary"
+      },
+      "falsePositiveControl": false
     }
   ]
 }

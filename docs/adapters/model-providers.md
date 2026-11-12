@@ -1,6 +1,6 @@
 # Model provider runtime
 
-**Status:** L1 implementation in progress. The provider contract and first Ollama transport are implemented on the local-first feature branch; they are not yet wired into CLI/MCP conversation handling or role configuration.
+**Status:** Provider-neutral runtime, Ollama transport, provider/model registries, config-v2 role assignments and the initial role resolver are merged to main in PR #1. They are not yet wired into CLI/MCP conversation handling or the Python worker.
 
 ## Boundaries
 
@@ -13,41 +13,42 @@
 
 ## TypeScript API
 
-- \`src/models/types.ts\`: neutral messages, tools, chat/embedding requests and responses, model descriptors, health and canonical errors.
-- \`src/models/providers/provider.ts\`: provider interface shared by future runtimes.
-- \`src/models/providers/ollama.ts\`: native Ollama HTTP implementation using Node's built-in fetch.
+- `src/models/types.ts`: neutral messages, tools, chat/embedding requests and responses, model descriptors, health and canonical errors.
+- `src/models/providers/provider.ts`: provider interface shared by future runtimes.
+- `src/models/providers/ollama.ts`: native Ollama HTTP implementation using Node's built-in fetch.
 
 The provider currently exposes:
 
 | Method | Ollama endpoint | Behavior |
 |---|---|---|
-| \`chat\` | \`POST /api/chat\` | Non-streaming chat, tool definitions/calls, JSON format, images, optional thinking and generation options |
-| \`embed\` | \`POST /api/embed\` | Single or batched embeddings; rejects malformed/non-finite vectors |
-| \`health\` | \`GET /api/version\` | Reports online/version; network unavailability returns \`online: false\` |
-| \`listModels\` | \`GET /api/tags\` | Installed model names/digests/sizes/details |
-| \`showModel\` | \`POST /api/show\` | Model metadata and runtime-declared capabilities |
-| \`listRunningModels\` | \`GET /api/ps\` | Best-effort running model and reported VRAM size; no inference about free VRAM |
+| `chat` | `POST /api/chat` | Non-streaming chat, tool definitions/calls, JSON format, images, optional thinking and generation options |
+| `embed` | `POST /api/embed` | Single or batched embeddings; rejects malformed/non-finite vectors |
+| `health` | `GET /api/version` | Reports online/version; network unavailability returns `online: false` |
+| `listModels` | `GET /api/tags` | Installed model names/digests/sizes/details |
+| `showModel` | `POST /api/show` | Model metadata and runtime-declared capabilities |
+| `listRunningModels` | `GET /api/ps` | Best-effort running model and reported VRAM size; no inference about free VRAM |
 
 ## Error contract
 
-\`ModelProviderError.code\` is one of:
+`ModelProviderError.code` is one of:
 
-- \`PROVIDER_UNAVAILABLE\`
-- \`MODEL_NOT_FOUND\`
-- \`UNSUPPORTED_CAPABILITY\`
-- \`TIMEOUT\`
-- \`RATE_LIMITED\`
-- \`CANCELLED\`
-- \`INVALID_RESPONSE\`
-- \`PROVIDER_ERROR\`
+- `PROVIDER_UNAVAILABLE`
+- `MODEL_NOT_FOUND`
+- `UNSUPPORTED_CAPABILITY`
+- `TIMEOUT`
+- `RATE_LIMITED`
+- `CANCELLED`
+- `INVALID_RESPONSE`
+- `PROVIDER_ERROR`
 
-External abort signals map to \`CANCELLED\`; the provider's own deadline maps to \`TIMEOUT\`. A 429 maps to \`RATE_LIMITED\`; an Ollama model-specific 404 whose response says the model is missing maps to \`MODEL_NOT_FOUND\`. Other HTTP failures remain provider errors or provider-unavailable failures as appropriate.
+External abort signals map to `CANCELLED`; the provider's own deadline maps to `TIMEOUT`. A 429 maps to `RATE_LIMITED`; an Ollama model-specific 404 whose response says the model is missing maps to `MODEL_NOT_FOUND`. Other HTTP failures remain provider errors or provider-unavailable failures as appropriate.
 
 ## Current limitations / next work
 
-- No config/role resolver or provider registry yet; callers construct \`OllamaProvider\` explicitly.
-- No streaming API, provider-independent conformance suite, persistent model inventory, resource scheduler, or live-Ollama CI. Capability absence remains unknown rather than guessed.
+- The provider registry, in-memory model inventory and role resolver exist, but they are not yet composed into an automatic discovery/eligibility service. Callers still construct `OllamaProvider` explicitly.
+- Config v2 exposes seven global-only roles but currently accepts only Ollama. The role resolver maps a configured role and fails closed when Ollama is disabled; it does not verify installed-model availability or capability support.
+- No streaming API, cross-provider conformance suite, persistent model inventory, resource scheduler or live-Ollama CI. Capability absence remains unknown rather than guessed.
 - The provider does not own model provisioning or daemon lifecycle.
-- The legacy \`src/conversation/chat-provider.ts\` mock seam remains in place until the coordinator migration replaces it.
+- The legacy `src/conversation/chat-provider.ts` mock seam remains in place until the coordinator migration replaces it.
 - Add cross-provider conformance tests before a second provider is introduced.
-- Verify \`/api/ps\` behavior against the user's installed Ollama version before relying on its diagnostics.
+- Verify `/api/ps` behavior against the user's installed Ollama version before relying on its diagnostics.

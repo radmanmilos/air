@@ -1,0 +1,1 @@
+This file is unrelated to the discount calculation and must remain unchanged.

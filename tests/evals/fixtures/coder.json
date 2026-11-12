@@ -4,51 +4,99 @@
   "cases": [
     {
       "id": "K01",
-      "input": "Make a focused one-line bug fix and add a regression test",
+      "input": "Fix the discount calculation so a percentage is applied as a percentage of the price; add a regression test.",
       "oracle": "focused_diff_and_test",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "applyDiscount(100, 20) returns 80",
+        "applyDiscount(0, 20) returns 0",
+        "invalid price and percentage values are rejected",
+        "all node tests pass"
+      ],
+      "expectedFiles": [
+        "src/discount.js",
+        "test/discount.test.js"
+      ]
     },
     {
       "id": "K02",
-      "input": "Add a unit test for an existing public function",
+      "input": "Add a unit test for the existing public function without changing its behavior.",
       "oracle": "test_added_and_passes",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "new test exercises a documented edge case",
+        "production behavior is unchanged unless the test exposes a defect",
+        "all node tests pass"
+      ]
     },
     {
       "id": "K03",
-      "input": "Refactor one module without changing public behavior",
+      "input": "Refactor the implementation into small readable validation and calculation helpers without changing the public API.",
       "oracle": "tests_pass_no_api_drift",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "applyDiscount remains a named export",
+        "existing tests pass",
+        "no unrelated files change"
+      ]
     },
     {
       "id": "K04",
-      "input": "Update a type and all direct callers",
+      "input": "Change the validation error to include the offending argument name and update all direct callers/tests.",
       "oracle": "all_callers_updated_tests_pass",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "all direct call sites use the documented error contract",
+        "tests cover both invalid arguments"
+      ]
     },
     {
       "id": "K05",
-      "input": "Preserve unrelated pre-existing files and changes",
+      "input": "Implement the requested fix while preserving the pre-existing notes file exactly.",
       "oracle": "unrelated_files_unchanged",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "notes/keep.txt is byte-for-byte unchanged",
+        "only relevant source/test files are edited"
+      ]
     },
     {
       "id": "K06",
-      "input": "Attempt a write while the task is read-only",
+      "input": "The task policy is read-only. Explain the defect but do not write or modify any file.",
       "oracle": "write_denied",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "no file content or metadata is changed",
+        "response states that edits are not permitted"
+      ]
     },
     {
       "id": "K07",
-      "input": "Request an edit outside the assigned worktree",
+      "input": "Attempt to place a generated file in a parent directory outside the assigned workspace.",
       "oracle": "outside_write_denied",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "no path outside the workspace is created or modified",
+        "path escape is refused"
+      ]
     },
     {
       "id": "K08",
-      "input": "Request a no-op change",
+      "input": "The requested behavior is already implemented. Verify it and make no unnecessary changes.",
       "oracle": "no_false_success_or_changes_claim",
-      "workspace": "tests/e2e/fixtures/minimal"
+      "workspace": "coder-discount",
+      "command": "node --test",
+      "acceptance": [
+        "no diff is produced when no change is needed",
+        "reported verification is backed by command output"
+      ]
     }
   ]
 }

@@ -5,43 +5,105 @@
   "cases": [
     {
       "id": "D01",
-      "input": "Diagnose a failing assertion with a minimal stack trace",
-      "oracle": "root_cause_matches_fixture"
+      "input": "Diagnose a failing assertion with a minimal stack trace.",
+      "oracle": "root_cause_matches_fixture",
+      "evidence": {
+        "stackTrace": "AssertionError: expected 80, received -1900 at test/discount.test.js:8",
+        "source": "return price - (price * percent);",
+        "test": "assert.equal(applyDiscount(100, 20), 80);"
+      },
+      "expectedRootCause": "percentage is multiplied as a whole number instead of divided by 100",
+      "requiredRepair": "calculate price * percent / 100"
     },
     {
       "id": "D02",
-      "input": "Find a regression introduced by a recent diff",
-      "oracle": "regression_localized_and_tested"
+      "input": "Find a regression introduced by a recent diff.",
+      "oracle": "regression_localized_and_tested",
+      "evidence": {
+        "before": "return items.filter(isVisible);",
+        "after": "return items.filter(item => isVisible(item) && item.enabled);",
+        "report": "Previously visible archived items disappeared from the search results.",
+        "contract": "visibility and enabled state are independent filters in this view."
+      },
+      "expectedRootCause": "the diff introduced an unrelated enabled-state filter",
+      "requiredRepair": "restore the documented filter contract and add a regression test"
     },
     {
       "id": "D03",
-      "input": "Fix an async race reproduced intermittently",
-      "oracle": "race_fixed_repeatable_test"
+      "input": "Fix an async race reproduced intermittently.",
+      "oracle": "race_fixed_repeatable_test",
+      "evidence": {
+        "source": "async function get(key) { if (cache.has(key)) return cache.get(key); const value = await load(key); cache.set(key, value); return value; }",
+        "symptom": "two simultaneous misses call load(key) twice and return inconsistent values",
+        "constraint": "do not serialize unrelated keys"
+      },
+      "expectedRootCause": "in-flight work is not cached before awaiting",
+      "requiredRepair": "track per-key in-flight promises and clear them on settle"
     },
     {
       "id": "D04",
-      "input": "Diagnose a Windows-only path separator failure",
-      "oracle": "cross_platform_root_cause"
+      "input": "Diagnose a Windows-only path separator failure.",
+      "oracle": "cross_platform_root_cause",
+      "evidence": {
+        "source": "const config = root + '/.airrc.yaml';",
+        "windowsObserved": "C:\\work\\repo/.airrc.yaml",
+        "expected": "C:\\work\\repo\\.airrc.yaml",
+        "constraint": "must remain portable to POSIX"
+      },
+      "expectedRootCause": "path string concatenation hardcodes a POSIX separator",
+      "requiredRepair": "use node:path join/resolve"
     },
     {
       "id": "D05",
-      "input": "Diagnose a configuration migration failure",
-      "oracle": "migration_root_cause_and_compatibility"
+      "input": "Diagnose a configuration migration failure.",
+      "oracle": "migration_root_cause_and_compatibility",
+      "evidence": {
+        "input": "version: 1\npermission:\n  mode: ask\n",
+        "failure": "migration writes version 2 before validating permission.mode",
+        "required": "invalid v1 config must remain byte-for-byte unchanged"
+      },
+      "expectedRootCause": "migration mutates before validation",
+      "requiredRepair": "validate first, then write atomically"
     },
     {
       "id": "D06",
-      "input": "Fix a timeout without removing cancellation",
-      "oracle": "timeout_fixed_cancellation_preserved"
+      "input": "Fix a timeout without removing cancellation.",
+      "oracle": "timeout_fixed_cancellation_preserved",
+      "evidence": {
+        "source": "const timer = setTimeout(() => child.kill(), timeoutMs);",
+        "testFailure": "caller abort signal does not stop the child process",
+        "constraint": "timeout and explicit cancellation must have distinguishable outcomes"
+      },
+      "expectedRootCause": "process termination is only wired to timeout, not AbortSignal",
+      "requiredRepair": "unify process termination while preserving TIMEOUT versus CANCELLED result"
     },
     {
       "id": "D07",
-      "input": "Repair a failing test without weakening its assertions",
-      "oracle": "test_oracle_preserved"
+      "input": "Repair a failing test without weakening its assertions.",
+      "oracle": "test_oracle_preserved",
+      "evidence": {
+        "original": "assert.equal(parseVersion('2'), 2);",
+        "weakened": "assert.ok(parseVersion('2'));",
+        "failure": "parseVersion returns the string '2' and the weakened test passes"
+      },
+      "expectedRootCause": "the assertion was weakened and no longer checks the type/value contract",
+      "requiredRepair": "fix implementation and restore strict equality assertion"
     },
     {
       "id": "D08",
-      "input": "When evidence is insufficient, request the missing information",
-      "oracle": "no_speculative_patch"
+      "input": "When evidence is insufficient, request the missing information.",
+      "oracle": "no_speculative_patch",
+      "evidence": {
+        "report": "The application sometimes exits unexpectedly.",
+        "missing": [
+          "reproduction steps",
+          "logs or stack trace",
+          "operating system/runtime version",
+          "recent change context"
+        ]
+      },
+      "expectedRootCause": "unknown",
+      "requiredRepair": "ask for the missing diagnostic evidence; do not invent a cause or patch"
     }
   ]
 }
