@@ -1,8 +1,8 @@
 # AIR Local-First Intelligence — Architecture and Implementation Blueprint
 
-**Status:** PR #1 merged: provider-neutral Ollama runtime, provider/model registries, global model-role config v2 and role resolver are on main. L0-04b concrete payloads/workspace harness are in progress on a follow-up branch. Independent architecture review remains outstanding.  
+**Status:** PRs #1-#3 merged: provider-neutral Ollama runtime, registries, global model-role config v2, role resolver, concrete evaluation payloads and repeatable evaluation runner are on main. Independent architecture and scoring review remain outstanding.  
 **Prepared:** 2026-11-12  
-**Repository baseline inspected:** main at 6fe3222cd6fcacbe8293b86a330a5e3138686006  
+**Repository baseline inspected:** main at 6b71e6180ce5de18e912f7ecd542366c18fb4701  
 **Purpose:** Make AIR's own intelligence local-first and model-driven while preserving deterministic control, safety, portability, and optional external providers.
 
 > This is the implementation contract for the next AIR architecture milestone. It is self-contained so an AI or human engineer can take an individual work package without relying on chat history. If implementation discovers that the live repository differs from a statement here, verify the live code, update this document, and record the discrepancy before changing behavior.
@@ -807,38 +807,39 @@ A work package is complete only when:
 
 ## 17. Decisions still requiring explicit confirmation during L0
 
-1. Whether role assignments live in existing global config under a new models section or in a dedicated model config file. Prefer one source of truth; decide based on current loader/migration ergonomics.
-2. Exact role names and whether task_analyst is separate from planner or initially merged.
-3. Whether reviewer is mandatory for all write tasks or only risk-tiered tasks in first release.
-4. Whether Ollama APIs expose enough runtime/resource state for first resource manager or require conservative heuristics/manual profile overrides.
-5. Whether embeddings/semantic retrieval deliver enough value to justify index lifecycle and privacy complexity in first release.
-6. Which second provider, if any, is worth supporting after local Ollama is proven.
-7. Which Desert Ant utility (if any) has a concrete user-facing requirement and acceptable Windows/runtime/license footprint.
+The global-only model config section, initial logical roles, provider/adapter separation, typed provider API and conservative one-generative-model default have an integration-owner disposition and initial implementation. Independent review is still required before resource lifecycle and coordinator work.
 
-Do not block L1/L2 on optional Desert Ant or hosted-provider choices.
+Remaining decisions:
+1. Whether reviewer should be mandatory for all write tasks or risk-tiered after seeded-defect results.
+2. Whether Ollama APIs expose enough runtime/resource state for the first resource manager or require conservative heuristics/manual profile overrides.
+3. Whether semantic retrieval adds enough value to justify index lifecycle and privacy complexity after the embeddings evaluation.
+4. Which second provider, if any, is worth supporting after local Ollama is proven.
+5. Which Desert Ant utility (if any) has a concrete user-facing requirement and acceptable Windows/runtime/license footprint.
+6. Exact worker contract v2 payload/version negotiation and compatibility test strategy.
 
-### 17.1 Integration-owner recommendations for L0 review
+Do not block the local-first Ollama path on optional Desert Ant or hosted-provider choices.
 
-The following recommendations are recorded in [the L0 baseline investigation](local-first-l0-baseline.md). They are proposals until independently reviewed and accepted in the active ledger:
+### 17.1 Integration-owner recommendations for independent review
 
-- Keep role/provider assignments in the existing global AIR config under a new `models` section; treat that section as global-only and ignore it in repository `.airrc.yaml`. Never let an untrusted repository choose a user's model, enable external egress or supply provider secrets.
-- Use the initial roles `coordinator`, `planner`, `coder`, `reviewer`, `reasoner`, `summarizer` and `embeddings`. Merge task analysis into `planner` until evaluations justify a separate role.
-- Keep reviewer output advisory in the first coordinator vertical slice. Add risk-tiered review only after seeded-defect evaluation; deterministic process/test/workspace evidence remains authoritative.
+The following decisions were reviewed by the integration owner against live source and recorded in the L0 baseline investigation. They are implemented in part, but this is not independent approval. The reviewer must challenge the actual code on main, not merely endorse this document:
+
+- Keep role/provider assignments in global AIR config under the models section; treat it as global-only and reject/strip it from repository .airrc.yaml. Never let an untrusted repository choose a user's model, enable external egress or supply provider secrets.
+- Use coordinator, planner, coder, reviewer, reasoner, summarizer and embeddings roles. Merge task analysis into planner until evaluations justify a separate role.
+- Keep reviewer output advisory in the first coordinator vertical slice. Deterministic process/test/workspace evidence remains authoritative.
 - Default to one active generative model and serialized role switching. Probe Ollama installed/running model state where supported; host GPU/VRAM metrics remain best-effort and unknown values stay unknown.
-- Defer semantic retrieval, hosted providers and Desert Ant utilities until local Ollama behavior is stable and a measured requirement exists.
-- Replace the legacy `ChatProvider.complete() -> string` seam with a typed provider-neutral API that represents tool calls, structured output, embeddings, capability declarations, cancellation and canonical model-provider errors.
-- Extend the shared worker contract only through an explicit versioned compatibility path; TypeScript resolves the role/model and the Python worker must not independently choose AIR roles.
+- Keep the model provider registry separate from execution adapters and keep provider responses/tool calls untrusted until AIR validates them.
+- Preserve the strict worker contract v1 until an explicit versioned role/provider handoff is designed and compatibility-tested. TypeScript should resolve roles; the Python worker must not independently choose AIR roles.
 
 ## 18. Immediate implementation sequence
 
-PR #1 and PR #2 are merged to main. The provider-neutral Ollama runtime, provider/model registries, global-only config v2, v1 migration, role resolver, concrete evaluation payloads and isolated coder workspace harness are now on main. The model runtime is not yet wired into CLI/MCP chat or the Python worker.
+PRs #1, #2 and #3 are merged to main. The provider-neutral Ollama runtime, provider/model registries, global-only config v2, v1 migration, role resolver, concrete evaluation payloads, isolated coder workspace harness and first repeatable evaluation runner are on main. The model runtime is not yet wired into CLI/MCP chat or the Python worker. The runner has not yet been used for a live model benchmark.
 
-The L0-04c evaluation runner is being implemented on a follow-up branch. It checks installed Ollama model tags without pulling, records raw generation proposals and reproducibility metadata, and computes embeddings retrieval rankings. It does not execute tool calls or apply coder patches; those remain separate execution/evaluation work.
+The runner checks installed Ollama model tags without pulling, records raw generation proposals and reproducibility metadata, and computes embeddings retrieval rankings. It does not execute tool calls or apply coder patches.
 
 Next sequence:
-1. Validate the runner on the exact PR head and merge it after CI passes.
-2. Obtain independent review of global-only config, provider API, role model and worker-v2 compatibility. Integration-owner review is not independent approval.
-3. Complete automated scoring and independent threshold review; do not recommend models from raw outputs alone.
+1. Obtain independent review of global-only config, provider API, role model, evaluation oracles/thresholds and worker-v2 compatibility. Integration-owner review is not independent approval.
+2. Reconcile P0/P1 review findings and record accepted/rejected decisions in the ledger.
+3. Complete a live reference-hardware evaluation only after independent review of scoring oracles; do not recommend models from raw outputs alone.
 4. Implement L3 resource-aware model lifecycle management with best-effort hardware/runtime probes and one active generative model by default.
 5. Implement L4 local Ollama-backed coordinator that can answer or propose one validated spawn_job action. Keep dispatch, permissions, process lifecycle, cancellation and success decisions deterministic.
 6. Add LLM planning, role-aware worker propagation and reviewer behavior only behind compatibility and evaluation gates.

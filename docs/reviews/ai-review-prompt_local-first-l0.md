@@ -1,80 +1,90 @@
-# Independent AI Review Assignment — AIR Local-First L0
+# Independent architecture and implementation review — AIR local-first L0
 
-**Review target:** [PR #1](https://github.com/radmanmilos/air/pull/1)  
-**Base:** `main` at `35c7300569df2568dbd2cec97a4f6cc232533cc5`  
-**Review branch:** `work/local-first-l0-baseline`  
-**Purpose:** Independent challenge of L0 architecture decisions before model runtime/config/worker-contract implementation begins.
+**Status:** Required independent review gate before L3 resource lifecycle and L4 coordinator implementation.  
+**Target repository:** https://github.com/radmanmilos/air  
+**Target branch/commit:** main at 6b71e6180ce5de18e912f7ecd542366c18fb4701  
+**Merged implementation PRs:** [#1](https://github.com/radmanmilos/air/pull/1), [#2](https://github.com/radmanmilos/air/pull/2), [#3](https://github.com/radmanmilos/air/pull/3)
 
-## Role and boundaries
+## Purpose
 
-Act as an independent senior architect and application-security reviewer. Review the design and evidence; do not implement code or push commits. Your task is to find incorrect assumptions, unsafe boundaries, missing compatibility requirements, or choices that would make multiple implementation agents diverge.
+Perform an independent, adversarial review of the actual implementation and remaining architecture before AIR proceeds to resource-aware model lifecycle management or a local-first coordinator. The integration owner has recorded decisions and implemented the first provider/config/evaluation foundations; that is not independent approval.
 
-Do not approve a decision merely because it is already written in the blueprint. Compare it with live source at the stated base and the PR diff. If the source differs, cite the exact path and symbol. Clearly label verified facts, inference and recommendations.
+Do not make source edits. Review the live code at the target commit, distinguish verified facts from inferences/recommendations, and challenge the decisions rather than endorsing the plan by default.
 
-## Read in this order
+## Required reading
 
-1. `AGENTS.md`
-2. `docs/architecture/local-first-ai-plan.md`
-3. `docs/reviews/tasks_air_13.md`
-4. `docs/architecture/local-first-l0-baseline.md`
-5. `docs/architecture/local-first-evaluation.md`
-6. `docs/adapters/chat-providers.md`
-7. The PR diff and the live source paths cited by the baseline investigation.
+1. AGENTS.md and docs/reviews/tasks_air_13.md (active task ledger).
+2. docs/architecture/local-first-ai-plan.md.
+3. docs/architecture/local-first-l0-baseline.md.
+4. docs/architecture/local-first-evaluation.md.
+5. docs/adapters/model-providers.md and docs/configuration/model-roles.md.
+6. docs/configuration/schema.md and relevant config migration documentation.
+7. src/models/types.ts, src/models/providers/provider.ts, src/models/providers/ollama.ts, provider/model registry and role resolver implementation.
+8. src/config/schema.ts, src/config/loader.ts and migration code.
+9. src/evals/runner.ts, scripts/eval-models.ts, tests/evals/runner.test.ts and tests/evals/fixtures/**.
+10. Relevant CLI/MCP conversation paths, contracts/job.schema.json, Python worker request/model selection and their tests.
 
-Relevant current source includes `src/config/schema.ts`, `src/config/loader.ts`, `src/config/paths.ts`, `src/conversation/actions.ts`, `src/conversation/decide.ts`, `src/conversation/chat-provider.ts`, `src/brain/index.ts`, `src/adapters/local.ts`, `src/orchestrator/orchestrator.ts`, `contracts/job.schema.json`, `src/contracts/job.ts`, `packages/local-worker/air_local/run.py`, `loop.py`, `models.py`, `ollama.py` and `config.yaml`.
+Use GitHub history/diffs for PRs #1-#3 as needed. Verify the latest main SHA and CI runs rather than relying on this prompt's snapshot.
 
-## Questions that must be answered
+## Review questions
 
-### A. Configuration and trust
-- Is global user config the correct single source for role/provider assignments?
-- Is the proposed `models` section correctly excluded from untrusted repository `.airrc.yaml`?
-- Are provider secrets, external egress, local model URLs and user overrides protected?
-- Is the migration v1→v2 plan non-destructive, idempotent and compatible with existing settings?
+### A. Configuration and trust boundary
+- Are model/provider assignments truly global-only? Can repo .airrc.yaml influence provider, model, egress, secrets or model lifecycle indirectly?
+- Is v1-to-v2 migration atomic, idempotent, permission-preserving and safe on malformed/future configs?
+- Are default roles/models appropriate, and are hosted provider IDs rejected until explicit user consent and support exist?
 
-### B. Role model
-- Are `coordinator`, `planner`, `coder`, `reviewer`, `reasoner`, `summarizer`, `embeddings` the right initial roles?
-- Should task analysis be a separate role or remain part of planner?
-- Are role selection and execution adapter selection cleanly separated?
+### B. Provider API and Ollama implementation
+- Are request/response types genuinely provider-neutral?
+- Are chat/tool-call/JSON/vision/thinking/embedding mappings correct for the Ollama API versions AIR claims to support?
+- Are timeouts, cancellation, malformed responses, 404/429/5xx and offline health classified correctly?
+- Are capabilities reported only when runtime-declared, with unknown kept unknown?
+- Is /api/ps optional and is reported per-model VRAM correctly distinguished from free GPU memory?
 
-### C. Provider API and model registry
-- Is the proposed typed API sufficient for chat, tool calls, structured output, embeddings, health, model discovery, cancellation and diagnostics?
-- Are capabilities declared/observed rather than guessed from model names?
-- Is the proposed error taxonomy complete and distinct from process/adapter errors?
-- What minimum Ollama endpoints and compatibility behavior should L1 support?
+### C. Registries, role resolution and lifecycle
+- Is provider registry separation from execution adapters sound?
+- Does model registry preserve digest, tag, size, capabilities and context without inventing metadata?
+- Does role resolution fail closed when provider/model is unavailable or disabled?
+- Is the one-active-generative-model policy actually enforced yet, or only documented? What exact provider lifecycle API is required to unload/switch models safely without unloading models owned by other applications?
+- What resource telemetry is realistically available on Windows 11 with an RTX 3060 Laptop 6GB?
 
-### D. Worker contract and configuration source of truth
-- Does the proposed versioned request carry enough information for role/model/provider settings without allowing the Python worker to re-resolve roles?
-- Should Ollama base URL/keep-alive be passed in the request or generated per-run config?
-- Is v1 compatibility/version negotiation safe given `additionalProperties: false` and separate TypeScript/Python validators?
-- Can worker-only settings remain in `packages/local-worker/config.yaml` without duplicating model/provider authority?
+### D. Evaluation fixtures and runner
+- Do the 20/12/12/8/8/10/8/10 scenario counts and concrete payloads cover their stated oracles?
+- Are hidden scoring oracles excluded from generation prompts, including nested payload fields?
+- Does the coder workspace copier prevent path/symlink escape and guarantee cleanup/isolation?
+- Does the runner reliably refuse missing models without any pull/install call?
+- Are warm-up/repetition semantics, JSONL output, model digest, prompt version, context, host/timing/RSS and best-effort /api/ps metrics sufficient and accurately labelled?
+- Are embedding corpus/query labels correct, including the superseded role document, lexical distractor and no-match case?
+- What additional tests are required before live model comparisons?
+- The runner currently stores raw generation proposals and computes embedding Recall@5/MRR; it does not execute tools, apply coder patches or automatically score all generation suites. Is that limitation clear and safe?
 
-### E. Resource policy and safety
-- Is one active generative model the correct conservative default for the 16 GB RAM / 6 GB VRAM reference machine?
-- What should happen when resource probes fail or Ollama reports incomplete runtime data?
-- Are queue priority, cancellation, model switching and unload failure behavior sufficiently specified?
-- Are the boundaries clear that model output cannot grant permissions, invoke arbitrary processes, authorize paid providers, or decide task success?
+### E. Coordinator, MCP/CLI and worker contract
+- The current CLI/MCP chat path still uses heuristic action selection; the new model runtime is not wired into it. Is the proposed first coordinator vertical slice appropriately bounded?
+- What exact versioned worker request is needed to pass a TypeScript-resolved role/provider/model while preserving strict v1 compatibility?
+- Which state transitions, permissions, cancellation, worktree operations, schema validation and success decisions must remain deterministic?
+- Are there MCP parity or stale conversation persistence/cancellation issues that must be fixed before coordinator integration?
 
-### F. Evaluation design
-- Are the suite sizes, repeat protocol, metrics and proposed thresholds meaningful?
-- Which fixtures are not sufficiently executable/deterministic?
-- Are any quality thresholds too strict, too weak, or misleading for the reference hardware?
-- What should block a model recommendation versus merely mark it experimental?
+### F. Evaluation thresholds and reference profile
+- Are the proposed quality, safety, latency and retrieval thresholds defensible for the reference Windows 11 / Ryzen 7 5800H / 16GB RAM / RTX 3060 Laptop 6GB machine?
+- Which thresholds should be hard gates, provisional targets or removed until a baseline exists?
+- What minimum live repetitions, hardware state and model/prompt digest controls are required?
+- What would invalidate a model recommendation?
 
-### G. Lifecycle and test coverage
-- Does the CLI/MCP call graph match the actual code?
-- Are the documented `chat_send` acknowledgement/cancel/stale-object issues accurate?
-- What tests must exist before the first coordinator vertical slice can be accepted?
-
-## Required review output
-
-Return a concise but evidence-heavy report in this structure:
+## Required response format
 
 1. **Verdict:** ACCEPT / ACCEPT WITH REQUIRED CHANGES / REJECT.
-2. **Blocking findings:** numbered, severity P0–P2, exact file/symbol or line, evidence, consequence, minimal correction.
-3. **Non-blocking findings:** severity P3, rationale and suggested follow-up.
-4. **Decision table:** each proposed L0 decision marked ACCEPT / CHANGE / DEFER, with reason.
-5. **Missing acceptance tests:** exact test scenarios and expected oracle.
-6. **Recommended interface freeze:** concrete TypeScript types/config fields/worker contract fields that should be frozen before parallel agents start.
-7. **Handoff:** which L0 items can close, which remain open, and which bounded package should start next.
+2. **Blocking findings:** P0/P1, each with exact file/line or symbol, impact, reproducible scenario and required fix.
+3. **Non-blocking findings:** P2/P3, prioritized.
+4. **Decision table:** accept / revise / reject each current architecture decision, with rationale.
+5. **Missing tests:** concrete test names and expected assertions.
+6. **Interface freeze:** proposed provider, model registry, role resolver, resource lifecycle and worker-v2 interfaces.
+7. **Next bounded implementation package:** smallest safe scope after findings are reconciled.
+8. **Evidence:** exact main SHA, PRs/commits inspected, CI run IDs/conclusions and commands actually run. Do not claim local tests were executed unless they were.
 
-Do not make source edits. Do not claim CI is green unless you verify the run for the exact PR head SHA. Do not treat model-generated prose as evidence. The goal is to make the next implementation agent able to start without guessing.
+## Constraints
+
+- Do not edit source or docs.
+- Do not assume the current implementation is correct because it is already merged.
+- Do not claim live model benchmark results; none have been executed yet.
+- Do not recommend automatic model downloads or hosted fallback.
+- Keep provider/runtime, execution adapters and deterministic AIR control plane separate.
+- Be explicit about any source or CI evidence you could not access.
