@@ -77,6 +77,15 @@ describe('OllamaProvider', () => {
     expect(running[0]?.sizeVramBytes).toBe(80);
   });
 
+  it('reports unsupported running-model diagnostics on older runtimes', async () => {
+    const provider = new OllamaProvider({
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ error: 'not found' }, 404)),
+    });
+    await expect(provider.listRunningModels()).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+    });
+  });
+
   it('reports provider health and handles offline runtime', async () => {
     const fetchMock = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse({ version: '0.5.0' }))
