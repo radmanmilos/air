@@ -2,13 +2,13 @@
 
 These JSON files are the initial version-controlled scenario catalog for the local-first model evaluation programme.
 
-| File | Cases | Role |
+| File | Cases | Evaluated role or purpose |
 |---|---:|---|
 | coordinator.json | 20 | Expected coordinator action class and safe fallback |
 | planner.json | 12 | Plan semantic oracles and invalid-graph rejection |
-| tool-calling.json | 12 | Expected registered worker tool and policy oracle |
+| tool-calling.json | 12 | Cross-role tool selection and policy oracle |
 | coder.json | 8 | Bounded code-edit acceptance oracle |
-| debugging.json | 8 | Root-cause and regression-repair oracle |
+| debugging.json | 8 | Coder role: root-cause and regression-repair oracle |
 | reviewer.json | 10 | Seeded-defect detection and clean controls |
 | summarizer.json | 8 | Preservation of facts, constraints and provenance |
 | embeddings.json | 10 | Retrieval relevance oracle |
