@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "role": "embeddings",
+  "cases": [
+    {
+      "id": "E01",
+      "query": "Exact symbol lookup: ActionSchema",
+      "oracle": "relevant_symbol_first"
+    },
+    {
+      "id": "E02",
+      "query": "Paraphrase: stop child processes when cancelling a task",
+      "oracle": "relevant_cancellation_docs_retrieved"
+    },
+    {
+      "id": "E03",
+      "query": "Find config migration code using different wording",
+      "oracle": "migration_docs_retrieved"
+    },
+    {
+      "id": "E04",
+      "query": "Retrieve worker policy for preventing writes outside workspace",
+      "oracle": "path_jail_docs_retrieved"
+    },
+    {
+      "id": "E05",
+      "query": "Multilingual paraphrase of a supported feature",
+      "oracle": "cross_language_relevance"
+    },
+    {
+      "id": "E06",
+      "query": "Near-duplicate docs with one authoritative current version",
+      "oracle": "authoritative_version_ranked"
+    },
+    {
+      "id": "E07",
+      "query": "Query with an irrelevant lexical distractor",
+      "oracle": "semantic_match_over_distractor"
+    },
+    {
+      "id": "E08",
+      "query": "Code identifier query with punctuation and casing variation",
+      "oracle": "identifier_recall"
+    },
+    {
+      "id": "E09",
+      "query": "Query with no relevant document",
+      "oracle": "no_false_relevant_result"
+    },
+    {
+      "id": "E10",
+      "query": "Retrieve related tests for a source implementation",
+      "oracle": "source_test_pair_retrieved"
+    }
+  ]
+}
