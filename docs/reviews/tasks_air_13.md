@@ -73,7 +73,7 @@
 - Owner: integration agent; evaluation agent/reviewer to validate
 - Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Eight version-controlled scenario catalogs are present and JSON-validated: 20 coordinator, 12 planner, 12 tool-calling, 8 coder, 8 debugging, 10 reviewer, 8 summarizer and 10 embeddings cases. Concrete payloads/corpora for several suites and an executable runner remain outstanding.
 - Scope: create deterministic coordinator, planner, tool-call, coding, debugging, review, summarization and embedding fixtures; define repeat count and metrics before model comparison.
-- Files: \`tests/evals/fixtures/*.json\`; \`docs/architecture/local-first-evaluation.md\`; future \`scripts/eval*\` / \`tests/evals/**\`.
+- Files: `tests/evals/fixtures/*.json`; `docs/architecture/local-first-evaluation.md`; future `scripts/eval*` / `tests/evals/**`.
 - Subtasks:
   - L0-04a [DONE]: create eight scenario catalogs with stable IDs and expected oracle classes (20/12/12/8/8/10/8/10 cases); validate JSON and align tool names with the current worker registry.
   - L0-04b [TODO]: create executable payloads/corpora for coder, debugging, reviewer, summarizer and embeddings; create a temporary-workspace harness; do not modify shared fixtures.
@@ -84,8 +84,8 @@
 ## L0 integration handoff (2026-11-12)
 
 - Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
-- Base commit: \`35c7300569df2568dbd2cec97a4f6cc232533cc5\`.
-- Working branch: \`work/local-first-l0-baseline\`.
+- Base commit: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
+- Working branch: `work/local-first-l0-baseline`.
 - Documentation/fixture catalog commits are present on this branch; no source implementation has started. Current branch head at handoff: `517b86f7d4afc3467afb699b6af3b0339f3cc8b8`.
 - Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
 - L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 decisions await independent review. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases) and proposed thresholds; concrete payloads/corpora for some suites and the evaluation runner remain outstanding.
