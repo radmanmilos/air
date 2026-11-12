@@ -1,6 +1,6 @@
 # AIR Local-First Model Evaluation Plan
 
-**Status:** Scenario catalogs, concrete payloads and isolated workspace harness are implemented; model evaluation runner is not yet implemented or executed  
+**Status:** Scenario catalogs, concrete payloads and isolated workspace harness are merged; first repeatable Ollama runner is implemented on a follow-up branch and awaiting exact-head CI  
 **Owner:** evaluation work-package owner (integration agent coordinates)  
 **Applies to:** coordinator, planner, tool calling, coder, debugging, reviewer, summarizer and embeddings roles.
 
@@ -129,3 +129,26 @@ The scenario catalogs are now paired with deterministic, synthetic payloads:
 - L0-04b is implemented as a concrete payload/workspace-harness package; CI must pass before it is marked DONE.
 - L0-04c remains separate: implement the repeatable model runner after the provider/runtime invocation boundary is ready, capture raw results and hardware/provider metadata, and never auto-pull models.
 - L0-04d remains open: obtain independent review of thresholds and scoring oracles before model comparisons or recommendations.
+
+
+## 9. Running the repeatable local evaluation runner
+
+The developer runner is available through:
+
+~~~bash
+npm run eval:models -- --suite coordinator --model qwen3.5:4b
+npm run eval:models -- --suite coder --model qwen2.5-coder:7b --repetitions 3 --context 8192
+npm run eval:models -- --suite embeddings --model nomic-embed-text:latest
+~~~
+
+The exact model tag must already exist in the local Ollama installation. The runner checks /api/tags and exits with a clear message when the tag is missing; it never invokes ollama pull or any model-install endpoint. Review model download size and approve installation separately.
+
+Supported suites: coordinator, planner, tool-calling, coder, debugging, reviewer, summarizer and embeddings. Generation suites make non-streaming chat requests and store raw model proposals. They do not execute tool calls, apply generated diffs, run fixture commands or change task state. Coder runs receive a fresh copied workspace per warm-up/repetition; the shared fixture remains immutable.
+
+Embeddings runs batch the synthetic corpus and queries, rank documents by cosine similarity, and record Recall@5/MRR against labelled expected document IDs. An empty expected set is recorded as a no-match control; it is not silently treated as a successful retrieval.
+
+Results are newline-delimited JSON written under results/evals/ by default (already ignored by git). Each run records provider/model tag and digest when available, Ollama version, prompt version, requested context, repetition counts, host OS/CPU/RAM, per-request duration, token usage/rate when reported, sampled process RSS, and explicit unknown GPU/VRAM metrics. A JSONL run header, case/query records and completion record are appended; retain the raw output for later scoring.
+
+Options include --base-url, --output, --repetitions, --warmups, --context, --timeout-ms and --prompt-version. Defaults are 127.0.0.1:11434, three measured repetitions, one warm-up, 8192 context tokens, 120000 ms timeout and prompt label local-first-eval-v1.
+
+This first runner is a raw-output and retrieval-metric collector, not a complete automatic scorer for coordinator/planner/coder/reviewer outputs. Do not mark a model recommended from its output alone; apply deterministic fixture oracles and reviewed thresholds, and retain all failures.
