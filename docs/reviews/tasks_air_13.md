@@ -86,11 +86,11 @@
 - Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
 - Base commit: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
 - Working branch: `work/local-first-l0-baseline`.
-- Documentation/fixture catalog commits are present on this branch; no source implementation has started. Current branch head at handoff: `517b86f7d4afc3467afb699b6af3b0339f3cc8b8`.
+- Documentation/fixture catalog commits are present on this branch; no source implementation has started. The authoritative current branch head is the live `head.sha` on [PR #1](https://github.com/radmanmilos/air/pull/1); re-check it before taking over.
 - Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
 - L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 decisions await independent review. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases) and proposed thresholds; concrete payloads/corpora for some suites and the evaluation runner remain outstanding.
 - Next: complete executable fixture payloads and evaluation harness; request independent AI review of provider/config/contract/security decisions; freeze L1/L2 interfaces; then begin the first Ollama coordinator vertical slice.
-- PR #1 is ready for review; CI runs [43219955351](https://github.com/radmanmilos/air/actions/runs/43219955351) and [43219839583](https://github.com/radmanmilos/air/actions/runs/43219839583) were still in progress for earlier PR heads at last poll. Re-check CI for the latest head before merge. No tests were run locally because no clone/worktree was available to this agent.
+- PR #1 is ready for review. CI for the latest PR head was queued at last poll; use the run attached to the current PR head SHA and do not infer success from runs on earlier commits. No tests were run locally because no clone/worktree was available to this agent.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
