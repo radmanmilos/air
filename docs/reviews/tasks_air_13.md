@@ -136,7 +136,7 @@
 ### L2-02 — Config v2 roles/providers and migration
 - Status: IN_PROGRESS
 - Owner: integration agent
-- Evidence: version-2 Zod config adds global-only local model/provider settings and seven role assignments. Repo .airrc.yaml model settings are stripped; hosted provider IDs are rejected. The v1 migration validates before writing, preserves existing YAML/comments and file permission bits, is idempotent, refuses future versions, and never downloads models. See docs/configuration/model-roles.md. Exact-head CI remains outstanding.
+- Evidence: version-2 Zod config adds global-only local model/provider settings and seven role assignments. Repo .airrc.yaml model settings are stripped; hosted provider IDs are rejected. The v1 migration validates before writing, preserves existing YAML/comments and file permission bits, is idempotent, refuses future versions, and never downloads models. See docs/configuration/model-roles.md. First CI attempt exposed a TypeScript literal-default mismatch; fixed by preserving the Ollama literal type. Follow-up CI run 43247330717 is queued for commit d60c1e72d7304dd3153d4a1add024f689b169e66.
 - Depends on: L0-03, L1
 - Scope: add providers, role assignments, local-first policy, resource policy and external fallback consent; migrate v1 safely.
 - Likely files: src/config/schema.ts; src/config/loader.ts; current migration module; tests and config docs.
