@@ -95,22 +95,23 @@
 - PR #3 merged to main at 6b71e6180ce5de18e912f7ecd542366c18fb4701. Exact-head CI run 301 passed on b8b0afa0d449d9add7b1f9c0ccb45b051ee3ae31; main push CI run 303 was in progress at this ledger update.
 - No local tests were run because no clone/worktree is available. All reported CI results are tied to the exact PR or merge commit.
 - Next gate: obtain an independent review of the merged provider/config/role/runtime/evaluation implementation and scoring thresholds. Reconcile all P0/P1 findings before starting L3 resource lifecycle or L4 coordinator work.
-- L0-05 reconciliation started 2026-11-12 on `fix/l0-05-p0-conversation-atomic` (base/head `f5e45a345f430b96d66933838944469886879689`, clean tree, CI run 43278214645 success). P0 conversation persistence fix implemented locally (atomic `mutateConversation`, locked `injectResult`, CLI/MCP stale-write refactor); focused tests pass locally (`tests/conversation.test.ts`, `tests/mcp.test.ts`, `tests/mcp-async.test.ts`, `tests/mcp-job-lifecycle.test.ts`), full validation/commit/CI pending. P1 (MCP cancel, external coding CLI consent, eval correctness/safety, Ollama tool-call contract) and P2 (provider/config hardening) remain OPEN; L3/L4 remain blocked.
+- L0-05 reconciliation started 2026-11-12 on `fix/l0-05-p0-conversation-atomic` (base `f5e45a345f430b96d66933838944469886879689`, CI run 43278214645 success). P0 conversation persistence fix (P0-01) committed and pushed as `fc3d23196193ad66d5ead6749a24b00e9a57df87` (atomic `mutateConversation`, locked `injectResult`, CLI/MCP stale-write refactor); full local `npm test` passed (exit 0, 65 files passed/2 skipped, 395 tests passed/16 skipped). CI for `fc3d231` not run: `.github/workflows/ci.yml` triggers on `push`/`pull_request` to `main` only, no PR exists for this branch (`gh pr list --head fix/l0-05-p0-conversation-atomic` empty). P1 (MCP cancel, external coding CLI consent, eval correctness/safety, Ollama tool-call contract) and P2 (provider/config hardening) remain OPEN; L3/L4 remain blocked.
 
 ### L0-05 — Reconcile independent review findings (P0/P1/P2)
 
 - Status: IN_PROGRESS
 - Owner: integration agent
-- Branch/commit: `fix/l0-05-p0-conversation-atomic` @ `f5e45a345f430b96d66933838944469886879689` (no local commits yet; working tree modified locally)
+- Branch/commit: `fix/l0-05-p0-conversation-atomic` @ `fc3d23196193ad66d5ead6749a24b00e9a57df87` (pushed to `origin/fix/l0-05-p0-conversation-atomic`, tracking up to date; base `f5e45a345f430b96d66933838944469886879689`)
 - Baseline CI: main `f5e45a345f430b96d66933838944469886879689` run [43278214645](https://github.com/radmanmilos/air/actions/runs/43278214645) success (all jobs).
+- Branch CI for `fc3d231`: **not run / no evidence**. `.github/workflows/ci.yml` triggers only on `push` to `main` and `pull_request` to `main`; no PR exists for this branch. Open a PR to `main` (or adjust triggers) to obtain required CI checks for the exact SHA.
 - Scope: reconcile `docs/reviews/independent-review_local-first-l0.md` required changes before L3/L4.
 
 #### P0-01 — Conversation data-loss from stale whole-object writes
-- Status: IN_PROGRESS (implemented locally, not yet committed/pushed/CI-verified)
+- Status: IN_PROGRESS (fix committed/pushed; full local tests passed; CI for exact SHA pending)
 - Files: `src/conversation/index.ts`, `bin/air.ts`, `src/mcp/server.ts`, `tests/conversation.test.ts`
 - Root cause: `appendMessage` persisted under `lockedReadModifyWrite`, but `saveConversation` wrote the supplied object wholesale without lock/re-read. CLI/MCP held long-lived `conv` snapshots, mutated them (activeWorkIds/facts/status paths), and called `saveConversation(conv)` after appends/injection/background completion, overwriting newer locked appends. `injectResult` performed its idempotency check outside the lock.
 - Change: added atomic `mutateConversation(id, mutator)` on `lockedReadModifyWrite` (re-reads latest, mutates, stamps `updatedAt`, persists). Refactored `appendMessage`/`injectResult` to use it; moved `injectResult` idempotency check+insert inside the same locked mutation. CLI/MCP now use `mutateConversation` for `activeWorkIds`/facts updates and reload fresh state for MCP status reply; `saveConversation` retained for initial whole-object creation only (documented in code). MCP spawn path no longer saves a pre-append stale snapshot after creation.
-- Tests (local): `npx vitest run tests/conversation.test.ts` — 10 passed (incl. concurrent appends, append+metadata/facts/activeWorkIds/summary mutations, concurrent `injectResult` idempotency, missing conversation/failure behavior). `npx vitest run tests/mcp-async.test.ts tests/mcp.test.ts tests/mcp-job-lifecycle.test.ts` — 8 passed. Full validation/CI pending.
+- Tests (local, 2026-11-12): `npx vitest run tests/conversation.test.ts` — 10 passed. `npx vitest run tests/mcp-async.test.ts tests/mcp.test.ts tests/mcp-job-lifecycle.test.ts` — 8 passed. `npm test` (full suite) — **exit 0**, `Test Files 65 passed | 2 skipped (67)`, `Tests 395 passed | 16 skipped (411)`, duration 42.54s (log `.kilo/tmp/npm-test-l0-05.log`). Required CI checks for `fc3d231` not yet verified (no workflow run).
 - Risks: `saveConversation` remains callable for full replacement; any future stale-object caller outside audited paths could regress. Deterministic lock-contention tests added; no timing-based sleeps.
 
 #### P1/P2 — Remaining required findings
@@ -120,7 +121,7 @@
 - P1-07 Ollama assistant tool-call request/response contract: TODO
 - P2-01/P2-02/P2-03 Provider/config hardening (health timeout, base URL/credentials): TODO
 
-- Gate: L3/L4 remain BLOCKED until P0/P1 reconciled and required P2 items resolved or explicitly dispositioned, with tests/docs/ledger and passing CI on final pushed changes.
+- Gate: L3/L4 remain BLOCKED until P0/P1 reconciled and required P2 items resolved or explicitly dispositioned, with tests/docs/ledger and passing CI on final pushed changes. P0-01 cannot be marked DONE until CI for `fc3d231` (or successor) is verified.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
