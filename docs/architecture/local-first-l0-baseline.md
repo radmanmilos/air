@@ -13,7 +13,7 @@
 - Baseline SHA: \`35c7300569df2568dbd2cec97a4f6cc232533cc5\`.
 - Active branches returned: \`main\`.
 - CI run for this exact SHA: [CI #43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531), push event.
-- At inspection: Node 22 test jobs passed on Ubuntu 24.04 and Windows; Python 3.12 and 3.14 jobs passed on Ubuntu and Windows. The real-binary smoke-test job was still in progress. Do not record the run as fully green until that job and the workflow complete successfully.
+- Final result: [CI #43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully. Node 22 test jobs passed on Ubuntu 24.04 and Windows; Python 3.12 and 3.14 jobs passed on Ubuntu and Windows; the real-binary smoke-test job also passed.
 - No local clone/worktree was available to this agent. No local commands are claimed as run. Use the GitHub Actions results for baseline validation and a real clone for implementation/test work where possible.
 - CI workflow: \`.github/workflows/ci.yml\`; Node test job runs typecheck, test typecheck, \`npm test\`, build, dist-import check, lint, package dry-run/pack and package smoke. Python job runs Ruff, mypy and pytest on Windows/Ubuntu with Python 3.12/3.14. Smoke job runs after Node test success.
 
