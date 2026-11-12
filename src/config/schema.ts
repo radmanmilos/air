@@ -21,13 +21,13 @@ export const MODEL_ROLES = [
 export type ModelRole = (typeof MODEL_ROLES)[number];
 
 const RoleAssignmentSchema = z.object({
-  provider: z.string().min(1),
+  provider: z.enum(['ollama']),
   model: z.string().min(1),
 });
 
 const ProviderSettingsSchema = z.object({
   enabled: z.boolean().default(true),
-  baseUrl: z.string().url().optional(),
+  baseUrl: z.string().url().default('http://127.0.0.1:11434'),
 });
 
 const DEFAULT_MODEL_ROLES = {
@@ -48,7 +48,9 @@ const ModelsSchema = z.object({
   localFirst: z.boolean().default(true),
   maxConcurrentGenerative: z.number().int().min(1).max(8).default(1),
   keepAlive: z.string().min(1).default('5m'),
-  providers: z.record(z.string(), ProviderSettingsSchema).default(DEFAULT_MODEL_PROVIDERS),
+  providers: z.object({
+    ollama: ProviderSettingsSchema.default(DEFAULT_MODEL_PROVIDERS.ollama),
+  }).default(DEFAULT_MODEL_PROVIDERS),
   roles: z.object({
     coordinator: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.coordinator),
     planner: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.planner),
