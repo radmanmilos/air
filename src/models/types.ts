@@ -6,7 +6,7 @@ export type ModelCapability =
   | 'embeddings'
   | 'thinking';
 
-export type ModelMessageRole = 'system' | 'user' | 'assistant' | 'tool';
+type ModelMessageRole = 'system' | 'user' | 'assistant' | 'tool';
 
 export interface ModelMessage {
   role: ModelMessageRole;
@@ -16,7 +16,7 @@ export interface ModelMessage {
   images?: string[];
 }
 
-export interface ModelToolDefinition {
+interface ModelToolDefinition {
   type: 'function';
   function: {
     name: string;
