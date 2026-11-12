@@ -84,7 +84,7 @@
       "id": "R07",
       "input": "Clean control: pure formatting change with tests passing.",
       "oracle": "no_false_positive",
-      "diff": "-const enabled=true;\\n+const enabled = true;",
+      "diff": "-const enabled=true;\n+const enabled = true;",
       "context": "no behavior or API changes; relevant tests pass",
       "expectedFinding": null,
       "falsePositiveControl": true
@@ -102,7 +102,7 @@
       "id": "R09",
       "input": "Seeded high: tests pass after silently skipping the changed assertion.",
       "oracle": "test_gap_detected",
-      "diff": "-expect(result).toEqual(expected);\\n+expect(true).toBe(true);",
+      "diff": "-expect(result).toEqual(expected);\n+expect(true).toBe(true);",
       "context": "the test remains green but no longer verifies the changed behavior",
       "expectedFinding": {
         "severity": "high",

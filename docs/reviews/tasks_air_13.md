@@ -72,7 +72,7 @@
 
 - Status: IN_PROGRESS
 - Owner: integration agent; evaluation agent/reviewer to validate
-- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Eight version-controlled scenario catalogs are present and JSON-validated: 20 coordinator, 12 planner, 12 tool-calling, 8 coder, 8 debugging, 10 reviewer, 8 summarizer and 10 embeddings cases. Concrete payloads/corpora for several suites and an executable runner remain outstanding.
+- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Eight version-controlled scenario catalogs are present: 20 coordinator, 12 planner, 12 tool-calling, 8 coder, 8 debugging, 10 reviewer, 8 summarizer and 10 embeddings cases. PR #2 adds concrete coder/debugging/reviewer/summarizer/embedding payloads and a tested temporary-workspace isolation helper; the repeatable model runner and independent scoring review remain outstanding.
 - Scope: create deterministic coordinator, planner, tool-call, coding, debugging, review, summarization and embedding fixtures; define repeat count and metrics before model comparison.
 - Files: `tests/evals/fixtures/*.json`; `docs/architecture/local-first-evaluation.md`; future `scripts/eval*` / `tests/evals/**`.
 - Subtasks:
@@ -85,15 +85,15 @@
 ## L0/L1/L2 integration handoff (2026-11-12)
 
 - Integration owner: ChatGPT; independent architecture review has not been supplied.
-- Historical baseline: \`35c7300569df2568dbd2cec97a4f6cc232533cc5\`.
-- PR #1: [merged](https://github.com/radmanmilos/air/pull/1) to \`main\` at \`a2dc1e95f3f26a5497e35c19c0af4c70976b1a96\` (squash merge, 2026-11-12).
-- PR #1 exact-head CI: [run 286](https://github.com/radmanmilos/air/actions/runs/43250494379) passed on \`5b968bb0024eec854861d5beb411e640cf3f3a1e\`: Node 22 Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows, package checks and real-binary smoke tests all green.
-- Main push CI for merge commit: [run 287](https://github.com/radmanmilos/air/actions/runs/43251279725) was in progress at handoff; re-check before reporting main CI complete.
+- Historical baseline: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
+- PR #1: [merged](https://github.com/radmanmilos/air/pull/1) to `main` at `a2dc1e95f3f26a5497e35c19c0af4c70976b1a96` (squash merge, 2026-11-12).
+- PR #1 exact-head CI: [run 286](https://github.com/radmanmilos/air/actions/runs/43250494379) passed on `5b968bb0024eec854861d5beb411e640cf3f3a1e`: Node 22 Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows, package checks and real-binary smoke tests all green.
+- Main push CI for merge commit: [run 287](https://github.com/radmanmilos/air/actions/runs/43251279725) completed successfully: all six matrix jobs plus real-binary smoke tests passed on merge commit `a2dc1e95f3f26a5497e35c19c0af4c70976b1a96`.
 - Merged implementation: provider-neutral TypeScript model API, Ollama chat/tool/embedding transport, health/model discovery, provider registry, in-memory model inventory, global-only config v2, v1 migration and no-fallback role resolver.
 - Important boundary: the model runtime/role resolver is not wired into CLI/MCP chat or the Python worker. The worker still uses worker-local model slots. No job-contract v1 changes were included.
 - L0-03 remains IN_PROGRESS: integration-owner decisions are recorded, but independent review and exact worker-v2 compatibility design remain open.
 - L0-04a is DONE; L0-04b concrete payloads/workspace harness are IN_PROGRESS; L0-04c runner and L0-04d independent scoring review remain TODO.
-- Current follow-up branch: \`work/local-first-eval-harness\`, based on main merge commit \`a2dc1e95f3f26a5497e35c19c0af4c70976b1a96\`. First implementation commit: \`a46b4ec91d73a6baaa3e65d87e3e8568d62cf5dc\`.
+- Current follow-up branch: `work/local-first-eval-harness`, based on main merge commit `a2dc1e95f3f26a5497e35c19c0af4c70976b1a96`. PR #2 is open at head `6a646f1714166d233bcc1427645e2cfc75eb9f0a`; exact-head CI run 43251984399 is in progress. Implementation commit: `a46b4ec91d73a6baaa3e65d87e3e8568d62cf5dc`.
 - No local tests were run because no clone/worktree is available. CI on the exact follow-up PR head is required.
 - Next: finish docs/ledger updates, validate the temporary workspace helper and payloads in GitHub CI, open PR #2, and merge only after its exact-head CI is green.
 

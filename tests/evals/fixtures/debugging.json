@@ -46,8 +46,8 @@
       "oracle": "cross_platform_root_cause",
       "evidence": {
         "source": "const config = root + '/.airrc.yaml';",
-        "windowsObserved": "C:\\\\work\\\\repo/.airrc.yaml",
-        "expected": "C:\\\\work\\\\repo\\\\.airrc.yaml",
+        "windowsObserved": "C:\\work\\repo/.airrc.yaml",
+        "expected": "C:\\work\\repo\\.airrc.yaml",
         "constraint": "must remain portable to POSIX"
       },
       "expectedRootCause": "path string concatenation hardcodes a POSIX separator",
@@ -58,7 +58,7 @@
       "input": "Diagnose a configuration migration failure.",
       "oracle": "migration_root_cause_and_compatibility",
       "evidence": {
-        "input": "version: 1\\npermission:\\n  mode: ask\\n",
+        "input": "version: 1\npermission:\n  mode: ask\n",
         "failure": "migration writes version 2 before validating permission.mode",
         "required": "invalid v1 config must remain byte-for-byte unchanged"
       },
