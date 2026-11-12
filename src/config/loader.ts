@@ -2,7 +2,8 @@
 // Repo config is untrusted by default: strict schema, unknown keys rejected,
 // verify.command never executed from repo config.
 
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 import { parse, parseDocument } from 'yaml';
 import { paths } from './paths';
@@ -29,7 +30,7 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
   const errors: string[] = [];
 
   // 1. Defaults
-  let config: Config = DEFAULT_CONFIG;
+  let config: Config = structuredClone(DEFAULT_CONFIG);
 
   // 2. Global config
   try {
@@ -176,10 +177,11 @@ export async function migrateConfig(
   if (!document.has('models')) document.set('models', DEFAULT_CONFIG.models);
   document.set('version', CONFIG_VERSION);
 
-  const temporaryFile = file + '.tmp-' + process.pid;
+  const temporaryFile = file + '.tmp-' + process.pid + '-' + randomUUID();
   try {
+    const originalStats = await stat(file);
     await mkdir(dirname(file), { recursive: true });
-    await writeFile(temporaryFile, document.toString(), 'utf8');
+    await writeFile(temporaryFile, document.toString(), { encoding: 'utf8', mode: originalStats.mode & 0o777 });
     await rename(temporaryFile, file);
     return { ok: true, message: 'Migrated global config from version 1 to version ' + CONFIG_VERSION + '.' };
   } catch (error) {
