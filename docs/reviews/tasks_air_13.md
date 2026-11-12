@@ -1,9 +1,9 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
 **Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)  
-**Status:** READY FOR L0 / implementation not started  
+**Status:** L0 IN PROGRESS / implementation not started  
 **Created:** 2026-11-12  
-**Baseline inspected:** main at 6fe3222cd6fcacbe8293b86a330a5e3138686006  
+**Baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5  
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -22,7 +22,7 @@
 
 | Phase | Goal | Status | Depends on |
 |---|---|---|---|
-| L0 | Baseline and executable design gate | READY | None |
+| L0 | Baseline and executable design gate | IN_PROGRESS | None |
 | L1 | Provider-neutral runtime + Ollama | TODO | L0 |
 | L2 | Model registry, capabilities, role config | TODO | L0, L1 |
 | L3 | Resource-aware model manager | TODO | L1, L2 |
@@ -36,21 +36,23 @@
 
 ## L0 — Baseline and executable design gate
 
-**Phase status:** READY  
-**Exit gate:** architecture contracts and baseline evidence are recorded; no implementation begins beyond isolated spikes until L0 is accepted.
+**Phase status:** IN_PROGRESS  
+**Exit gate:** architecture contracts and baseline evidence are recorded; no implementation begins beyond isolated spikes until L0 is accepted. See [L0 baseline investigation](../architecture/local-first-l0-baseline.md) and [evaluation plan](../architecture/local-first-evaluation.md).
 
 ### L0-01 — Refresh repository and CI baseline
 
-- Status: READY
+- Status: IN_PROGRESS
 - Owner: integration agent
+- Evidence: baseline SHA `35c7300569df2568dbd2cec97a4f6cc232533cc5`; only `main` branch returned. CI run [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531): Node Ubuntu/Windows and Python 3.12/3.14 Ubuntu/Windows jobs succeeded; real-binary smoke job was still in progress at last check. No local clone/commands available. Re-poll and record final workflow conclusion before DONE.
 - Scope: verify repository access, default branch/head, all active branches, recent commits, workflow runs/checks for current head, clean/dirty local worktree when using a clone.
 - Required output: exact baseline SHA; branch list; CI run/check links and conclusions; tests/commands run locally; any unavailable evidence explicitly marked.
 - Acceptance: no statement that CI is green without a run/check tied to the exact SHA.
 
 ### L0-02 — Map the current end-to-end request lifecycle
 
-- Status: READY
-- Owner: architecture/investigation agent
+- Status: DONE
+- Owner: integration agent
+- Evidence: [L0 baseline investigation](../architecture/local-first-l0-baseline.md), including CLI/MCP sequence diagrams, exact call sites, local worker path, current test coverage and discrepancies. Baseline commit: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
 - Scope: trace CLI and MCP user turn through conversation persistence, action handling, planner, orchestrator, adapter, local worker, result compilation and result injection.
 - Expected files to inspect: bin/air.ts; src/conversation/*; src/planner/*; src/orchestrator/*; src/adapters/*; src/execution/*; src/result-compiler/*; src/mcp/*; packages/local-worker/air_local/*; contracts/*.
 - Required output: sequence diagram or call graph, actual call sites, gaps and tests proving each path.
@@ -58,19 +60,32 @@
 
 ### L0-03 — Freeze provider, role, config and contract boundaries
 
-- Status: READY
-- Owner: integration agent + independent reviewer
+- Status: IN_PROGRESS
+- Owner: integration agent; independent reviewer required
+- Proposal recorded in [L0 baseline investigation](../architecture/local-first-l0-baseline.md): global-only `models` config section; seven initial roles; typed provider-neutral model API; versioned worker contract; one active generative model by default. Awaiting independent review/acceptance.
 - Scope: settle provider interface, model registry record, role names, role request/response contracts, config v2 shape, migration behavior, resource policy, error taxonomy, worker request contract and compatibility strategy.
 - Files: blueprint; src/config/schema.ts; src/config/loader.ts; migration module; src/types/*; contracts/job.schema.json; Python contract.
 - Acceptance: decisions and rejected alternatives recorded in blueprint; one source of truth for effective configuration; TS/Python contract compatibility test plan.
 
 ### L0-04 — Define benchmark fixtures and evaluation thresholds
 
-- Status: READY
-- Owner: evaluation agent
+- Status: IN_PROGRESS
+- Owner: integration agent; evaluation agent/reviewer to validate
+- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Actual version-controlled fixture data and runner remain outstanding.
 - Scope: create deterministic coordinator, planner, tool-call, coding, debugging, review, summarization and embedding fixtures; define repeat count and metrics before model comparison.
 - Files: proposed tests/evals/* or equivalent; docs/architecture/local-first-ai-plan.md.
 - Acceptance: fixtures contain no private repository/user data; expected outcomes are deterministic; thresholds are explicit and reviewed before claiming a model is recommended.
+
+## L0 integration handoff (2026-11-12)
+
+- Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
+- Base commit: \`35c7300569df2568dbd2cec97a4f6cc232533cc5\`.
+- Working branch: \`work/local-first-l0-baseline\`.
+- Documentation commits are being prepared on this branch; no source implementation has started.
+- Current CI run: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531); six Node/Python jobs passed, smoke-test job pending at last poll.
+- L0-02 call graph and baseline findings are documented. L0-03 decisions and L0-04 thresholds are proposals awaiting independent review; fixture files/runner are not complete.
+- Next: finish/poll CI; create stable fixture files; request independent AI review of provider/config/contract/security decisions; then freeze L1/L2 interfaces and begin the first Ollama coordinator vertical slice.
+- No tests were run locally because no clone/worktree was available to this agent.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
