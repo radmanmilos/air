@@ -4,7 +4,8 @@ import { arch, cpus, hostname, platform, release, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { OllamaProvider } from '../models/providers/ollama';
-import type { ModelDescriptor, ModelMessage } from '../models/types';
+import { ModelProviderError } from '../models/types';
+import type { ModelDescriptor, ModelMessage, RunningModelDescriptor } from '../models/types';
 import type { ModelProvider } from '../models/providers/provider';
 
 export const EVAL_SUITES = [
@@ -449,6 +450,14 @@ export async function runEvaluation(
     );
   }
 
+  let modelDetails = model;
+  let modelMetadataError: string | null = null;
+  try {
+    modelDetails = await provider.showModel(options.model, { timeoutMs: options.timeoutMs });
+  } catch (error) {
+    modelMetadataError = error instanceof ModelProviderError ? error.code : 'UNKNOWN';
+  }
+
   const catalog = await loadCatalog(options.suite);
   const outputPath = resolve(options.output ?? defaultOutputPath(options));
   await mkdir(dirname(outputPath), { recursive: true });
@@ -466,8 +475,9 @@ export async function runEvaluation(
     modelFamily: model.family ?? null,
     modelParameterSize: model.parameterSize ?? null,
     quantizationLevel: model.quantizationLevel ?? null,
-    declaredCapabilities: model.capabilities ?? null,
-    modelContextLength: model.contextLength ?? null,
+    declaredCapabilities: modelDetails.capabilities ?? model.capabilities ?? null,
+    modelContextLength: modelDetails.contextLength ?? model.contextLength ?? null,
+    modelMetadataError,
     ollamaVersion: health.version ?? null,
     promptVersion: options.promptVersion,
     contextTokens: options.context,
@@ -482,6 +492,34 @@ export async function runEvaluation(
   const measuredCases = options.suite === 'embeddings'
     ? await runEmbeddingSuite(options, catalog, provider, outputPath)
     : await runGenerationSuite(options, catalog, provider, outputPath, dependencies);
+
+  let runningModelStatus = 'unsupported';
+  let runningModelError: string | null = null;
+  let runningModels: RunningModelDescriptor[] | null = null;
+  if (provider.listRunningModels) {
+    try {
+      runningModels = await provider.listRunningModels({ timeoutMs: options.timeoutMs });
+      runningModelStatus = 'available';
+    } catch (error) {
+      runningModelStatus = error instanceof ModelProviderError && error.code === 'UNSUPPORTED_CAPABILITY'
+        ? 'unsupported'
+        : 'error';
+      runningModelError = error instanceof ModelProviderError ? error.code : 'UNKNOWN';
+    }
+  }
+  await writeRecord(outputPath, {
+    recordType: 'runtime',
+    runningModelStatus,
+    runningModelError,
+    runningModels: runningModels?.map((item) => ({
+      name: item.name,
+      digest: item.digest ?? null,
+      sizeBytes: item.sizeBytes ?? null,
+      sizeVramBytes: item.sizeVramBytes ?? null,
+      expiresAt: item.expiresAt ?? null,
+    })) ?? null,
+  });
+
   await writeRecord(outputPath, {
     recordType: 'complete',
     runId,

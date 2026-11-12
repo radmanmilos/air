@@ -1,10 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildEvalMessages,
   cosineSimilarity,
   parseEvalArgs,
   rankTopDocuments,
+  runEvaluation,
+  type EvalRunnerOptions,
 } from '../../src/evals/runner';
+import type { ModelChatRequest, ModelChatResponse, ModelDescriptor, ModelEmbeddingRequest, ModelEmbeddingResponse, ProviderHealth, RunningModelDescriptor } from '../../src/models/types';
+import type { ModelProvider } from '../../src/models/providers/provider';
 
 describe('evaluation runner argument parsing', () => {
   it('requires a suite and exact installed model tag', () => {
@@ -91,5 +98,104 @@ describe('evaluation prompt and scoring helpers', () => {
       [[0, 1], [1, 0]],
     );
     expect(ranked[0]?.id).toBe('B');
+  });
+});
+
+
+function createMockProvider(installed = true): ModelProvider {
+  return {
+    id: 'ollama',
+    health: vi.fn(async (): Promise<ProviderHealth> => ({
+      provider: 'ollama',
+      online: true,
+      version: 'test-ollama',
+    })),
+    listModels: vi.fn(async (): Promise<ModelDescriptor[]> =>
+      installed ? [{ name: 'test-model:latest', digest: 'sha-test' }] : [],
+    ),
+    showModel: vi.fn(async (model: string): Promise<ModelDescriptor> => ({
+      name: model,
+      contextLength: 4096,
+      capabilities: ['chat', 'embeddings'],
+    })),
+    listRunningModels: vi.fn(async (): Promise<RunningModelDescriptor[]> => [{
+      name: 'test-model:latest',
+      sizeVramBytes: 512,
+    }]),
+    chat: vi.fn(async (request: ModelChatRequest): Promise<ModelChatResponse> => ({
+      provider: 'ollama',
+      model: request.model,
+      message: { role: 'assistant', content: 'candidate output', toolCalls: [] },
+    })),
+    embed: vi.fn(async (request: ModelEmbeddingRequest): Promise<ModelEmbeddingResponse> => {
+      const inputs = Array.isArray(request.input) ? request.input : [request.input];
+      return {
+        provider: 'ollama',
+        model: request.model,
+        embeddings: inputs.map(() => [1, 0]),
+      };
+    }),
+  };
+}
+
+function embeddingRunOptions(output: string): EvalRunnerOptions {
+  return {
+    suite: 'embeddings',
+    model: 'test-model:latest',
+    baseUrl: 'http://127.0.0.1:11434',
+    output,
+    repetitions: 1,
+    warmups: 0,
+    context: 2048,
+    promptVersion: 'test-prompt-v1',
+    timeoutMs: 5000,
+  };
+}
+
+describe('evaluation runner execution boundary', () => {
+  it('refuses missing models without invoking generation or embedding', async () => {
+    const provider = createMockProvider(false);
+    await expect(runEvaluation(embeddingRunOptions(join(tmpdir(), 'unused.jsonl')), {
+      provider,
+    })).rejects.toThrow('this runner never pulls models');
+    expect(provider.chat).not.toHaveBeenCalled();
+    expect(provider.embed).not.toHaveBeenCalled();
+  });
+
+  it('writes reproducible embedding results and runtime diagnostics', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'air-eval-runner-'));
+    const output = join(directory, 'results.jsonl');
+    const provider = createMockProvider(true);
+    try {
+      const result = await runEvaluation(embeddingRunOptions(output), { provider });
+      expect(result.measuredCases).toBe(10);
+      expect(result.modelDigest).toBe('sha-test');
+
+      const records = (await readFile(output, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(records[0]).toMatchObject({
+        recordType: 'run',
+        modelDigest: 'sha-test',
+        ollamaVersion: 'test-ollama',
+        promptVersion: 'test-prompt-v1',
+        modelContextLength: 4096,
+      });
+      expect(records.filter((record) => record.recordType === 'query')).toHaveLength(10);
+      expect(records.find((record) => record.recordType === 'runtime')).toMatchObject({
+        runningModelStatus: 'available',
+        runningModels: [{ name: 'test-model:latest', sizeVramBytes: 512 }],
+      });
+      expect(records.find((record) => record.queryId === 'E09')).toMatchObject({
+        expectedNoMatch: true,
+        recallAt5: null,
+        reciprocalRank: null,
+      });
+      expect(provider.embed).toHaveBeenCalledTimes(2);
+      expect(provider.chat).not.toHaveBeenCalled();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
