@@ -8,7 +8,7 @@ import { ModelProviderError } from '../models/types';
 import type { ModelDescriptor, ModelMessage, RunningModelDescriptor } from '../models/types';
 import type { ModelProvider } from '../models/providers/provider';
 
-export const EVAL_SUITES = [
+const EVAL_SUITES = [
   'coordinator', 'planner', 'tool-calling', 'coder',
   'debugging', 'reviewer', 'summarizer', 'embeddings',
 ] as const;
@@ -25,7 +25,7 @@ export interface EvalRunnerOptions {
   promptVersion: string;
   timeoutMs: number;
 }
-export interface EvalWorkspaceLike {
+interface EvalWorkspaceLike {
   path: string;
   cleanup(): Promise<void>;
 }
