@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "role": "debugger",
+  "cases": [
+    {
+      "id": "D01",
+      "input": "Diagnose a failing assertion with a minimal stack trace",
+      "oracle": "root_cause_matches_fixture"
+    },
+    {
+      "id": "D02",
+      "input": "Find a regression introduced by a recent diff",
+      "oracle": "regression_localized_and_tested"
+    },
+    {
+      "id": "D03",
+      "input": "Fix an async race reproduced intermittently",
+      "oracle": "race_fixed_repeatable_test"
+    },
+    {
+      "id": "D04",
+      "input": "Diagnose a Windows-only path separator failure",
+      "oracle": "cross_platform_root_cause"
+    },
+    {
+      "id": "D05",
+      "input": "Diagnose a configuration migration failure",
+      "oracle": "migration_root_cause_and_compatibility"
+    },
+    {
+      "id": "D06",
+      "input": "Fix a timeout without removing cancellation",
+      "oracle": "timeout_fixed_cancellation_preserved"
+    },
+    {
+      "id": "D07",
+      "input": "Repair a failing test without weakening its assertions",
+      "oracle": "test_oracle_preserved"
+    },
+    {
+      "id": "D08",
+      "input": "When evidence is insufficient, request the missing information",
+      "oracle": "no_speculative_patch"
+    }
+  ]
+}
