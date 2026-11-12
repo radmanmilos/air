@@ -1,10 +1,10 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
 **Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)  
-**Status:** L0 design/evaluation gates IN PROGRESS / L1 provider runtime and L2 registry/config foundations IN PROGRESS  
+**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN / L1-L2 integration remains IN PROGRESS  
 **Created:** 2026-11-12  
 **Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5  
-**Current main baseline:** 5f82d98cae74b0d2be4360c9b451b708b5a436dc (PR #2 merged)  
+**Current main baseline:** 6b71e6180ce5de18e912f7ecd542366c18fb4701 (PR #3 merged)  
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -72,13 +72,13 @@
 
 - Status: IN_PROGRESS
 - Owner: integration agent; evaluation agent/reviewer to validate
-- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Eight scenario catalogs, concrete synthetic payloads/corpora, fixture-integrity tests and the isolated coder workspace harness are merged. PR #3 adds the first repeatable Ollama runner; exact-head CI is pending.
+- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Eight scenario catalogs, concrete synthetic payloads/corpora, fixture-integrity tests, isolated coder workspace harness and the first repeatable Ollama runner are merged. PR #3 exact-head CI run 301 passed. No live model benchmark has been executed.
 - Scope: create deterministic coordinator, planner, tool-call, coding, debugging, review, summarization and embedding fixtures; define repeat count and metrics before model comparison.
 - Files: `tests/evals/fixtures/*.json`; `docs/architecture/local-first-evaluation.md`; future `scripts/eval*` / `tests/evals/**`.
 - Subtasks:
   - L0-04a [DONE]: create eight scenario catalogs with stable IDs and expected oracle classes (20/12/12/8/8/10/8/10 cases); validate JSON and align tool names with the current worker registry.
   - L0-04b [DONE]: concrete synthetic payloads/corpora and temporary-workspace harness merged in PR #2; exact-head CI runs 297 and 298 passed. Shared fixtures are copied, never edited in place.
-  - L0-04c [IN_PROGRESS]: first repeatable Ollama runner added on work/local-first-eval-runner; it checks installed models without pulling, records JSONL metadata/raw outputs, supports all eight suites and computes embeddings Recall@5/MRR. Exact-head CI pending.
+  - L0-04c [DONE]: repeatable Ollama runner merged in PR #3. It checks installed models without pulling, records JSONL model/prompt/context/host/timing/runtime metadata and raw outputs for all eight suites, and computes embeddings Recall@5/MRR. Exact-head CI run 301 passed. No live model benchmark has been executed.
   - L0-04d [TODO]: independent review of thresholds and scoring oracles before comparing models.
 - Acceptance: fixtures contain no private repository/user data; expected outcomes are deterministic; thresholds are explicit and reviewed before claiming a model is recommended.
 
@@ -87,14 +87,14 @@
 - Integration owner: ChatGPT; independent architecture review has not been supplied.
 - Historical baseline: 35c7300569df2568dbd2cec97a4f6cc232533cc5.
 - PR #1 merged to main at a2dc1e95f3f26a5497e35c19c0af4c70976b1a96; exact-head CI run 286 and main push run 287 passed.
-- PR #2 merged to main at 5f82d98cae74b0d2be4360c9b451b708b5a436dc; exact-head CI runs 297 and 298 passed on 4d877676a4865cbb2f402f4d040917f08ae65bfe. Main push CI [run 299](https://github.com/radmanmilos/air/actions/runs/43253903400) completed successfully on merge commit 5f82d98cae74b0d2be4360c9b451b708b5a436dc.
+- PR #2 merged to main at 5f82d98cae74b0d2be4360c9b451b708b5a436dc; exact-head CI runs 297 and 298 passed on 4d877676a4865cbb2f402f4d040917f08ae65bfe. Main push CI run 299 passed.
 - Merged implementation: provider-neutral TypeScript model API, Ollama chat/tool/embedding transport, health/model discovery, provider registry, in-memory model inventory, global-only config v2, v1 migration, no-fallback role resolver, concrete synthetic eval payloads, coder workspace fixture and isolated workspace helper.
 - Important boundary: the model runtime/role resolver is not wired into CLI/MCP chat or the Python worker. The worker still uses worker-local model slots. No job-contract v1 changes were included.
 - L0-03 remains IN_PROGRESS: integration-owner decisions are recorded, but independent review and exact worker-v2 compatibility design remain open.
-- L0-04a and L0-04b are DONE. L0-04c runner is IN_PROGRESS; L0-04d independent scoring review remains TODO.
-- Current follow-up branch: work/local-first-eval-runner, based on main merge commit 5f82d98cae74b0d2be4360c9b451b708b5a436dc. Current head before PR creation: 6b6cda3d77617a084d58d28ebb174810c462603d. It contains the runner, CLI entry point, parser/prompt/ranking tests and runtime metadata capture.
-- No local tests were run because no clone/worktree is available. CI on the exact follow-up PR head is required.
-- Next: validate runner tests in GitHub CI, open PR #3, merge after exact-head CI passes, then proceed to resource management and coordinator vertical slice after independent architecture review.
+- L0-04a, L0-04b and L0-04c are DONE as implementation packages. L0-04d independent scoring/threshold review remains TODO. No live model results exist.
+- PR #3 merged to main at 6b71e6180ce5de18e912f7ecd542366c18fb4701. Exact-head CI run 301 passed on b8b0afa0d449d9add7b1f9c0ccb45b051ee3ae31; main push CI run 303 was in progress at this ledger update.
+- No local tests were run because no clone/worktree is available. All reported CI results are tied to the exact PR or merge commit.
+- Next gate: obtain an independent review of the merged provider/config/role/runtime/evaluation implementation and scoring thresholds. Reconcile all P0/P1 findings before starting L3 resource lifecycle or L4 coordinator work.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
@@ -390,7 +390,7 @@ Copy this into the PR description or update the relevant package entry at the en
 
 | Phase | Integrated commit / PR | CI evidence | Reviewer | Completion date |
 |---|---|---|---|---|
-| L0 | PR #1 and PR #2 merged | PR runs 286, 297 and 298 passed; main push runs 287 and 299 passed | Integration owner; independent review open | 2026-11-12 |
+| L0 | PR #1, #2 and #3 merged | PR runs 286, 297, 298 and 301 passed; main push runs 287 and 299 passed; run 303 pending | Integration owner; independent review open | 2026-11-12 |
 | L1 | PR #1 foundation merged at a2dc1e95 | CI run 286 passed | Integration owner; independent review open | 2026-11-12 |
 | L2 | PR #1 config/registry foundation merged at a2dc1e95 | CI run 286 passed | Integration owner; independent review open | 2026-11-12 |
 | L3 | — | — | — | — |

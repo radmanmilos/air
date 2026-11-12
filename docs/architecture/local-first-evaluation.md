@@ -1,6 +1,6 @@
 # AIR Local-First Model Evaluation Plan
 
-**Status:** Scenario catalogs, concrete payloads and isolated workspace harness are merged; first repeatable Ollama runner is implemented on a follow-up branch and awaiting exact-head CI  
+**Status:** Scenario catalogs, concrete payloads, isolated workspace harness and repeatable Ollama runner are merged to main (PR #1-#3). Exact-head CI passed; no live model benchmark has been executed.  
 **Owner:** evaluation work-package owner (integration agent coordinates)  
 **Applies to:** coordinator, planner, tool calling, coder, debugging, reviewer, summarizer and embeddings roles.
 
@@ -30,7 +30,7 @@ The first fixture set should live under `tests/evals/fixtures/`. Fixture IDs rem
 | Summarizer | 8 | long thread, constraints, decisions, facts, IDs, unresolved questions, active jobs, conflicting untrusted content | Required fact/constraint preservation and no fabricated facts |
 | Embeddings | 10 query sets | exact vs semantic match, paraphrase, near-duplicate, irrelevant distractor, code identifier, multilingual query | Recall@5 / MRR against labelled relevant documents |
 
-Minimum counts are initial suite sizes. The scenario catalogs and concrete synthetic payloads are committed under `tests/evals/fixtures/`. Coder tasks use a deliberately failing Node.js project under `payloads/workspaces/coder-discount`; debugging cases include concrete diagnostic evidence; reviewer cases include seeded diffs and evidence anchors; summarizer cases include message transcripts and required/forbidden facts; embeddings cases include a labelled 15-document corpus. The workspace helper creates a fresh temporary copy for each repetition and never mutates the shared fixture. This is still not a model benchmark: provider invocation, repeated execution, scoring and result reporting remain L0-04c. Do not report model scores from fixture payloads alone.
+Minimum counts are initial suite sizes. The scenario catalogs and concrete synthetic payloads are committed under `tests/evals/fixtures/`. Coder tasks use a deliberately failing Node.js project under `payloads/workspaces/coder-discount`; debugging cases include concrete diagnostic evidence; reviewer cases include seeded diffs and evidence anchors; summarizer cases include message transcripts and required/forbidden facts; embeddings cases include a labelled 15-document corpus. The workspace helper creates a fresh temporary copy for each repetition and never mutates the shared fixture. PR #3 adds the repeatable runner and JSONL output. The runner records raw proposals and retrieval metrics but is not a complete automatic scorer; no live model benchmark has been executed. Do not report model scores from fixture payloads alone.
 
 ## 3. Metrics
 
@@ -107,27 +107,27 @@ All assignments remain provisional until the suite is executed on the reference 
 
 The scenario catalogs are now paired with deterministic, synthetic payloads:
 
-- **Coder:** \`tests/evals/fixtures/payloads/workspaces/coder-discount\` is a small Node.js project with an intentional percentage-calculation defect, regression tests and an unrelated file used to detect collateral edits.
-- **Debugging:** \`debugging.json\` now carries the diagnostic evidence for all eight cases: stack trace, regression diff, async race, Windows path issue, migration failure, cancellation/timeout issue, weakened assertion and insufficient-evidence control.
-- **Reviewer:** \`reviewer.json\` carries ten synthetic diffs/context snippets, expected severity/evidence anchors and clean controls.
-- **Summarizer:** \`summarizer.json\` carries eight message transcripts, required facts and forbidden output markers for redaction.
-- **Embeddings:** \`embeddings.json\` carries twelve synthetic corpus documents and ten labelled queries with expected relevant document IDs, including one no-match case.
+- **Coder:** `tests/evals/fixtures/payloads/workspaces/coder-discount` is a small Node.js project with an intentional percentage-calculation defect, regression tests and an unrelated file used to detect collateral edits.
+- **Debugging:** `debugging.json` now carries the diagnostic evidence for all eight cases: stack trace, regression diff, async race, Windows path issue, migration failure, cancellation/timeout issue, weakened assertion and insufficient-evidence control.
+- **Reviewer:** `reviewer.json` carries ten synthetic diffs/context snippets, expected severity/evidence anchors and clean controls.
+- **Summarizer:** `summarizer.json` carries eight message transcripts, required facts and forbidden output markers for redaction.
+- **Embeddings:** `embeddings.json` carries fifteen synthetic corpus documents and ten labelled queries with expected relevant document IDs, including one no-match case.
 
 ### 8.1 Temporary workspace API
 
-\`tests/evals/helpers/workspace.ts\` exports \`createEvalWorkspace(fixtureName, options?)\`. It:
+`tests/evals/helpers/workspace.ts` exports `createEvalWorkspace(fixtureName, options?)`. It:
 1. accepts only a single safe fixture-name segment;
 2. resolves the fixture under the repository-owned payload root and rejects path escapes;
 3. rejects symlinks in the fixture tree;
 4. creates a unique temporary parent directory and copies the fixture into it;
 5. returns the copied workspace path and an idempotent cleanup function.
 
-\`tests/evals/workspace.test.ts\` verifies copy isolation, source immutability, distinct workspaces across repetitions, cleanup and invalid-name rejection. These tests do not invoke a model, execute the fixture's acceptance command or calculate benchmark scores.
+`tests/evals/workspace.test.ts` verifies copy isolation, source immutability, distinct workspaces across repetitions, cleanup and invalid-name rejection. These tests do not invoke a model, execute the fixture's acceptance command or calculate benchmark scores.
 
 ### 8.2 Remaining L0-04 work
 
-- L0-04b is implemented as a concrete payload/workspace-harness package; CI must pass before it is marked DONE.
-- L0-04c remains separate: implement the repeatable model runner after the provider/runtime invocation boundary is ready, capture raw results and hardware/provider metadata, and never auto-pull models.
+- L0-04b is merged and CI-validated: concrete payloads and the isolated workspace harness are in main.
+- L0-04c is merged and CI-validated: the runner checks installed tags without pulling, records raw outputs and reproducibility metadata, supports all eight suites, and computes embeddings Recall@5/MRR. No live model benchmark has been executed.
 - L0-04d remains open: obtain independent review of thresholds and scoring oracles before model comparisons or recommendations.
 
 
