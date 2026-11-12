@@ -89,8 +89,8 @@
 - Documentation/fixture catalog, provider runtime, version-2 global model config, migration and initial role resolver commits are present on this branch. The authoritative current branch head is the live `head.sha` on [PR #1](https://github.com/radmanmilos/air/pull/1); re-check it before taking over.
 - Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
 - L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 has an integration-owner disposition but still lacks independent review and exact config/worker migration tests. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases); executable payloads/corpora and the evaluation runner remain outstanding.
-- L1 provider API/Ollama slice and L2 global-only model config/role resolution are in progress on this same feature branch. They are not wired into CLI/MCP or the Python worker. No local tests were run because no clone/worktree is available in this session. Re-check GitHub CI for the exact current PR head.
-- Current implementation includes typed provider contracts, Ollama chat/tool calls/embeddings/metadata/health, v2 model-role defaults, v1 migration and a no-fallback role resolver. L0-03 still needs independent review; L0-04b/c/d remain outstanding.
+- L1 provider API/Ollama slice and L2 provider/model registries, global-only model config and role resolution are in progress on this same feature branch. They are not wired into CLI/MCP or the Python worker. No local tests were run because no clone/worktree is available in this session. Re-check GitHub CI for the exact current PR head.
+- Current implementation includes typed provider contracts, Ollama chat/tool calls/embeddings/metadata/health, provider and model registries, v2 model-role defaults, v1 migration and a no-fallback role resolver. L0-03 still needs independent review; L0-04b/c/d remain outstanding.
 - Next: validate exact-head CI; fix all failures; complete provider conformance, concrete evaluation payloads and temporary-workspace harness. Then add model registry/capability verification before attempting coordinator integration.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
@@ -126,17 +126,17 @@
 ## L2 — Model registry, capabilities and role configuration
 
 ### L2-01 — Model registry and capability metadata
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: src/models/provider-registry.ts keeps model API providers separate from execution adapters and rejects duplicate/unknown provider IDs. src/models/model-registry.ts tracks discovered models with available/missing/unknown state, checked-at timestamps and provider-declared capabilities; missing metadata remains unknown and model names are never used to infer capability. Tests are in tests/models/registry.test.ts. Persistence, eligibility explanations and runtime integration remain open.
 - Depends on: L1
 - Scope: separate declared metadata from observed availability; provenance and verification timestamp; no capability inference solely from model name.
-- Likely files: src/models/registry.ts; src/models/capabilities.ts; tests.
 - Acceptance: resolver can explain why a model is eligible or rejected.
 
 ### L2-02 — Config v2 roles/providers and migration
 - Status: IN_PROGRESS
 - Owner: integration agent
-- Evidence: version-2 Zod config adds global-only local model/provider settings and seven role assignments. Repo .airrc.yaml model settings are stripped; hosted provider IDs are rejected. The v1 migration validates before writing, preserves existing YAML/comments and file permission bits, is idempotent, refuses future versions, and never downloads models. See docs/configuration/model-roles.md. First CI attempt exposed a TypeScript literal-default mismatch; fixed by preserving the Ollama literal type. Follow-up CI run 43247330717 is queued for commit d60c1e72d7304dd3153d4a1add024f689b169e66.
+- Evidence: version-2 Zod config adds global-only local model/provider settings and seven role assignments. Repo .airrc.yaml model settings are stripped; hosted provider IDs are rejected. The v1 migration validates before writing, preserves existing YAML/comments and file permission bits, is idempotent, refuses future versions, and never downloads models. See docs/configuration/model-roles.md. CI typechecks and config/provider tests are passing on the latest run; an intermediate registry run caught one unused exported type, now made internal. Re-check the run attached to the current PR head before accepting this package.
 - Depends on: L0-03, L1
 - Scope: add providers, role assignments, local-first policy, resource policy and external fallback consent; migrate v1 safely.
 - Likely files: src/config/schema.ts; src/config/loader.ts; current migration module; tests and config docs.
