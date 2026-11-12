@@ -41,9 +41,9 @@
 
 ### L0-01 — Refresh repository and CI baseline
 
-- Status: IN_PROGRESS
+- Status: DONE
 - Owner: integration agent
-- Evidence: baseline SHA `35c7300569df2568dbd2cec97a4f6cc232533cc5`; only `main` branch returned. CI run [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531): Node Ubuntu/Windows and Python 3.12/3.14 Ubuntu/Windows jobs succeeded; real-binary smoke job was still in progress at last check. No local clone/commands available. Re-poll and record final workflow conclusion before DONE.
+- Evidence: baseline SHA `35c7300569df2568dbd2cec97a4f6cc232533cc5`; only `main` branch returned. CI run [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully: Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows, and real-binary smoke tests all passed. No local clone/commands were run.
 - Scope: verify repository access, default branch/head, all active branches, recent commits, workflow runs/checks for current head, clean/dirty local worktree when using a clone.
 - Required output: exact baseline SHA; branch list; CI run/check links and conclusions; tests/commands run locally; any unavailable evidence explicitly marked.
 - Acceptance: no statement that CI is green without a run/check tied to the exact SHA.
@@ -83,7 +83,7 @@
 - Working branch: \`work/local-first-l0-baseline\`.
 - Documentation commits are being prepared on this branch; no source implementation has started.
 - Current CI run: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531); six Node/Python jobs passed, smoke-test job pending at last poll.
-- L0-02 call graph and baseline findings are documented. L0-03 decisions and L0-04 thresholds are proposals awaiting independent review; fixture files/runner are not complete.
+- L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 decisions await independent review. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases) and proposed thresholds; concrete payloads/corpora for some suites and the evaluation runner remain outstanding.
 - Next: finish/poll CI; create stable fixture files; request independent AI review of provider/config/contract/security decisions; then freeze L1/L2 interfaces and begin the first Ollama coordinator vertical slice.
 - No tests were run locally because no clone/worktree was available to this agent.
 
