@@ -1,10 +1,10 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
-**Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)  
-**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN / L1-L2 integration remains IN PROGRESS  
-**Created:** 2026-11-12  
-**Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5  
-**Current main baseline:** 6b71e6180ce5de18e912f7ecd542366c18fb4701 (PR #3 merged)  
+**Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)
+**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN; L0-05 P0 conversation persistence reconciliation IN_PROGRESS on `fix/l0-05-p0-conversation-atomic` (P1/P2 open) / L1-L2 integration remains IN_PROGRESS
+**Created:** 2026-11-12
+**Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5
+**Current main baseline:** f5e45a345f430b96d66933838944469886879689 (independent review merged; CI run 43278214645 passed)
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -37,7 +37,7 @@
 
 ## L0 — Baseline and executable design gate
 
-**Phase status:** IN_PROGRESS  
+**Phase status:** IN_PROGRESS
 **Exit gate:** architecture contracts and baseline evidence are recorded; no implementation begins beyond isolated spikes until L0 is accepted. See [L0 baseline investigation](../architecture/local-first-l0-baseline.md) and [evaluation plan](../architecture/local-first-evaluation.md).
 
 ### L0-01 — Refresh repository and CI baseline
@@ -95,6 +95,32 @@
 - PR #3 merged to main at 6b71e6180ce5de18e912f7ecd542366c18fb4701. Exact-head CI run 301 passed on b8b0afa0d449d9add7b1f9c0ccb45b051ee3ae31; main push CI run 303 was in progress at this ledger update.
 - No local tests were run because no clone/worktree is available. All reported CI results are tied to the exact PR or merge commit.
 - Next gate: obtain an independent review of the merged provider/config/role/runtime/evaluation implementation and scoring thresholds. Reconcile all P0/P1 findings before starting L3 resource lifecycle or L4 coordinator work.
+- L0-05 reconciliation started 2026-11-12 on `fix/l0-05-p0-conversation-atomic` (base/head `f5e45a345f430b96d66933838944469886879689`, clean tree, CI run 43278214645 success). P0 conversation persistence fix implemented locally (atomic `mutateConversation`, locked `injectResult`, CLI/MCP stale-write refactor); focused tests pass locally (`tests/conversation.test.ts`, `tests/mcp.test.ts`, `tests/mcp-async.test.ts`, `tests/mcp-job-lifecycle.test.ts`), full validation/commit/CI pending. P1 (MCP cancel, external coding CLI consent, eval correctness/safety, Ollama tool-call contract) and P2 (provider/config hardening) remain OPEN; L3/L4 remain blocked.
+
+### L0-05 — Reconcile independent review findings (P0/P1/P2)
+
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Branch/commit: `fix/l0-05-p0-conversation-atomic` @ `f5e45a345f430b96d66933838944469886879689` (no local commits yet; working tree modified locally)
+- Baseline CI: main `f5e45a345f430b96d66933838944469886879689` run [43278214645](https://github.com/radmanmilos/air/actions/runs/43278214645) success (all jobs).
+- Scope: reconcile `docs/reviews/independent-review_local-first-l0.md` required changes before L3/L4.
+
+#### P0-01 — Conversation data-loss from stale whole-object writes
+- Status: IN_PROGRESS (implemented locally, not yet committed/pushed/CI-verified)
+- Files: `src/conversation/index.ts`, `bin/air.ts`, `src/mcp/server.ts`, `tests/conversation.test.ts`
+- Root cause: `appendMessage` persisted under `lockedReadModifyWrite`, but `saveConversation` wrote the supplied object wholesale without lock/re-read. CLI/MCP held long-lived `conv` snapshots, mutated them (activeWorkIds/facts/status paths), and called `saveConversation(conv)` after appends/injection/background completion, overwriting newer locked appends. `injectResult` performed its idempotency check outside the lock.
+- Change: added atomic `mutateConversation(id, mutator)` on `lockedReadModifyWrite` (re-reads latest, mutates, stamps `updatedAt`, persists). Refactored `appendMessage`/`injectResult` to use it; moved `injectResult` idempotency check+insert inside the same locked mutation. CLI/MCP now use `mutateConversation` for `activeWorkIds`/facts updates and reload fresh state for MCP status reply; `saveConversation` retained for initial whole-object creation only (documented in code). MCP spawn path no longer saves a pre-append stale snapshot after creation.
+- Tests (local): `npx vitest run tests/conversation.test.ts` — 10 passed (incl. concurrent appends, append+metadata/facts/activeWorkIds/summary mutations, concurrent `injectResult` idempotency, missing conversation/failure behavior). `npx vitest run tests/mcp-async.test.ts tests/mcp.test.ts tests/mcp-job-lifecycle.test.ts` — 8 passed. Full validation/CI pending.
+- Risks: `saveConversation` remains callable for full replacement; any future stale-object caller outside audited paths could regress. Deterministic lock-contention tests added; no timing-based sleeps.
+
+#### P1/P2 — Remaining required findings
+- P1-01 MCP cancellation semantics (`chat_send cancel_job` path appears to ack without cancelling underlying work): TODO
+- P1-02 External coding CLI consent on default/fallback answer paths: TODO
+- P1-03/P1-04/P1-05/P1-06 Evaluation correctness/safety oracles (schemas/tools in prompts, reviewer leakage, planner validator, coder/tool safety execution): TODO
+- P1-07 Ollama assistant tool-call request/response contract: TODO
+- P2-01/P2-02/P2-03 Provider/config hardening (health timeout, base URL/credentials): TODO
+
+- Gate: L3/L4 remain BLOCKED until P0/P1 reconciled and required P2 items resolved or explicitly dispositioned, with tests/docs/ledger and passing CI on final pushed changes.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 

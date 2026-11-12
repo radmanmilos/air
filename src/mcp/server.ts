@@ -612,12 +612,11 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
       },
     },
     async (args: any) => {
-      const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../conversation');
+      const { createConversation, loadConversation, saveConversation, appendMessage, injectResult, mutateConversation } = await import('../conversation');
       const { decide } = await import('../conversation/decide');
       const { planFromRequest } = await import('../planner');
       let conv = args.conversationId ? loadConversation(args.conversationId) : null;
-      if (!conv) conv = createConversation();
-      saveConversation(conv);
+      if (!conv) { conv = createConversation(); saveConversation(conv); }
       await appendMessage(conv.id, { role: 'user', content: args.message });
       const actions = decide(args.message, conv);
       const replies: string[] = [];
@@ -635,8 +634,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
           const plan = planFromRequest(enriched, a.hints ?? {});
           const item = plan.workItems[0];
           const session = await orch.start(item.objective, process.cwd(), { mode: 'auto', freeOnly: conv.userPreferences.freeOnly, readOnly: a.hints?.requiresWrite === false });
-          conv.activeWorkIds.push(session.runId);
-          saveConversation(conv);
+          await mutateConversation(conv.id, (c) => { c.activeWorkIds.push(session.runId); });
           replies.push(`Started job ${session.runId}.`);
           // Background completion inject.
           (async () => {
@@ -661,8 +659,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
               };
               const summary = compileJobResult(facts as any);
               await injectResult(conv!.id, summary, session.runId);
-              conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== session.runId);
-              saveConversation(conv!);
+              await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== session.runId); });
             } catch { /* noop */ }
           })();
         } else if (a.type === 'answer') {
@@ -672,7 +669,8 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
           await appendMessage(conv.id, { role: 'assistant', content: a.question });
           replies.push(a.question);
         } else if (a.type === 'status') {
-          replies.push(`messages=${conv.messages.length} active=${conv.activeWorkIds.join(',')}`);
+          const fresh = loadConversation(conv.id);
+          replies.push(`messages=${fresh?.messages.length ?? 0} active=${(fresh?.activeWorkIds ?? []).join(',')}`);
         } else if (a.type === 'cancel_job') {
           replies.push(`Cancel requested for ${a.jobId}.`);
         }

@@ -646,7 +646,7 @@ program
   .option('--resume <id>', 'Resume a conversation')
   .option('--free-only', 'Prefer free models (default true)')
   .action(async (options: { resume?: string; freeOnly?: boolean }) => {
-    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../src/conversation');
+    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult, mutateConversation } = await import('../src/conversation');
     const { decide } = await import('../src/conversation/decide');
     const { planFromRequest } = await import('../src/planner');
     const { compileJobResult } = await import('../src/result-compiler');
@@ -690,8 +690,7 @@ program
       logEvent('job_started', session.runId);
       logEvent('notice_printed', `Started job ${session.runId}`);
       console.log(chalk.green(`Started job ${session.runId}`));
-      conv!.activeWorkIds.push(session.runId);
-      saveConversation(conv!);
+      await mutateConversation(conv!.id, (c) => { c.activeWorkIds.push(session.runId); });
       // Background waiter.
       const p = (async () => {
         try {
@@ -717,11 +716,11 @@ program
           };
           const summary = compileJobResult(facts as any);
           await injectResult(conv!.id, summary, session.runId);
-          conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== session.runId);
-          // update facts
-          const bullet = `Job ${session.runId} ${facts.result}: ${facts.changedFiles?.length ?? 0} changed`;
-          if (!conv!.facts.includes(bullet)) conv!.facts.push(bullet);
-          saveConversation(conv!);
+          await mutateConversation(conv!.id, (c) => {
+            c.activeWorkIds = c.activeWorkIds.filter((x) => x !== session.runId);
+            const bullet = `Job ${session.runId} ${facts.result}: ${facts.changedFiles?.length ?? 0} changed`;
+            if (!c.facts.includes(bullet)) c.facts.push(bullet);
+          });
           logEvent('job_finished', `${session.runId}: ${summary.split('.')[0]}`);
           console.log(chalk.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
         } catch (err) {
@@ -765,8 +764,7 @@ program
         }
         try { await entry.orch.cancel(id); } catch { /* noop */ }
         entry.controller.abort();
-        conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== id);
-        saveConversation(conv!);
+        await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== id); });
         console.log(chalk.yellow(`Cancelled ${id}`));
         return;
       }
@@ -812,8 +810,7 @@ program
             try { await entry.orch.cancel(a.jobId); } catch { /* noop */ }
             entry.controller.abort();
           }
-          conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== a.jobId);
-          saveConversation(conv!);
+          await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== a.jobId); });
           console.log(chalk.yellow(`Cancelled ${a.jobId}`));
         }
       }
