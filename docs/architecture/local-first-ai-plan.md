@@ -1,6 +1,6 @@
 # AIR Local-First Intelligence — Architecture and Implementation Blueprint
 
-**Status:** L0 baseline documented; integration-owner boundary review recorded; L1 provider runtime implementation in progress. Independent review remains outstanding.  
+**Status:** PR #1 merged: provider-neutral Ollama runtime, provider/model registries, global model-role config v2 and role resolver are on main. L0-04b concrete payloads/workspace harness are in progress on a follow-up branch. Independent architecture review remains outstanding.  
 **Prepared:** 2026-11-12  
 **Repository baseline inspected:** main at 6fe3222cd6fcacbe8293b86a330a5e3138686006  
 **Purpose:** Make AIR's own intelligence local-first and model-driven while preserving deterministic control, safety, portability, and optional external providers.
@@ -831,15 +831,16 @@ The following recommendations are recorded in [the L0 baseline investigation](lo
 
 ## 18. Immediate implementation sequence
 
-The L0 baseline and request lifecycle map are recorded in docs/architecture/local-first-l0-baseline.md; the active work state is tracked in docs/reviews/tasks_air_13.md. The integration owner has reviewed and accepted the provider/role/config/control-plane boundaries as an implementation direction. This is not independent review, and exact config-v2 and worker-v2 compatibility contracts remain open.
+The baseline and request lifecycle map are recorded in \`docs/architecture/local-first-l0-baseline.md\`; active work is tracked in \`docs/reviews/tasks_air_13.md\`. PR #1 is merged to \`main\` at \`a2dc1e95f3f26a5497e35c19c0af4c70976b1a96\`. It provides the provider-neutral TypeScript model API, Ollama transport, in-memory provider/model registries, global-only config v2, v1 migration and initial role resolver. It does not yet wire model roles into CLI/MCP chat or the Python worker.
 
-The first isolated L1 package is the provider-neutral TypeScript API and Ollama transport. It is intentionally not wired to CLI/MCP, role configuration, the Python worker or task execution. Validate it in exact-head CI before proceeding.
+The exact PR head passed full GitHub Actions CI (run 286, \`5b968bb0024eec854861d5beb411e640cf3f3a1e\`); the merge commit also has a push-triggered main CI run, which must be monitored separately.
 
-Next sequence:
-1. Finish and validate L1 provider contracts, Ollama behavior and deterministic failure tests.
-2. Complete concrete evaluation payloads and a temporary-workspace harness; add the repeatable runner only after the provider API stabilizes.
-3. Obtain independent review of global-only config, role assignments, error taxonomy, provider API and worker versioning before L2 config/worker changes.
-4. Implement L2 config migration, model registry and role resolver with v1 preservation and repo-config trust tests.
-5. Build the first local Ollama-backed coordinator that can answer or propose one validated spawn_job action. Keep all dispatch, permissions, process lifecycle and success decisions deterministic.
+Current sequence:
+1. Finish L0-04b concrete synthetic payloads and the temporary-workspace isolation helper; require exact-head CI before marking it done.
+2. Obtain independent review of the global-only config, provider API, role model and worker-v2 boundary. Integration-owner review is not independent approval.
+3. Complete L0-04c repeatable model evaluation only after the provider invocation contract is ready; capture raw outcomes, digests, prompts, context, latency and measurable resources. Never auto-pull models.
+4. Implement the L3 resource-aware model manager: best-effort hardware/runtime probes and serialized model lifecycle management, defaulting to one active generative model.
+5. Implement the L4 local Ollama-backed coordinator that can answer or propose one validated \`spawn_job\` action. Keep dispatch, permissions, process lifecycle, cancellation and success decisions deterministic.
+6. Add LLM planning, role-aware worker propagation and reviewer behavior only behind their own compatibility/evaluation gates.
 
-Do not add automatic model downloads, hosted fallback, or unreviewed worker-contract fields as part of the provider package.
+Do not add automatic model downloads, hosted fallback or unreviewed worker-contract fields.

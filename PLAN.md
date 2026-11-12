@@ -10,7 +10,7 @@
 
 ## Current architecture direction (2026-11-12)
 
-The next major milestone is local-first AIR-owned intelligence. The detailed architecture, model roles, provider boundaries, resource policy, evaluation strategy, phased implementation plan and multi-AI handoff protocol live in [docs/architecture/local-first-ai-plan.md](docs/architecture/local-first-ai-plan.md). The active work-package ledger is [docs/reviews/tasks_air_13.md](docs/reviews/tasks_air_13.md). The TypeScript provider runtime, Ollama transport, version-2 global model config and role resolver are now implemented on the feature branch; they are not yet integrated into the conversation coordinator or Python worker.
+The next major milestone is local-first AIR-owned intelligence. The detailed architecture, model roles, provider boundaries, resource policy, evaluation strategy, phased implementation plan and multi-AI handoff protocol live in [docs/architecture/local-first-ai-plan.md](docs/architecture/local-first-ai-plan.md). The active work-package ledger is [docs/reviews/tasks_air_13.md](docs/reviews/tasks_air_13.md). The TypeScript provider runtime, Ollama transport, provider/model registries, version-2 global model config and role resolver were merged to main in PR #1 (merge commit `a2dc1e95`). They are not yet integrated into the conversation coordinator or Python worker.
 
 
 ## Reviews applied
@@ -53,7 +53,7 @@ Redaction is idempotent and deterministic. The `allow` option protects allowlist
 
 ## Config schema
 
-Zod is the single source of truth. Config is versioned (`version: 1`); `air config migrate` upgrades older versions.
+Zod is the single source of truth. Config is versioned (`version: 2`); `air config migrate` upgrades v1 settings.
 Precedence: CLI > env > repo `.airrc.yaml` > global > defaults. Repo config is untrusted by default.
 
 ## File Structure

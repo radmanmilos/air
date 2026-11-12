@@ -1,6 +1,6 @@
 # Model provider runtime
 
-**Status:** L1 implementation in progress. The provider contract and first Ollama transport are implemented on the local-first feature branch; they are not yet wired into CLI/MCP conversation handling or role configuration.
+**Status:** Provider-neutral runtime, Ollama transport, provider/model registries, config-v2 role assignments and the initial role resolver are merged to main in PR #1. They are not yet wired into CLI/MCP conversation handling or the Python worker.
 
 ## Boundaries
 

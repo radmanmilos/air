@@ -22,7 +22,7 @@ It is insufficient for AIR's local-first model roles because it cannot represent
 
 ## Replacement direction
 
-The L1 model runtime will introduce a provider-neutral typed API under `src/models/`. The provider contract must support chat, tool calls, structured output, embeddings, health, model discovery/metadata, cancellation and explicit capability declarations. Ollama is the first implementation. A provider is a model-serving runtime, not an execution adapter.
+The L1 model runtime has introduced a provider-neutral typed API under `src/models/`. The provider contract must support chat, tool calls, structured output, embeddings, health, model discovery/metadata, cancellation and explicit capability declarations. Ollama is the first implementation. A provider is a model-serving runtime, not an execution adapter.
 
 The exact interfaces are defined by the accepted L0 contract in [the architecture blueprint](../architecture/local-first-ai-plan.md) and [L0 baseline investigation](../architecture/local-first-l0-baseline.md). Do not implement a second hosted provider until the local Ollama provider and conformance suite are stable.
 
