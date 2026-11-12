@@ -3,7 +3,8 @@
 **Source:** plan discussion (2026-11-11)
 **Decision:** monorepo; AIR is the control plane, the retained MGAI subset is an
 internal local worker. `air` is the only user-facing interface.
-**Status:** COMPLETE (2026-11-12) — M0–M5 done; `MakingGoodAIs` decommissioned.
+**Status:** COMPLETE (2026-11-12) — M0–M6 done; `MakingGoodAIs` decommissioned;
+GitHub CI green on Ubuntu and Windows.
 
 ## Scope rule
 
@@ -180,3 +181,21 @@ Take MGAI's **tools and local model transport**, not its orchestration:
   (2026-11-12); `gh repo view` now returns "Could not resolve to a Repository".
 - The local clone at `E:\GitHub\MakeingGoodAIs` is left in place; AIR's subtree
   history is the canonical copy.
+
+## M6 — Green CI [DONE]
+
+### T12-060 [DONE] — Ubuntu e2e orphan oracle
+- `oracles.noOrphans` ignored its `marker` argument and matched any
+  `fake-executor|fake-aider|fake-goose` process on the machine. Vitest runs test
+  files in parallel (`singleFork: false`), so on Linux a live executor from
+  another sandbox was reported as an orphan (three failures: the oracle unit
+  test, `group G` G-hang, and `real: P-03`).
+- It now reads `AIR_E2E_MARKER` from `/proc/<pid>/environ` and matches only this
+  sandbox's processes. Windows still short-circuits to `true` (no `/proc`).
+
+### T12-061 [DONE] — Linux mypy on the worker
+- `air_local/ollama.py` referenced `subprocess.CREATE_NEW_PROCESS_GROUP`
+  unconditionally. The attribute is Windows-only and absent from the typeshed
+  stubs elsewhere, so `mypy` failed on the Ubuntu 3.12/3.14 jobs while passing on
+  Windows. It is now resolved with `getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)`
+  behind an `os.name == "nt"` check.

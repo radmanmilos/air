@@ -83,11 +83,14 @@ class OllamaClient:
         if self.is_online():
             return True
         try:
+            # CREATE_NEW_PROCESS_GROUP is Windows-only and absent from the
+            # typeshed stubs on other platforms, so resolve it dynamically.
+            creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
             subprocess.Popen(
                 ["ollama", "serve"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+                creationflags=creationflags,
             )
         except Exception:
             pass

@@ -375,7 +375,7 @@ applied. Conflicts were resolved as follows:
 - **README honesty (G3-15):** README lists only implemented adapters (aider,
   goose, mock-for-tests) and documents known limitations.
 
-## Current state (2026-11-11)
+## Current state (2026-11-12)
 - Monorepo absorption: `MakeingGoodAIs` was imported with `git subtree` into
   `packages/local-worker` (full history preserved) and pruned to the useful
   subset: Ollama transport, ReAct loop, tool registry, and scaffolding.
@@ -384,8 +384,9 @@ applied. Conflicts were resolved as follows:
 - The worker is hardened: one `policy` layer (job-root jail, read-only mode,
   protected files, shell/network gates), argv-only shell with an allowlist, no
   interactive approval, no destructive git rollback.
-- Python package tests: 100 passing (`pytest`); `ruff` and `mypy` clean. CI runs
-  Node plus Python 3.12/3.14 on Ubuntu and Windows.
+- Python package tests: 102 passing (`pytest`); `ruff` and `mypy` clean (the
+  worker resolves Windows-only `creationflags` dynamically so `mypy` also passes
+  on Linux). CI runs Node plus Python 3.12/3.14 on Ubuntu and Windows.
 - M3 contract: `contracts/job.schema.json` is the single source of truth for the
   request/result payloads and the worker exit codes. `air_local/contract.py` and
   `src/contracts/job.ts` implement the same small JSON Schema subset, and both
@@ -409,7 +410,11 @@ applied. Conflicts were resolved as follows:
 - E2E determinism: fixtures are read-only inputs and each sandbox builds its own
   git baseline; `oracles.gitChangedFiles` parses porcelain correctly. Write jobs
   now fail closed when worktree creation fails instead of touching the source
-  tree. Latest full suite: 300 passed, 15 skipped, green on repeated runs.
+  tree. Latest full suite: 350 passed, 16 skipped, green on repeated runs.
+- CI fixes (M6): the e2e `noOrphans` oracle is scoped to the sandbox's
+  `AIR_E2E_MARKER` (parallel test files no longer cross-report each other's live
+  executors), and the worker resolves Windows-only `creationflags` dynamically so
+  `mypy` passes on Linux. GitHub CI is green on Ubuntu and Windows.
 - M4 local adapter: `src/adapters/local.ts` runs the provisioned worker with
   `--request/--result/--print-answer`. Requests are written under
   `cacheDir/worker/requests/`; the final answer reaches stdout only when asked.
@@ -420,7 +425,7 @@ applied. Conflicts were resolved as follows:
 - M5 apply UX: `air merge <id>` is a read-only preview; `air merge <id> --apply`
   performs the merge. A successful write job prints one loud next step
   (`air merge <id> --apply`).
-- Task list complete: `docs/reviews/tasks_air_12.md` (M0–M5 done; MakeingGoodAIs
+- Task list complete: `docs/reviews/tasks_air_12.md` (M0–M6 done; MakeingGoodAIs
   absorbed and its remote decommissioned 2026-11-12).
 - `npm test` is green (deterministic suite; live scenarios remain gated).
 

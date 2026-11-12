@@ -32,18 +32,26 @@ export const oracles = {
       return readFileSync(join(dir, path), 'utf8').includes(text);
     } catch { return false; }
   },
-  noOrphans(_marker: string): boolean {
+  noOrphans(marker: string): boolean {
     try {
       if (process.platform === 'win32') {
         // Windows: process environment is not exposed via command line.
         // Fall back to a conservative "true" (no orphans reported) on this platform.
         return true;
       }
+      // Vitest runs test files in parallel (singleFork: false), so fake
+      // executors from other sandboxes are alive at the same time. Match only
+      // the processes belonging to this sandbox by reading AIR_E2E_MARKER from
+      // the process environment; matching on the executable name alone would
+      // flag an unrelated test's live executor as an orphan.
+      const expected = `AIR_E2E_MARKER=${marker}`;
       for (const pid of readdirSync('/proc').filter((x: string) => /^\d+$/.test(x))) {
         if (Number(pid) === process.pid) continue;
         try {
           const cmdline = readFileSync(`/proc/${pid}/cmdline`).toString('utf8').replace(/\0/g, ' ');
-          if (/fake[-_]?executor|fake[-_]?aider|fake[-_]?goose/i.test(cmdline)) return false;
+          if (!/fake[-_]?executor|fake[-_]?aider|fake[-_]?goose/i.test(cmdline)) continue;
+          const environ = readFileSync(`/proc/${pid}/environ`).toString('utf8');
+          if (environ.split('\0').includes(expected)) return false;
         } catch { /* noop */ }
       }
       return true;
