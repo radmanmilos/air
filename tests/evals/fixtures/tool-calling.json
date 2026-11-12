@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "role": "tool_calling",
+  "suite": "tool_calling",
   "cases": [
     {
       "id": "T01",
