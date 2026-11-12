@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 interface FixtureCase {
   id: string;
+  oracle?: string;
   workspace?: string;
   evidence?: Record<string, unknown>;
   falsePositiveControl?: boolean;
