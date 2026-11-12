@@ -38,7 +38,7 @@ const DEFAULT_MODEL_ROLES = {
   reasoner: { provider: 'ollama', model: 'deepseek-r1:1.5b' },
   summarizer: { provider: 'ollama', model: 'qwen3.5:4b' },
   embeddings: { provider: 'ollama', model: 'nomic-embed-text:latest' },
-};
+} as const;
 
 const DEFAULT_MODEL_PROVIDERS = {
   ollama: { enabled: true, baseUrl: 'http://127.0.0.1:11434' },
