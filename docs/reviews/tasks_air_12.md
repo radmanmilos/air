@@ -199,3 +199,11 @@ Take MGAI's **tools and local model transport**, not its orchestration:
   stubs elsewhere, so `mypy` failed on the Ubuntu 3.12/3.14 jobs while passing on
   Windows. It is now resolved with `getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)`
   behind an `os.name == "nt"` check.
+
+### T12-062 [DONE] — G-hang cancels the right job
+- `groups.test.ts` G-hang sent `/cancel last`. The CLI reads `/cancel ` as
+  `/cancel <id>` and looks up a job literally named `last`, so it answered
+  "No such job" and left the hung job running. The assertion accepted
+  `Cancelled|No such job`, so it only ever passed on Windows (where `noOrphans`
+  returns `true`). It now sends bare `/cancel` (cancels the most recent active
+  job) and requires `Cancelled`. CLI help now documents `/cancel [id]`.

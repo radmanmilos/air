@@ -413,8 +413,10 @@ applied. Conflicts were resolved as follows:
   tree. Latest full suite: 350 passed, 16 skipped, green on repeated runs.
 - CI fixes (M6): the e2e `noOrphans` oracle is scoped to the sandbox's
   `AIR_E2E_MARKER` (parallel test files no longer cross-report each other's live
-  executors), and the worker resolves Windows-only `creationflags` dynamically so
-  `mypy` passes on Linux. GitHub CI is green on Ubuntu and Windows.
+  executors); the worker resolves Windows-only `creationflags` dynamically so
+  `mypy` passes on Linux; and the G-hang scenario sends bare `/cancel` (the CLI
+  reads `/cancel last` as a job id named "last"). GitHub CI is green on Ubuntu
+  and Windows.
 - M4 local adapter: `src/adapters/local.ts` runs the provisioned worker with
   `--request/--result/--print-answer`. Requests are written under
   `cacheDir/worker/requests/`; the final answer reaches stdout only when asked.

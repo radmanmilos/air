@@ -658,7 +658,7 @@ program
     if (!conv) conv = createConversation({ freeOnly: options.freeOnly !== false });
     saveConversation(conv);
     console.log(chalk.cyan(`air chat (conversation ${conv.id})`));
-    console.log(chalk.gray('Type a message, /run <task>, /status, /jobs, /cancel <id>, /last, /help, /quit'));
+    console.log(chalk.gray('Type a message, /run <task>, /status, /jobs, /cancel [id], /last, /help, /quit'));
 
     const eventLog = process.env.AIR_EVENT_LOG;
     const logEvent = (type: string, detail: string) => {
@@ -739,7 +739,7 @@ program
       logEvent('message_received', trimmed);
       if (trimmed === '/quit' || trimmed === '/exit') { rl.close(); return; }
       if (trimmed === '/help') {
-        console.log(chalk.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel <id>, /last, /stats, /tasks, /quit'));
+        console.log(chalk.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel [id], /last, /stats, /tasks, /quit'));
         return;
       }
       if (trimmed === '/status') { const c = (await import('../src/conversation')).loadConversation(conv!.id) ?? conv!; console.log(chalk.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`)); return; }

@@ -81,8 +81,10 @@ describe('group G: failure and recovery', () => {
           await chat.waitForLine(/air chat \(conversation/, 0, 10000);
           chat.say('/run do something');
           await chat.waitForLine(/Started job (\S+)/, 0, 20000);
-          chat.say('/cancel last');
-          await chat.waitForLine(/Cancelled|No such job/, 0, 20000);
+          // Bare /cancel cancels the most recent active job. "/cancel last"
+          // would be read as a job id named "last" and only print "No such job".
+          chat.say('/cancel');
+          await chat.waitForLine(/Cancelled/, 0, 20000);
           expect(oracles.noOrphans(sandbox.marker)).toBe(true);
         } finally {
           await chat.quit().catch(() => {});
