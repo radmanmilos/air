@@ -170,5 +170,16 @@ Take MGAI's **tools and local model transport**, not its orchestration:
 - `docs/adapters/local.md`, README, `air status`, MCP `list_adapters`,
   `docs/behavior-spec.md` merge/status sections.
 
-### T12-052 [ ] — Decommission MakeingGoodAIs
-- Tag `final-before-absorb`, push the subtree, then delete the GitHub repo.
+### T12-052 [BLOCKED] — Decommission MakeingGoodAIs
+- Done: full history preserved in AIR via the subtree import
+  (`137e0a4 Add 'packages/local-worker/' from commit 'a5e8818'`); MGAI tagged
+  `final-before-absorb` (annotated) and the tag + `master` pushed to
+  `origin` (`refs/tags/final-before-absorb` = `7705c7d` -> `a5e8818`).
+- Blocked: `gh repo delete radmanmilos/MakingGoodAIs --yes` returns
+  `HTTP 403: Must have admin rights ... needs the "delete_repo" scope`.
+  `gh auth refresh -h github.com -s delete_repo` is an interactive device
+  flow and cannot be completed from a headless agent.
+- Unblock (one command after granting scope):
+  `gh auth refresh -h github.com -s delete_repo && gh repo delete radmanmilos/MakingGoodAIs --yes`
+- The local clone at `E:\GitHub\MakeingGoodAIs` and the AIR subtree both retain
+  the full history, so nothing is lost if deletion is never performed.

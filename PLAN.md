@@ -420,8 +420,9 @@ applied. Conflicts were resolved as follows:
 - M5 apply UX: `air merge <id>` is a read-only preview; `air merge <id> --apply`
   performs the merge. A successful write job prints one loud next step
   (`air merge <id> --apply`).
-- Active task list: `docs/reviews/tasks_air_12.md` (M5 remains: decommission
-  MakeingGoodAIs).
+- Active task list: `docs/reviews/tasks_air_12.md` (M5: T12-050/051 done;
+  T12-052 decommission blocked on the GitHub `delete_repo` scope — the tag and
+  subtree are pushed, only the remote deletion remains).
 - `npm test` is green (deterministic suite; live scenarios remain gated).
 
 ## Adapters
