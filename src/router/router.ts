@@ -66,7 +66,7 @@ export function selectCandidateFrom(
   }
 
   // Free-first ranking: prefer lower cost tier, then local providers, then larger context window.
-  const isPreferred = (c: any) => c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
+  const isPreferred = (c: any) => c.id === 'local' || c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
   candidates.sort((a, b) => costTier(a) - costTier(b) || (isPreferred(a) ? -1 : isPreferred(b) ? 1 : 0));
 
   for (const candidate of candidates) {
@@ -153,7 +153,7 @@ export function costTier(c: ExecutionCandidate): number {
   const ov = isFreeOverride(c.provider, c.model);
   if (ov === true) return 0;
   if (ov === false) return 2;
-  const preferred = c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
+  const preferred = c.id === 'local' || c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
   if (preferred) return -1;
   if (c.provider === 'lm-studio') return 0;
   if (c.provider === 'openrouter' && /free/i.test(c.model)) return 0;

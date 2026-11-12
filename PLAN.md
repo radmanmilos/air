@@ -410,8 +410,15 @@ applied. Conflicts were resolved as follows:
   git baseline; `oracles.gitChangedFiles` parses porcelain correctly. Write jobs
   now fail closed when worktree creation fails instead of touching the source
   tree. Latest full suite: 300 passed, 15 skipped, green on repeated runs.
-- Active task list: `docs/reviews/tasks_air_12.md` (M4–M5 remain: AIR adapter,
-  apply UX and decommission).
+- M4 local adapter: `src/adapters/local.ts` runs the provisioned worker with
+  `--request/--result/--print-answer`. Requests are written under
+  `cacheDir/worker/requests/`; the final answer reaches stdout only when asked.
+  Exit 5 maps to `MODEL_UNAVAILABLE` (failover-worthy); 4 is terminal. The
+  adapter is registered as verified without an exact-version lockout, its
+  availability is the worker's provisioning state, and routing ranks it with
+  the free/preferred adapters. `air status` and MCP `list_adapters` include it.
+- Active task list: `docs/reviews/tasks_air_12.md` (M5 remains: explicit apply
+  UX, docs, decommission).
 - `npm test` is green (deterministic suite; live scenarios remain gated).
 
 ## Adapters
@@ -425,6 +432,7 @@ applied. Conflicts were resolved as follows:
 | opencode | `opencode` | `run <prompt> --auto` | 2.2.5 |
 | kilocode | `kilocode` | `run <prompt> --auto` | 7.5.16 |
 | ollama | `ollama` | `run <model> <prompt>` | runtime |
+| local | bundled worker | `python -m air_local.run --request/--result` | AIR version |
 
 ### Unverified
 

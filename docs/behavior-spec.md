@@ -31,6 +31,8 @@ CLI but not documented here, the conformance test in
 - When `air status` is run,
 - Then it shows agent/provider/model availability, active cooldowns, and a
   concise recent health/failure summary.
+- The bundled `local` worker is listed with the other adapters; it is available
+  when `air setup local` has provisioned it (or `AIR_WORKER_PYTHON` is set).
 - `--json` returns the same data as machine-readable JSON.
 
 ### `air health`

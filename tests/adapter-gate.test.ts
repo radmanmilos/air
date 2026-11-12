@@ -6,10 +6,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const mockExecSync = vi.mocked(execSync);
 
-vi.mock('node:child_process', () => ({
-  ...vi.importActual('node:child_process'),
-  execSync: vi.fn(),
-}));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, execSync: vi.fn() };
+});
 
 describe('adapter verification gate (R5-02)', () => {
   beforeEach(() => {
@@ -38,13 +38,14 @@ describe('adapter verification gate (R5-02)', () => {
     expect(ids).toContain('codex');
     expect(ids).toContain('github-copilot');
     const verified = status.filter((s) => s.verified);
-    // aider, goose, opencode, kilocode, ollama are verified.
-    expect(verified.length).toBe(5);
+    // aider, goose, opencode, kilocode, ollama, local are verified.
+    expect(verified.length).toBe(6);
     expect(verified.map((s) => s.id)).toContain('aider');
     expect(verified.map((s) => s.id)).toContain('goose');
     expect(verified.map((s) => s.id)).toContain('opencode');
     expect(verified.map((s) => s.id)).toContain('kilocode');
     expect(verified.map((s) => s.id)).toContain('ollama');
+    expect(verified.map((s) => s.id)).toContain('local');
   });
 
   it('availableAdapters includes all verified adapters when installed', () => {

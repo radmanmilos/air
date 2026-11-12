@@ -25,10 +25,10 @@ import type { Config } from '../src/config/schema';
 
 const mockExecSync = vi.mocked(execSync);
 
-vi.mock('node:child_process', () => ({
-  ...vi.importActual('node:child_process'),
-  execSync: vi.fn(),
-}));
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return { ...actual, execSync: vi.fn() };
+});
 
 vi.mock('../src/installer/installer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/installer/installer')>();

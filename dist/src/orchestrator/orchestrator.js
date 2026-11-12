@@ -140,7 +140,7 @@ export class Orchestrator {
         const { config } = await loadConfig({ cwd });
         const tracker = createHealthTracker();
         await tracker.load();
-        const { fromConfig, enforce } = await import('../permissions/index.js');
+        const { fromConfig, enforce, allowsShell } = await import('../permissions/index.js');
         const policy = fromConfig(config);
         const permCheck = enforce(policy, { write: !readOnly, shell: false, network: false });
         if (!permCheck.ok)
@@ -174,6 +174,8 @@ export class Orchestrator {
             files: options.files,
             mode,
             readOnly,
+            allowShell: allowsShell(policy),
+            allowNetwork: policy.allowNetwork,
         };
         const onSig = () => controller.abort();
         process.on('SIGINT', onSig);

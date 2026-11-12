@@ -82,6 +82,21 @@ export declare function workerCommand(layout?: WorkerLayout): {
     executable: string;
     args: string[];
 } | null;
+export interface WorkerInstallInfo {
+    provisioned: boolean;
+    version?: string;
+    python?: string;
+}
+/**
+ * One-stop availability probe used by the registry, status, and the local
+ * adapter. Never throws when the bundled package is missing or the marker is
+ * unreadable.
+ */
+export declare function workerInstallInfo(options?: {
+    cacheDir?: string;
+    packageDir?: string;
+    platform?: string;
+}): WorkerInstallInfo;
 export declare function formatProvisionResult(result: ProvisionResult): string;
 export declare function formatDoctorReport(report: DoctorReport): string;
 /** Report whether a local job can run. Read-only: it never provisions. */

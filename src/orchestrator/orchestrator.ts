@@ -202,7 +202,7 @@ export class Orchestrator {
     const tracker = createHealthTracker();
     await tracker.load();
 
-    const { fromConfig, enforce } = await import('../permissions');
+    const { fromConfig, enforce, allowsShell } = await import('../permissions');
     const policy = fromConfig(config);
     const permCheck = enforce(policy, { write: !readOnly, shell: false, network: false });
     if (!permCheck.ok) throw new Error(`Permission denied: ${permCheck.reason}`);
@@ -238,6 +238,8 @@ export class Orchestrator {
       files: options.files,
       mode,
       readOnly,
+      allowShell: allowsShell(policy),
+      allowNetwork: policy.allowNetwork,
     };
 
     const onSig = () => controller.abort();

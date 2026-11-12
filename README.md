@@ -24,7 +24,7 @@ npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.g
 
 **Status:** Release candidate. CLI + MCP server functional. Typecheck, lint, test and package dry-run green. Chat, planner, result-compiler, worktrees, and permissions modules are wired; the active task list and remaining gaps live in `docs/reviews/tasks_air_12.md`.
 
-AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot, ollama) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
+AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot, ollama, and its bundled local worker) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
 
 ## Purpose and benefit
 
@@ -170,6 +170,7 @@ Repo config cannot set global-only keys (failover, permission, redaction, truste
 | opencode | `opencode` | `run <prompt> --auto` | yes | 2.2.5 |
 | kilocode | `kilocode` | `run <prompt> --auto` | yes | 7.5.16 |
 | ollama | `ollama` | `run <model> <prompt>` | yes | runtime |
+| local | bundled worker (`air setup local`) | `python -m air_local.run --request/--result` | yes | AIR version |
 
 ### Unverified spikes (visible in `air status`, never routed)
 
@@ -178,7 +179,7 @@ Repo config cannot set global-only keys (failover, permission, redaction, truste
 | codex | `codex` | 0.166.0 |
 | github-copilot | `gh` | 2.102.0 |
 
-Adapters are discovered from PATH at runtime. The mock adapter is test-only and is never registered by production code. Unverified adapters require confirmation of headless flags before they become eligible.
+Adapters are discovered from PATH at runtime. The `local` adapter has no PATH executable: it is available when `air setup local` has provisioned the worker (or `AIR_WORKER_PYTHON` is set). The mock adapter is test-only and is never registered by production code. Unverified adapters require confirmation of headless flags before they become eligible.
 
 ## Free AI Adapter Catalog
 
@@ -197,8 +198,8 @@ npm run dev            # tsx bin/air.ts
 
 ## Known limitations
 
-- Aider, goose, opencode, kilocode, and ollama are verified and eligible for routing; codex and github-copilot are unverified spikes.
-- Verified adapters require the external CLI installed and on PATH.
+- Aider, goose, opencode, kilocode, ollama, and the bundled local worker are verified and eligible for routing; codex and github-copilot are unverified spikes.
+- Verified adapters require the external CLI installed and on PATH. The local adapter instead requires `air setup local`.
 - Cross-provider front-agent fallback is not implemented in MVP (same-provider fallback only).
 - Daemon/IPC mode is not yet implemented; state is file-based with atomic writes and crash recovery.
 - Web UI not included; CLI + MCP only.

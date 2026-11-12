@@ -21,6 +21,8 @@ import { KilocodeAdapter } from './kilocode';
 import { CodexAdapter } from './codex';
 import { GitHubCopilotAdapter } from './github-copilot';
 import { OllamaAdapter } from './ollama';
+import { LocalAdapter } from './local';
+import { workerInstallInfo } from '../worker/provision';
 
 export interface AdapterInfo {
   adapter: AgentAdapter;
@@ -58,6 +60,9 @@ const META: Record<string, AdapterMeta> = {
   kilocode: { verified: true, enabled: true, headlessSupported: true, verificationVersion: '7.5.16' },
   codex: { verified: false, enabled: true, headlessSupported: true, verificationVersion: '0.166.0' },
   ollama: { verified: true, enabled: true, headlessSupported: true, verificationVersion: 'runtime' },
+  // The local worker is versioned with AIR itself and provisioned by
+  // `air setup local`, so there is no external CLI version to lock to.
+  local: { verified: true, enabled: true, headlessSupported: true },
 };
 
 const FACTORY: Record<string, () => AgentAdapter> = {
@@ -68,6 +73,7 @@ const FACTORY: Record<string, () => AgentAdapter> = {
   codex: () => new CodexAdapter(),
   'github-copilot': () => new GitHubCopilotAdapter(),
   ollama: () => new OllamaAdapter(),
+  local: () => new LocalAdapter(),
 };
 
 const EXE: Record<string, string> = {
@@ -78,6 +84,7 @@ const EXE: Record<string, string> = {
   codex: 'codex',
   'github-copilot': 'gh',
   ollama: 'ollama',
+  local: 'python',
 };
 
 /** Apply configured tool overrides to an adapter instance and its meta. */
@@ -125,6 +132,25 @@ export function listAdapters(config?: Config): AdapterInfo[] {
     const meta = META[id] ?? { verified: false, enabled: false, headlessSupported: false };
     // Configured enablement overrides the default.
     const enabled = metaOverride.enabled ?? meta.enabled;
+
+    if (id === 'local') {
+      // The worker has no PATH executable. Availability is whether the
+      // provisioned venv (or AIR_WORKER_PYTHON) can run `air_local.run`.
+      const info = workerInstallInfo();
+      results.push({
+        adapter,
+        meta: { ...meta, enabled },
+        available: info.provisioned,
+        installed: info.provisioned,
+        version: info.version,
+        installStatus: info.provisioned ? 'installed' : 'not-installed',
+        reason: info.provisioned
+          ? undefined
+          : 'local worker not provisioned; run `air setup local`',
+      });
+      continue;
+    }
+
     const available = isOnPath(EXE[id]);
     const install = getInstallStatus(id, EXE[id]);
     results.push({

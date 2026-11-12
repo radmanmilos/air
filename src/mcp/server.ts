@@ -468,7 +468,7 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
     'list_adapters',
     {
       title: 'List adapters',
-      description: 'Return all catalog entries with install status (installed, version, installStatus, available, verified).',
+      description: 'Return all registered adapters with install status (installed, version, installStatus, available, verified).',
       inputSchema: {},
     },
     async () => {
@@ -492,6 +492,24 @@ export async function startMcp(transport?: Transport): Promise<{ server: McpServ
           verified: s?.verified ?? false,
         };
       });
+      // Registered adapters that are not installable catalog entries (for
+      // example the bundled local worker and Ollama) still matter to callers.
+      const catalogIds = new Set(tools.map((t) => t.id));
+      for (const s of statuses) {
+        if (catalogIds.has(s.id)) continue;
+        rows.push({
+          id: s.id,
+          name: s.id,
+          adapterId: s.id,
+          provider: s.provider,
+          model: s.model,
+          installed: s.installed,
+          version: s.version,
+          installStatus: s.installStatus,
+          available: s.available,
+          verified: s.verified,
+        });
+      }
       return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
     },
   );

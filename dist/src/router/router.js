@@ -32,7 +32,7 @@ export function selectCandidateFrom(task, adapters, tracker, visited, allow, now
         });
     }
     // Free-first ranking: prefer lower cost tier, then local providers, then larger context window.
-    const isPreferred = (c) => c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
+    const isPreferred = (c) => c.id === 'local' || c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
     candidates.sort((a, b) => costTier(a) - costTier(b) || (isPreferred(a) ? -1 : isPreferred(b) ? 1 : 0));
     for (const candidate of candidates) {
         const adapter = adapters.find((a) => a.id === candidate.id);
@@ -111,7 +111,7 @@ export function costTier(c) {
         return 0;
     if (ov === false)
         return 2;
-    const preferred = c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
+    const preferred = c.id === 'local' || c.id === 'ollama' || c.id === 'opencode' || c.id === 'kilocode';
     if (preferred)
         return -1;
     if (c.provider === 'lm-studio')

@@ -101,6 +101,44 @@ def test_missing_request_file_is_an_invalid_request(tmp_path, capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_print_answer_writes_only_the_final_answer(tmp_path, monkeypatch, capsys):
+    _fake_agent(monkeypatch, answer="the answer")
+    request = _write_request(tmp_path, _request(tmp_path))
+
+    code = run.main(
+        [
+            "--request",
+            request,
+            "--result",
+            str(tmp_path / "result.json"),
+            "--print-answer",
+        ]
+    )
+
+    assert code == 0
+    captured = capsys.readouterr()
+    assert captured.out == "the answer\n"
+    assert _result(tmp_path)["answer"] == "the answer"
+
+
+def test_print_answer_stays_silent_on_failure(tmp_path, monkeypatch, capsys):
+    _fake_agent(monkeypatch, error=ValueError("tool exploded"))
+    request = _write_request(tmp_path, _request(tmp_path))
+
+    code = run.main(
+        [
+            "--request",
+            request,
+            "--result",
+            str(tmp_path / "result.json"),
+            "--print-answer",
+        ]
+    )
+
+    assert code == 3
+    assert capsys.readouterr().out == ""
+
+
 def test_malformed_json_is_an_invalid_request(tmp_path):
     request = _write_request(tmp_path, "{not json")
     code = run.run(request, str(tmp_path / "result.json"))

@@ -334,6 +334,39 @@ export function workerCommand(
   return null;
 }
 
+export interface WorkerInstallInfo {
+  provisioned: boolean;
+  version?: string;
+  python?: string;
+}
+
+/**
+ * One-stop availability probe used by the registry, status, and the local
+ * adapter. Never throws when the bundled package is missing or the marker is
+ * unreadable.
+ */
+export function workerInstallInfo(
+  options: { cacheDir?: string; packageDir?: string; platform?: string } = {},
+): WorkerInstallInfo {
+  try {
+    const layout = workerLayout(options);
+    const command = workerCommand(layout);
+    if (!command) return { provisioned: false };
+    let version: string | undefined;
+    try {
+      const marker = JSON.parse(readFileSync(layout.markerFile, 'utf8')) as {
+        packageVersion?: string;
+      };
+      version = marker.packageVersion;
+    } catch {
+      // A venv without a marker is still usable; the version is just unknown.
+    }
+    return { provisioned: true, version, python: command.executable };
+  } catch {
+    return { provisioned: false };
+  }
+}
+
 export function formatProvisionResult(result: ProvisionResult): string {
   const lines = ['air setup local'];
   for (const step of result.steps) {

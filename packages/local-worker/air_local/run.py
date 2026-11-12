@@ -1,10 +1,12 @@
 """Headless worker entrypoint used by AIR.
 
-    python -m air_local.run --request <file> --result <file> [--verbose]
+    python -m air_local.run --request <file> --result <file> [--verbose] [--print-answer]
 
 Reads a contract request, runs the local model with tools, writes a contract
 result file, and exits with a stable code. Logs go to stderr; stdout stays
-empty so callers never parse prose.
+empty unless ``--print-answer`` is passed, in which case the final answer is
+the only thing written to stdout. Callers that need structured data read the
+result file.
 
 Exit codes (also recorded in ``contracts/job.schema.json``)::
 
@@ -153,7 +155,12 @@ def _install_signal_handlers() -> None:
             pass
 
 
-def run(request_path: str, result_path: str, verbose: bool = False) -> int:
+def run(
+    request_path: str,
+    result_path: str,
+    verbose: bool = False,
+    print_answer: bool = False,
+) -> int:
     started_at = _now()
 
     try:
@@ -256,6 +263,11 @@ def run(request_path: str, result_path: str, verbose: bool = False) -> int:
         )
 
     _log(f"completed in {agent.steps_used} step(s)")
+    if print_answer:
+        # stdout is reserved for the final answer when explicitly requested.
+        # Failures never write to stdout, so a caller can treat empty output as
+        # "no answer" without parsing prose.
+        print(answer)
     return _finish(
         result_path,
         run_id=run_id,
@@ -276,8 +288,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--request", required=True, help="Path to the contract request JSON")
     parser.add_argument("--result", required=True, help="Path to write the contract result JSON")
     parser.add_argument("--verbose", action="store_true", help="Log agent steps to stderr")
+    parser.add_argument(
+        "--print-answer",
+        action="store_true",
+        help="Write the final answer to stdout (only on success)",
+    )
     args = parser.parse_args(argv)
-    return run(args.request, args.result, verbose=args.verbose)
+    return run(
+        args.request,
+        args.result,
+        verbose=args.verbose,
+        print_answer=args.print_answer,
+    )
 
 
 if __name__ == "__main__":

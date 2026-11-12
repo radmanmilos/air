@@ -28,6 +28,10 @@ export interface TaskInput {
     preferredModel?: string;
     mode: 'ask' | 'auto';
     readOnly?: boolean;
+    /** Shell access resolved from the permission policy before adapter selection. */
+    allowShell?: boolean;
+    /** Network access resolved from the permission policy before adapter selection. */
+    allowNetwork?: boolean;
     taskType?: TaskType;
     requiresWrite?: boolean;
     requiresCode?: boolean;

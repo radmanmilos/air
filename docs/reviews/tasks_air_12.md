@@ -133,19 +133,28 @@ Take MGAI's **tools and local model transport**, not its orchestration:
 - `tests/worker-provision.test.ts` covers pure helpers and doctor; the real
   provisioning test is opt-in with `AIR_PROVISION_TEST=1` and passes locally.
 
-## M4 — AIR adapter
+## M4 — AIR adapter [DONE]
 
-### T12-040 [ ] — `src/adapters/local.ts`
+### T12-040 [DONE] — `src/adapters/local.ts`
 - Implements `AgentAdapter`; `buildCommand` writes the request file and passes
-  `--request/--result`; structured `classifyError` with `UNKNOWN` fallback.
+  `--request/--result/--print-answer`; structured `classifyError` with `UNKNOWN`
+  fallback.
+- Exit 5 maps to `MODEL_UNAVAILABLE` (failover-worthy); 4 is terminal; process
+  facts win over exit codes.
+- `canHandle` is synchronous and reflects worker provisioning.
 
-### T12-041 [ ] — Registry + catalog
+### T12-041 [DONE] — Registry + catalog
 - `META` (verified, no exact-version lockout), `FACTORY`, `EXE`; catalog
-  `costTier: 0`; availability probe via the worker's doctor output.
+  `costTier: 0`; availability probe is `workerInstallInfo()` (venv or
+  `AIR_WORKER_PYTHON`), not a PATH executable.
+- Router ranks `local` with the free/preferred adapters.
 
-### T12-042 [ ] — Tests
-- Adapter conformance, fake-shim unit tests, env-gated integration test,
-  failover on `PROVIDER_UNAVAILABLE`.
+### T12-042 [DONE] — Tests
+- `tests/local-adapter.test.ts`: request/result wiring, model selection, run-id
+  sanitization, exit-code taxonomy, conformance helper, a fake worker shim
+  through the shared process runner, and provider-unavailable failover.
+- Python `test_run.py` covers `--print-answer` (answer only on success, silent
+  on failure). Registry tests now include `local` in verified status.
 
 ## M5 — Apply UX, docs, decommission
 
