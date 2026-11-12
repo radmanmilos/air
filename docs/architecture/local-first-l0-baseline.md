@@ -205,3 +205,34 @@ Do not parallelize changes to `src/config/schema.ts`, `contracts/job.schema.json
 - Confirm whether the Ollama version deployed by the user exposes `/api/ps` and which fields can be trusted for running-model diagnostics; do not infer GPU memory from it.
 - Benchmark installed models on the reference machine before declaring any default role assignment recommended.
 - Do not mark L0 complete until L0-01 through L0-04 have evidence and reviewer sign-off.
+
+
+## 8. Integration-owner review disposition (2026-11-12)
+
+The integration owner has reviewed the proposed L0 boundaries against the live source and accepted the following as the implementation direction:
+
+| Boundary | Owner disposition | Guardrail |
+|---|---|---|
+| Model configuration | Keep role/provider assignments in the global user config only; repository config cannot select models/providers or authorize egress | Exact config-v2 schema and migration remain a separate L2 change with v1 preservation and repo-config rejection tests |
+| Roles | Retain coordinator, planner, coder, reviewer, reasoner, summarizer and embeddings; merge task analysis into planner initially | Logical roles do not imply separate resident models |
+| Provider vs adapter | Separate model-provider runtime from execution adapters and the task orchestrator | Provider APIs cannot launch jobs, processes or tools directly |
+| Model output | Treat all output/tool calls as untrusted proposals | AIR validates schemas and enforces permissions before any dispatch |
+| Reviewer | Advisory in the first slice | Deterministic tests, process facts and workspace evidence remain authoritative |
+| Resource policy | Default to one active generative model and serialized role changes | Runtime telemetry is best-effort; unknown VRAM is unknown |
+| Worker contract | Preserve v1 until a versioned role/provider handoff is implemented and compatibility-tested | No additive fields to the strict v1 contract |
+
+This is an integration-owner review, not independent approval. The independent review assignment remains open. The exact config-v2 shape, migration behavior and worker v2 payload are not frozen by the provider API implementation.
+
+### 8.1 L1 provider slice started
+
+The feature branch now contains:
+
+- src/models/types.ts — provider-neutral messages, tool calls, chat/embedding contracts, model metadata, health and normalized errors.
+- src/models/providers/provider.ts — provider interface.
+- src/models/providers/ollama.ts — native Node fetch transport for chat, embeddings, health, model metadata and optional running-model diagnostics.
+- tests/models/ollama.test.ts — deterministic fetch-mocked tests for response mapping and failure behavior.
+- docs/adapters/model-providers.md — provider boundary and limitations.
+
+The provider does not start Ollama, download models, select AIR roles, manage residency, call execution tools or integrate with CLI/MCP. It currently uses non-streaming chat. Streaming and provider conformance across a second implementation are deferred.
+
+No local test command has been run in this environment. The new source and tests must pass the exact-head GitHub CI before this package is accepted. The /api/ps endpoint is optional; a 404 is normalized to UNSUPPORTED_CAPABILITY. Runtime-reported VRAM size is surfaced only as a reported value and is not treated as free VRAM.
