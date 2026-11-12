@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "role": "debugger",
+  "role": "coder",
+  "suite": "debugging",
   "cases": [
     {
       "id": "D01",
