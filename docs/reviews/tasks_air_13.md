@@ -23,8 +23,8 @@
 | Phase | Goal | Status | Depends on |
 |---|---|---|---|
 | L0 | Baseline and executable design gate | IN_PROGRESS | None |
-| L1 | Provider-neutral runtime + Ollama | TODO | L0 |
-| L2 | Model registry, capabilities, role config | TODO | L0, L1 |
+| L1 | Provider-neutral runtime + Ollama | IN_PROGRESS | L0 (owner boundary review accepted; independent review open) |
+| L2 | Model registry, capabilities, role config | IN_PROGRESS | L0, L1 |
 | L3 | Resource-aware model manager | TODO | L1, L2 |
 | L4 | Local LLM coordinator/front agent | TODO | L1, L2 |
 | L5 | LLM planner + validated work graph | TODO | L1, L2, L4 |
@@ -86,11 +86,12 @@
 - Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
 - Base commit: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
 - Working branch: `work/local-first-l0-baseline`.
-- Documentation/fixture catalog and first provider-runtime implementation commits are present on this branch. The authoritative current branch head is the live `head.sha` on [PR #1](https://github.com/radmanmilos/air/pull/1); re-check it before taking over.
+- Documentation/fixture catalog, provider runtime, version-2 global model config, migration and initial role resolver commits are present on this branch. The authoritative current branch head is the live `head.sha` on [PR #1](https://github.com/radmanmilos/air/pull/1); re-check it before taking over.
 - Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
 - L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 has an integration-owner disposition but still lacks independent review and exact config/worker migration tests. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases); executable payloads/corpora and the evaluation runner remain outstanding.
-- L1 provider API/Ollama slice is in progress on this same feature branch. It is not wired into CLI/MCP or the Python worker; no model-role config exists yet. No local tests were run because no clone/worktree is available in this session. Re-check GitHub CI for the exact current PR head.
-- Next: validate the provider implementation in CI, complete provider contract/failure cases, then add concrete evaluation payloads and a temporary-workspace harness. Keep coordinator/role config work behind their own tests and explicit review.
+- L1 provider API/Ollama slice and L2 global-only model config/role resolution are in progress on this same feature branch. They are not wired into CLI/MCP or the Python worker. No local tests were run because no clone/worktree is available in this session. Re-check GitHub CI for the exact current PR head.
+- Current implementation includes typed provider contracts, Ollama chat/tool calls/embeddings/metadata/health, v2 model-role defaults, v1 migration and a no-fallback role resolver. L0-03 still needs independent review; L0-04b/c/d remain outstanding.
+- Next: validate exact-head CI; fix all failures; complete provider conformance, concrete evaluation payloads and temporary-workspace harness. Then add model registry/capability verification before attempting coordinator integration.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
@@ -133,16 +134,18 @@
 - Acceptance: resolver can explain why a model is eligible or rejected.
 
 ### L2-02 — Config v2 roles/providers and migration
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: version-2 Zod config adds global-only local model/provider settings and seven role assignments. Repo .airrc.yaml model settings are stripped; hosted provider IDs are rejected. The v1 migration validates before writing, preserves existing YAML/comments and file permission bits, is idempotent, refuses future versions, and never downloads models. See docs/configuration/model-roles.md. Exact-head CI remains outstanding.
 - Depends on: L0-03, L1
 - Scope: add providers, role assignments, local-first policy, resource policy and external fallback consent; migrate v1 safely.
 - Likely files: src/config/schema.ts; src/config/loader.ts; current migration module; tests and config docs.
 - Acceptance: v1 migration is idempotent, non-destructive and preserves existing settings; untrusted repo config cannot self-authorize providers or external egress.
 
 ### L2-03 — Role resolver
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: src/models/role-resolver.ts resolves logical role to the configured Ollama model/endpoint/resource intent and fails closed when the provider is disabled. It does not probe model availability or silently fall back; registry/capability checks remain future work.
 - Depends on: L2-01, L2-02
 - Scope: role → provider/model selection with capability, availability, resource and user-policy filters; explainable decisions.
 - Acceptance: no silent paid fallback; role assignment is independent of execution adapter.
