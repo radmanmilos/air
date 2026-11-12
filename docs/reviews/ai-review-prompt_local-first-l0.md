@@ -18,8 +18,8 @@ Do not make source edits. Review the live code at the target commit, distinguish
 3. docs/architecture/local-first-l0-baseline.md.
 4. docs/architecture/local-first-evaluation.md.
 5. docs/adapters/model-providers.md and docs/configuration/model-roles.md.
-6. docs/configuration/schema.md and relevant config migration documentation.
-7. src/models/types.ts, src/models/providers/provider.ts, src/models/providers/ollama.ts, provider/model registry and role resolver implementation.
+6. docs/configuration/model-roles.md and relevant config migration documentation.
+7. src/models/types.ts, src/models/providers/provider.ts, src/models/providers/ollama.ts, src/models/provider-registry.ts, src/models/model-registry.ts, src/models/role-resolver.ts and src/models/index.ts.
 8. src/config/schema.ts, src/config/loader.ts and migration code.
 9. src/evals/runner.ts, scripts/eval-models.ts, tests/evals/runner.test.ts and tests/evals/fixtures/**.
 10. Relevant CLI/MCP conversation paths, contracts/job.schema.json, Python worker request/model selection and their tests.
