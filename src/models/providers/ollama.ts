@@ -318,12 +318,27 @@ export class OllamaProvider implements ModelProvider {
   async listRunningModels(
     options: { timeoutMs?: number; signal?: AbortSignal } = {},
   ): Promise<RunningModelDescriptor[]> {
-    const raw = await this.request<Record<string, unknown>>(
-      '/api/ps',
-      { method: 'GET' },
-      options.timeoutMs,
-      options.signal,
-    );
+    let raw: Record<string, unknown>;
+    try {
+      raw = await this.request<Record<string, unknown>>(
+        '/api/ps',
+        { method: 'GET' },
+        options.timeoutMs,
+        options.signal,
+      );
+    } catch (error) {
+      if (error instanceof ModelProviderError && error.statusCode === 404) {
+        throw new ModelProviderError(
+          'UNSUPPORTED_CAPABILITY',
+          'This Ollama runtime does not expose running-model diagnostics',
+          this.id,
+          undefined,
+          404,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
     if (!Array.isArray(raw.models)) {
       throw new ModelProviderError(
         'INVALID_RESPONSE',
