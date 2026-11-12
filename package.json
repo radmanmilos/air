@@ -18,7 +18,14 @@
     "files": [
         "dist",
         "config",
-        "docs"
+        "docs",
+        "contracts",
+        "packages/local-worker/air_local",
+        "packages/local-worker/pyproject.toml",
+        "packages/local-worker/config.yaml",
+        "packages/local-worker/README.md",
+        "!packages/local-worker/air_local/**/__pycache__",
+        "!packages/local-worker/air_local/**/*.pyc"
     ],
     "scripts": {
     "build": "tsc",

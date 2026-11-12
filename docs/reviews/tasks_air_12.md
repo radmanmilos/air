@@ -100,21 +100,38 @@ Take MGAI's **tools and local model transport**, not its orchestration:
   refused, protected files refused.
 
 
-## M3 — Contract and headless entrypoint
+## M3 — Contract and headless entrypoint [DONE]
 
-### T12-030 [ ] — `contracts/job.schema.json`
-- Request/result schema, `contractVersion: 1`, exit-code table.
+### T12-030 [DONE] — `contracts/job.schema.json`
+- Request/result definitions, `x-contractVersion: 1`, `x-exitCodes`. The file is
+  the only contract; neither side keeps a copy.
+- `contracts/examples/cases.json` holds valid/invalid payloads that both test
+  suites read.
 
-### T12-031 [ ] — `python -m air_local.run --request --result`
-- Result file, not stdout; logs to stderr; stable exit codes.
+### T12-031 [DONE] — `python -m air_local.run --request --result`
+- Atomic result file (temp + replace), logs only to stderr, stdout empty.
+- Exit codes: 0 COMPLETED, 2 INVALID_REQUEST, 3 WORKER_FAILED, 4 CANCELLED,
+  5 PROVIDER_UNAVAILABLE. Signals map to CANCELLED; connection/timeout/HTTP
+  404/429/5xx map to PROVIDER_UNAVAILABLE.
+- Accepts a UTF-8 BOM in the request file (Windows editors write one).
 
-### T12-032 [ ] — `air setup local` and `air doctor`
-- Provision a cache venv from the bundled package; report Python, venv, Ollama,
-  and model status.
+### T12-032 [DONE] — `air setup local` and `air doctor`
+- `air setup local` creates `cacheDir/worker/venv` and installs the bundled
+  package with `pip install --editable` (a copied install would break the
+  contract/config walk-up). Idempotent via `install.json`; `--force` recreates.
+- `air doctor` checks Python (>= 3.12), venv, worker import, Ollama
+  `/api/version`, and `/api/tags`; `--offline` skips the network checks.
+- `air status` reports whether the local worker is provisioned.
+- Verified end-to-end on this machine: provision -> `python -m air_local.run`
+  -> COMPLETED with `answer: "pong"` against `qwen3.5:4b`.
 
-### T12-033 [ ] — Contract tests on both sides
-- Python validates against `../../contracts/job.schema.json`; TypeScript
-  validates the same file.
+### T12-033 [DONE] — Contract tests on both sides
+- Python (`tests/test_contract.py`, `tests/test_run.py`) and TypeScript
+  (`tests/contracts.test.ts`) validate the same schema and the same shared
+  examples. `unsupported_keywords` / `unsupportedKeywords` fail the tests if the
+  schema grows a keyword the validators do not implement.
+- `tests/worker-provision.test.ts` covers pure helpers and doctor; the real
+  provisioning test is opt-in with `AIR_PROVISION_TEST=1` and passes locally.
 
 ## M4 — AIR adapter
 

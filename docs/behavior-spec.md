@@ -72,11 +72,24 @@ CLI but not documented here, the conformance test in
 - Then it applies the job's worktree into the current branch and reports the
   result. Jobs without worktree state are refused with a non-zero exit.
 
+### `air setup local`
+- Given the internal local worker is not provisioned,
+- When `air setup local [--force] [--json]` is run,
+- Then it creates a private venv under the AIR cache directory and installs the
+  bundled worker package into it. `--force` recreates the venv. Unknown
+  components are refused.
+
+### `air doctor`
+- Given a request to check local readiness,
+- When `air doctor [--offline] [--json]` is run,
+- Then it reports Python, venv, worker import, Ollama, and model status, and
+  exits non-zero when a check fails. `--offline` skips the network checks.
+
 ### `air commands`
 - Given a request for side-panel help,
 - When `air commands` is run,
 - Then it lists available slash commands (/run, /status, /dashboard, /export,
-  /models, /verify, /merge, /mcp).
+  /models, /verify, /merge, /setup, /doctor, /mcp).
 - Given a task description,
 - When `air route-test --explain` is run,
 - Then it prints the routing reasoning (classification, candidates considered

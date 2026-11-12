@@ -43,6 +43,8 @@ class Agent:
         self.registry = registry
         self.max_steps = max_steps
         self.verbose = verbose
+        self.steps_used = 0
+        self.tool_calls: list[dict] = []
         self.messages: list[dict] = [
             {"role": "system", "content": BASE_SYSTEM_PROMPT}
         ]
@@ -52,7 +54,10 @@ class Agent:
             print(text, file=sys.stderr)
 
     def _loop(self, model: str, messages: list[dict]) -> str:
+        self.steps_used = 0
+        self.tool_calls = []
         for step in range(1, self.max_steps + 1):
+            self.steps_used = step
             self._log(f"[step {step}] thinking with {model}...")
             resp = self.client.chat(
                 model=model,
@@ -83,6 +88,8 @@ class Agent:
                     if self.registry
                     else "ERROR: no registry"
                 )
+                ok = not (result.startswith("ERROR:") or result.startswith("BLOCKED:"))
+                self.tool_calls.append({"name": name, "ok": ok})
                 preview = result[:400].replace("\n", " ")
                 self._log(f"     <- {preview}{'...' if len(result) > 400 else ''}")
                 messages.append(

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/radmanmilos/air/contracts/job.schema.json",
+  "title": "AIR local worker job",
+  "description": "Canonical request/result contract between the AIR control plane and packages/local-worker. Both sides read and validate this file; neither keeps a copy.",
+  "x-contractVersion": 1,
+  "x-exitCodes": {
+    "0": "COMPLETED",
+    "2": "INVALID_REQUEST",
+    "3": "WORKER_FAILED",
+    "4": "CANCELLED",
+    "5": "PROVIDER_UNAVAILABLE"
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/result" }
+  ],
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "runId", "task", "cwd"],
+      "properties": {
+        "contractVersion": { "type": "integer", "enum": [1] },
+        "runId": { "type": "string" },
+        "task": { "type": "string" },
+        "cwd": { "type": "string" },
+        "readOnly": { "type": "boolean" },
+        "allowShell": { "type": "boolean" },
+        "allowNetwork": { "type": "boolean" },
+        "model": { "type": "string" },
+        "maxSteps": { "type": "integer", "minimum": 1, "maximum": 200 },
+        "configPath": { "type": "string" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractVersion", "runId", "state"],
+      "properties": {
+        "contractVersion": { "type": "integer", "enum": [1] },
+        "runId": { "type": "string" },
+        "state": { "type": "string", "enum": ["COMPLETED", "FAILED", "CANCELLED"] },
+        "answer": { "type": "string" },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["category", "message"],
+          "properties": {
+            "category": {
+              "type": "string",
+              "enum": [
+                "INVALID_REQUEST",
+                "PROVIDER_UNAVAILABLE",
+                "WORKER_FAILED",
+                "CANCELLED",
+                "INTERNAL"
+              ]
+            },
+            "message": { "type": "string" }
+          }
+        },
+        "startedAt": { "type": "string" },
+        "endedAt": { "type": "string" },
+        "steps": { "type": "integer", "minimum": 0 },
+        "toolCalls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "ok"],
+            "properties": {
+              "name": { "type": "string" },
+              "ok": { "type": "boolean" }
+            }
+          }
+        },
+        "changedFiles": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

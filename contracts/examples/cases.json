@@ -1,0 +1,142 @@
+{
+  "description": "Shared contract examples. The Python and TypeScript test suites both read this file, so the two validators are proven to agree on the same inputs.",
+  "cases": [
+    {
+      "name": "minimal request",
+      "kind": "request",
+      "valid": true,
+      "value": { "contractVersion": 1, "runId": "run-1", "task": "say hi", "cwd": "." }
+    },
+    {
+      "name": "full request",
+      "kind": "request",
+      "valid": true,
+      "value": {
+        "contractVersion": 1,
+        "runId": "run-1",
+        "task": "say hi",
+        "cwd": ".",
+        "readOnly": true,
+        "allowShell": true,
+        "allowNetwork": false,
+        "model": "qwen2.5-coder:7b",
+        "maxSteps": 12,
+        "configPath": "/tmp/worker.yaml"
+      }
+    },
+    {
+      "name": "request missing runId",
+      "kind": "request",
+      "valid": false,
+      "value": { "contractVersion": 1, "task": "say hi", "cwd": "." }
+    },
+    {
+      "name": "request unknown field",
+      "kind": "request",
+      "valid": false,
+      "value": { "contractVersion": 1, "runId": "run-1", "task": "say hi", "cwd": ".", "extra": "nope" }
+    },
+    {
+      "name": "request wrong contract version",
+      "kind": "request",
+      "valid": false,
+      "value": { "contractVersion": 2, "runId": "run-1", "task": "say hi", "cwd": "." }
+    },
+    {
+      "name": "request maxSteps below minimum",
+      "kind": "request",
+      "valid": false,
+      "value": { "contractVersion": 1, "runId": "run-1", "task": "say hi", "cwd": ".", "maxSteps": 0 }
+    },
+    {
+      "name": "request maxSteps above maximum",
+      "kind": "request",
+      "valid": false,
+      "value": { "contractVersion": 1, "runId": "run-1", "task": "say hi", "cwd": ".", "maxSteps": 201 }
+    },
+    {
+      "name": "request readOnly not a boolean",
+      "kind": "request",
+      "valid": false,
+      "value": { "contractVersion": 1, "runId": "run-1", "task": "say hi", "cwd": ".", "readOnly": "yes" }
+    },
+    {
+      "name": "completed result",
+      "kind": "result",
+      "valid": true,
+      "value": {
+        "contractVersion": 1,
+        "runId": "run-1",
+        "state": "COMPLETED",
+        "answer": "done",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "endedAt": "2026-01-01T00:00:01Z",
+        "steps": 2,
+        "toolCalls": [{ "name": "read_file", "ok": true }],
+        "changedFiles": ["src/a.ts"]
+      }
+    },
+    {
+      "name": "failed result",
+      "kind": "result",
+      "valid": true,
+      "value": {
+        "contractVersion": 1,
+        "runId": "run-1",
+        "state": "FAILED",
+        "error": { "category": "PROVIDER_UNAVAILABLE", "message": "no ollama" }
+      }
+    },
+    {
+      "name": "cancelled result",
+      "kind": "result",
+      "valid": true,
+      "value": {
+        "contractVersion": 1,
+        "runId": "run-1",
+        "state": "CANCELLED",
+        "error": { "category": "CANCELLED", "message": "cancelled by signal" }
+      }
+    },
+    {
+      "name": "result unknown state",
+      "kind": "result",
+      "valid": false,
+      "value": { "contractVersion": 1, "runId": "run-1", "state": "DONE" }
+    },
+    {
+      "name": "result unknown error category",
+      "kind": "result",
+      "valid": false,
+      "value": {
+        "contractVersion": 1,
+        "runId": "run-1",
+        "state": "FAILED",
+        "error": { "category": "SOMETHING_ELSE", "message": "x" }
+      }
+    },
+    {
+      "name": "result tool call missing ok",
+      "kind": "result",
+      "valid": false,
+      "value": {
+        "contractVersion": 1,
+        "runId": "run-1",
+        "state": "COMPLETED",
+        "toolCalls": [{ "name": "read_file" }]
+      }
+    },
+    {
+      "name": "result negative steps",
+      "kind": "result",
+      "valid": false,
+      "value": { "contractVersion": 1, "runId": "run-1", "state": "COMPLETED", "steps": -1 }
+    },
+    {
+      "name": "result used as a request",
+      "kind": "request",
+      "valid": false,
+      "value": { "contractVersion": 1, "runId": "run-1", "state": "COMPLETED" }
+    }
+  ]
+}

@@ -25,6 +25,8 @@ function buildProgram() {
   configCmd.command('migrate');
 
   program.command('mcp');
+  program.command('setup').argument('<component>').option('--force').option('--json');
+  program.command('doctor').option('--json').option('--offline');
   return program;
 }
 

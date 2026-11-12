@@ -56,6 +56,17 @@ const BASELINE = new Set([
 	'src/execution/sessions.ts#assertSessionIsolation',
 	// workspace
 	'src/workspace/index.ts#worktreeDiff',
+	// local worker provisioning (public surface used by the CLI and the M4 adapter)
+	'src/worker/provision.ts#ProvisionStep',
+	'src/worker/provision.ts#DoctorCheckId',
+	'src/worker/provision.ts#DoctorCheck',
+	'src/worker/provision.ts#SystemPython',
+	// job contract types (consumed by the local adapter and tests)
+	'src/contracts/job.ts#JobErrorCategory',
+	'src/contracts/job.ts#JobState',
+	'src/contracts/job.ts#JobRequest',
+	'src/contracts/job.ts#JobToolCall',
+	'src/contracts/job.ts#JobResult',
 ]);
 
 let output = '';

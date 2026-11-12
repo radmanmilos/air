@@ -143,12 +143,21 @@ async function runAction(task: string, options: { files?: string[]; auto?: boole
 
 function showStatus(options: { json?: boolean }) {
   const tracker = createHealthTracker();
-  return tracker.load().then(() => {
+  return tracker.load().then(async () => {
     const snap = tracker.snapshot();
+    const { workerCommand } = await import('../src/worker/provision');
+    let localWorker: { provisioned: boolean; python?: string } = { provisioned: false };
+    try {
+      const command = workerCommand();
+      localWorker = command
+        ? { provisioned: true, python: command.executable }
+        : { provisioned: false };
+    } catch { /* bundled worker missing: report as not provisioned */ }
     const data = {
       command: 'status',
       version: AIR_VERSION,
       tools: adapterStatus(),
+      localWorker,
       cooldowns: snap.cooldowns.map((c) => ({
         provider: c.provider,
         model: c.model,
@@ -171,6 +180,10 @@ function showStatus(options: { json?: boolean }) {
       const inst = t.installed ? `installed${t.version ? ` v${t.version}` : ''}` : 'not-installed';
       return `${t.id} (${inst})${t.available ? '' : ' (unavailable)'}`;
     }).join(', ') || 'none');
+    console.log(
+      chalk.gray('Local worker:'),
+      localWorker.provisioned ? `provisioned (${localWorker.python})` : 'not provisioned (run `air setup local`)',
+    );
     console.log(chalk.gray('Cooldowns:'), data.cooldowns.length);
     console.log(chalk.gray('Successes:'), snap.totalSuccesses);
     console.log(chalk.gray('Failures:'), snap.totalFailures);
@@ -372,6 +385,8 @@ program
     console.log('  /models            List models');
     console.log('  /verify <cmd...>   Run verification');
     console.log('  /merge <jobId>     Apply a completed job worktree');
+    console.log('  /setup local       Provision the internal local worker');
+    console.log('  /doctor            Check whether a local job can run');
     console.log('  /mcp               Start MCP server');
     console.log('Type "/" then a command, or run "air <command>".');
   });
@@ -806,6 +821,46 @@ program
     const res = applyWorktree(info as any);
     console.log(res.ok ? chalk.green(res.message) : chalk.red(res.message));
     process.exit(res.ok ? 0 : 1);
+  });
+
+program
+  .command('setup')
+  .description('Provision an internal AIR component')
+  .argument('<component>', 'component to provision (local)')
+  .option('--force', 'Recreate the component from scratch')
+  .option('--json', 'Emit machine-readable JSON')
+  .action(async (component: string, options: { force?: boolean; json?: boolean }) => {
+    if (component !== 'local') {
+      console.error(`Unknown component: ${component}. Available: local`);
+      process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+    }
+    const { provisionLocalWorker, formatProvisionResult } = await import('../src/worker/provision');
+    const result = await provisionLocalWorker({
+      force: !!options.force,
+      log: options.json ? undefined : (line) => console.log(chalk.gray(line)),
+    });
+    if (options.json) {
+      process.stdout.write(JSON.stringify(result) + '\n');
+    } else {
+      console.log(result.ok ? chalk.green(formatProvisionResult(result)) : chalk.red(formatProvisionResult(result)));
+    }
+    process.exit(result.ok ? 0 : EXIT_CODES.TASK_FAILURE);
+  });
+
+program
+  .command('doctor')
+  .description('Check whether a local job can run (Python, venv, worker, Ollama, models)')
+  .option('--json', 'Emit machine-readable JSON')
+  .option('--offline', 'Skip Ollama network checks')
+  .action(async (options: { json?: boolean; offline?: boolean }) => {
+    const { doctorLocalWorker, formatDoctorReport } = await import('../src/worker/provision');
+    const report = await doctorLocalWorker({ offline: !!options.offline });
+    if (options.json) {
+      process.stdout.write(JSON.stringify(report) + '\n');
+    } else {
+      console.log(report.ok ? chalk.green(formatDoctorReport(report)) : chalk.red(formatDoctorReport(report)));
+    }
+    process.exit(report.ok ? 0 : 1);
   });
 
 program.parse();

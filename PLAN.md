@@ -384,8 +384,21 @@ applied. Conflicts were resolved as follows:
 - The worker is hardened: one `policy` layer (job-root jail, read-only mode,
   protected files, shell/network gates), argv-only shell with an allowlist, no
   interactive approval, no destructive git rollback.
-- Python package tests: 60 passing (`pytest`); `ruff` and `mypy` clean. CI runs
+- Python package tests: 100 passing (`pytest`); `ruff` and `mypy` clean. CI runs
   Node plus Python 3.12/3.14 on Ubuntu and Windows.
+- M3 contract: `contracts/job.schema.json` is the single source of truth for the
+  request/result payloads and the worker exit codes. `air_local/contract.py` and
+  `src/contracts/job.ts` implement the same small JSON Schema subset, and both
+  test suites read `contracts/examples/cases.json` so they cannot drift. A schema
+  keyword the validators do not implement fails the tests.
+- M3 entrypoint: `python -m air_local.run --request <file> --result <file>`
+  writes an atomic result file, logs only to stderr, and returns stable exit
+  codes (0/2/3/4/5). stdout stays empty.
+- M3 provisioning: `air setup local` creates a private venv under
+  `cacheDir/worker/venv` and installs the bundled package in editable mode (so
+  the worker still finds the canonical contract and config). `air doctor`
+  reports Python, venv, worker import, Ollama, and models; `air status` shows
+  whether the local worker is provisioned.
 - M0 truth pass: version strings unified at 0.2.0 (`src/index.ts` is the
   source), README/`air commands` document `air merge`, adapter verification
   table matches `src/adapters/registry.ts`, and the `--allow-paid` claim was
@@ -397,8 +410,8 @@ applied. Conflicts were resolved as follows:
   git baseline; `oracles.gitChangedFiles` parses porcelain correctly. Write jobs
   now fail closed when worktree creation fails instead of touching the source
   tree. Latest full suite: 300 passed, 15 skipped, green on repeated runs.
-- Active task list: `docs/reviews/tasks_air_12.md` (M3–M5 remain: contract and
-  entrypoint, AIR adapter, apply UX and decommission).
+- Active task list: `docs/reviews/tasks_air_12.md` (M4–M5 remain: AIR adapter,
+  apply UX and decommission).
 - `npm test` is green (deterministic suite; live scenarios remain gated).
 
 ## Adapters

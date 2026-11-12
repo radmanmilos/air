@@ -61,7 +61,7 @@ flowchart LR
 ```
 
 Components:
-- **CLI (`air`)** - `bin/air.ts` with commands: run, status/health, route-test, config, mcp, adapters, chat, resume, merge, verify, dashboard, commands, models.
+- **CLI (`air`)** - `bin/air.ts` with commands: run, status/health, route-test, config, mcp, adapters, chat, resume, merge, setup, doctor, verify, dashboard, commands, models.
 - **Config** — Zod schema is single source of truth, versioned (`version: 1`); `air config migrate` upgrades. Platform-appropriate global config + optional repo `.airrc.yaml` (untrusted). Precedence: CLI > env > repo > global > defaults.
 - **Router** — Priority list with free-first cost sorting, cooldowns keyed by (provider, model), exact skip reasons.
 - **Adapters** — Per-tool connectors implementing `AgentAdapter` (id, provider, model, capabilities, canHandle, buildCommand, parseOutput, classifyError). Conformance suite gates registration. Test-only mock adapter under `src/adapters/mock.ts`.
@@ -76,13 +76,13 @@ Components:
 - **Planner / result compiler** — Lightweight task decomposition and coherent reply compilation (`src/planner`, `src/result-compiler`).
 - **Permissions** — Shared permission policy (`src/permissions`) applied before worker invocation.
 - **Workspace** — Real git worktree isolation per write job (`src/workspace`).
-- **Local worker** — Internal Python package (`packages/local-worker`) providing an Ollama transport, a jailed tool set, and project scaffolding. `air` is its only entrypoint; there is no separate CLI or install.
+- **Local worker** — Internal Python package (`packages/local-worker`) providing an Ollama transport, a jailed tool set, and project scaffolding. `air` is its only entrypoint; there is no separate CLI or install. `air setup local` provisions a private venv under the AIR cache directory; `air doctor` reports whether a local job can run.
 
 ## Repository layout
 
 - `bin/`, `src/` — the TypeScript control plane (CLI, MCP server, router, adapters, conversation, workspace).
 - `packages/local-worker/` — the internal Python worker (`air_local`). Never invoked by users directly.
-- `contracts/` — shared job contract between the control plane and the worker (M3).
+- `contracts/` — the canonical job contract (`job.schema.json`) shared by the control plane and the worker, plus shared examples both test suites read.
 - `docs/` — behavior spec, adapter notes, and the active task ledger.
 
 ## Quick start
@@ -99,6 +99,18 @@ npm run build
 npm link
 ```
 
+To run a local Ollama-backed job, provision the internal worker once and check
+the environment:
+
+```bash
+air setup local     # creates a private venv under the AIR cache dir
+air doctor          # Python, venv, worker import, Ollama, models
+```
+
+`air setup local --force` recreates the venv. `air doctor --offline` skips the
+Ollama network checks. The worker is internal: there is no `mgai` command and
+nothing to install separately.
+
 ## Commands
 
 - `air run "<task>"` - Route and run task (`-f, --files`, `--auto`, `--allow-dirty`, `--read-only`, `--allow-provider`)
@@ -113,6 +125,8 @@ npm link
 - `air models` - List adapters with provider/model and allow-list status
 - `air chat` - Interactive non-blocking conversation (`--resume <id>`, `--free-only`)
 - `air merge <jobId>` - Apply a completed job's worktree into the current branch
+- `air setup local` - Provision the internal local worker (`--force`, `--json`)
+- `air doctor` - Check whether a local job can run (`--offline`, `--json`)
 - `air mcp` - Start MCP server over stdio
 - `--dev` - Developer mode with verbose diagnostics
 
