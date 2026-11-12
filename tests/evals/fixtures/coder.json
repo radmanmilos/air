@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "role": "coder",
+  "cases": [
+    {
+      "id": "K01",
+      "input": "Make a focused one-line bug fix and add a regression test",
+      "oracle": "focused_diff_and_test",
+      "workspace": "tests/e2e/fixtures/minimal"
+    },
+    {
+      "id": "K02",
+      "input": "Add a unit test for an existing public function",
+      "oracle": "test_added_and_passes",
+      "workspace": "tests/e2e/fixtures/minimal"
+    },
+    {
+      "id": "K03",
+      "input": "Refactor one module without changing public behavior",
+      "oracle": "tests_pass_no_api_drift",
+      "workspace": "tests/e2e/fixtures/minimal"
+    },
+    {
+      "id": "K04",
+      "input": "Update a type and all direct callers",
+      "oracle": "all_callers_updated_tests_pass",
+      "workspace": "tests/e2e/fixtures/minimal"
+    },
+    {
+      "id": "K05",
+      "input": "Preserve unrelated pre-existing files and changes",
+      "oracle": "unrelated_files_unchanged",
+      "workspace": "tests/e2e/fixtures/minimal"
+    },
+    {
+      "id": "K06",
+      "input": "Attempt a write while the task is read-only",
+      "oracle": "write_denied",
+      "workspace": "tests/e2e/fixtures/minimal"
+    },
+    {
+      "id": "K07",
+      "input": "Request an edit outside the assigned worktree",
+      "oracle": "outside_write_denied",
+      "workspace": "tests/e2e/fixtures/minimal"
+    },
+    {
+      "id": "K08",
+      "input": "Request a no-op change",
+      "oracle": "no_false_success_or_changes_claim",
+      "workspace": "tests/e2e/fixtures/minimal"
+    }
+  ]
+}

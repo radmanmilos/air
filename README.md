@@ -22,7 +22,7 @@ npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.g
 
 *AIR is free and so are we.*
 
-**Status:** Release candidate. CLI + MCP server functional. Typecheck, lint, test and package dry-run green. Chat, planner, result-compiler, worktrees, and permissions modules are wired; the active task list and remaining gaps live in `docs/reviews/tasks_air_12.md`.
+**Status:** Release candidate; local-first intelligence milestone is in progress. Existing CLI/MCP execution remains available. The active local-first implementation ledger is `docs/reviews/tasks_air_13.md`; the provider runtime and model-role config are being introduced incrementally and are not yet wired into the chat coordinator.
 
 AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot, ollama, and its bundled local worker) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
 
@@ -66,7 +66,7 @@ flowchart LR
 
 Components:
 - **CLI (`air`)** - `bin/air.ts` with commands: run, status/health, route-test, config, mcp, adapters, chat, resume, merge, setup, doctor, verify, dashboard, commands, models.
-- **Config** — Zod schema is single source of truth, versioned (`version: 1`); `air config migrate` upgrades. Platform-appropriate global config + optional repo `.airrc.yaml` (untrusted). Precedence: CLI > env > repo > global > defaults.
+- **Config** — Zod schema is single source of truth, versioned (`version: 2`); `air config migrate` upgrades v1 settings. Platform-appropriate global config + optional repo `.airrc.yaml` (untrusted). Precedence: CLI > env > repo > global > defaults.
 - **Router** — Priority list with free-first cost sorting, cooldowns keyed by (provider, model), exact skip reasons.
 - **Adapters** — Per-tool connectors implementing `AgentAdapter` (id, provider, model, capabilities, canHandle, buildCommand, parseOutput, classifyError). Conformance suite gates registration. Test-only mock adapter under `src/adapters/mock.ts`.
 - **Context packer / handoff** — Builds handoff from git state only (never model prose), redacts secrets.
@@ -80,7 +80,8 @@ Components:
 - **Planner / result compiler** — Lightweight task decomposition and coherent reply compilation (`src/planner`, `src/result-compiler`).
 - **Permissions** — Shared permission policy (`src/permissions`) applied before worker invocation.
 - **Workspace** — Real git worktree isolation per write job (`src/workspace`).
-- **Local worker** — Internal Python package (`packages/local-worker`) providing an Ollama transport, a jailed tool set, and project scaffolding. `air` is its only entrypoint; there is no separate CLI or install. `air setup local` provisions a private venv under the AIR cache directory; `air doctor` reports whether a local job can run.
+- **Model runtime (new, not yet wired to chat)** — Provider-neutral TypeScript contracts and an Ollama HTTP provider live under `src/models/`. Logical model roles are configured globally and resolved separately from execution adapters. See [model provider runtime](docs/adapters/model-providers.md) and [model roles](docs/configuration/model-roles.md).
+- **Local worker** — Internal Python package (`packages/local-worker`) providing its existing Ollama transport, a jailed tool set, and project scaffolding. `air` is its only entrypoint; there is no separate CLI or install. `air setup local` provisions a private venv under the AIR cache directory; `air doctor` reports whether a local job can run. Role/model propagation to the worker remains future work.
 
 ## Repository layout
 
@@ -161,7 +162,9 @@ Repo config: `.airrc.yaml` (untrusted by default; validation required)
 Cache: platform cache directory / `air/`
 
 Precedence: CLI > env > repo `.airrc.yaml` > global > defaults.
-Repo config cannot set global-only keys (failover, permission, redaction, trustedRepos, tools, concurrency, verify, catalog, timeouts, buffers, logging).
+Repo config cannot set global-only keys (failover, permission, redaction, trustedRepos, tools, concurrency, verify, catalog, timeouts, buffers, logging, models). Model role/provider assignments live only in global config; see [model roles and configuration](docs/configuration/model-roles.md).
+
+Model role assignments and the local provider defaults are documented in [model roles and configuration](docs/configuration/model-roles.md). The provider runtime is not yet used by CLI/MCP chat and does not download models.
 
 ## Adapters
 
@@ -204,6 +207,7 @@ npm run dev            # tsx bin/air.ts
 
 - Aider, goose, opencode, kilocode, ollama, and the bundled local worker are verified and eligible for routing; codex and github-copilot are unverified spikes.
 - Verified adapters require the external CLI installed and on PATH. The local adapter instead requires `air setup local`.
-- Cross-provider front-agent fallback is not implemented in MVP (same-provider fallback only).
+- The TypeScript model-provider API and Ollama implementation are not yet wired into CLI/MCP chat; the existing Python worker still uses its worker-local model slots.
+- Cross-provider front-agent fallback is not implemented; only Ollama is accepted by the current model-role config.
 - Daemon/IPC mode is not yet implemented; state is file-based with atomic writes and crash recovery.
 - Web UI not included; CLI + MCP only.

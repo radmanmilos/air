@@ -1,9 +1,9 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
 **Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)  
-**Status:** READY FOR L0 / implementation not started  
+**Status:** L0 design/evaluation gates IN PROGRESS / L1 provider runtime and L2 registry/config foundations IN PROGRESS  
 **Created:** 2026-11-12  
-**Baseline inspected:** main at 6fe3222cd6fcacbe8293b86a330a5e3138686006  
+**Baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5  
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -22,9 +22,9 @@
 
 | Phase | Goal | Status | Depends on |
 |---|---|---|---|
-| L0 | Baseline and executable design gate | READY | None |
-| L1 | Provider-neutral runtime + Ollama | TODO | L0 |
-| L2 | Model registry, capabilities, role config | TODO | L0, L1 |
+| L0 | Baseline and executable design gate | IN_PROGRESS | None |
+| L1 | Provider-neutral runtime + Ollama | IN_PROGRESS | L0 (owner boundary review accepted; independent review open) |
+| L2 | Model registry, capabilities, role config | IN_PROGRESS | L0, L1 |
 | L3 | Resource-aware model manager | TODO | L1, L2 |
 | L4 | Local LLM coordinator/front agent | TODO | L1, L2 |
 | L5 | LLM planner + validated work graph | TODO | L1, L2, L4 |
@@ -36,21 +36,23 @@
 
 ## L0 — Baseline and executable design gate
 
-**Phase status:** READY  
-**Exit gate:** architecture contracts and baseline evidence are recorded; no implementation begins beyond isolated spikes until L0 is accepted.
+**Phase status:** IN_PROGRESS  
+**Exit gate:** architecture contracts and baseline evidence are recorded; no implementation begins beyond isolated spikes until L0 is accepted. See [L0 baseline investigation](../architecture/local-first-l0-baseline.md) and [evaluation plan](../architecture/local-first-evaluation.md).
 
 ### L0-01 — Refresh repository and CI baseline
 
-- Status: READY
+- Status: DONE
 - Owner: integration agent
+- Evidence: baseline SHA `35c7300569df2568dbd2cec97a4f6cc232533cc5`; only `main` branch returned. CI run [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully: Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows, and real-binary smoke tests all passed. No local clone/commands were run.
 - Scope: verify repository access, default branch/head, all active branches, recent commits, workflow runs/checks for current head, clean/dirty local worktree when using a clone.
 - Required output: exact baseline SHA; branch list; CI run/check links and conclusions; tests/commands run locally; any unavailable evidence explicitly marked.
 - Acceptance: no statement that CI is green without a run/check tied to the exact SHA.
 
 ### L0-02 — Map the current end-to-end request lifecycle
 
-- Status: READY
-- Owner: architecture/investigation agent
+- Status: DONE
+- Owner: integration agent
+- Evidence: [L0 baseline investigation](../architecture/local-first-l0-baseline.md), including CLI/MCP sequence diagrams, exact call sites, local worker path, current test coverage and discrepancies. Baseline commit: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
 - Scope: trace CLI and MCP user turn through conversation persistence, action handling, planner, orchestrator, adapter, local worker, result compilation and result injection.
 - Expected files to inspect: bin/air.ts; src/conversation/*; src/planner/*; src/orchestrator/*; src/adapters/*; src/execution/*; src/result-compiler/*; src/mcp/*; packages/local-worker/air_local/*; contracts/*.
 - Required output: sequence diagram or call graph, actual call sites, gaps and tests proving each path.
@@ -58,41 +60,65 @@
 
 ### L0-03 — Freeze provider, role, config and contract boundaries
 
-- Status: READY
-- Owner: integration agent + independent reviewer
+- Status: IN_PROGRESS
+- Owner: integration agent; independent reviewer still required
+- Integration-owner review completed 2026-11-12; disposition and explicit non-independent status recorded in [L0 baseline investigation](../architecture/local-first-l0-baseline.md). The global-only model-config boundary, seven logical roles, provider/adapter separation, typed provider API, canonical error taxonomy, and conservative one-generative-model default are accepted as the implementation direction. Exact config-v2 fields/migration and worker contract-v2 remain unfrozen until their compatibility tests are designed. No independent AI review has been supplied; the review assignment remains open.
 - Scope: settle provider interface, model registry record, role names, role request/response contracts, config v2 shape, migration behavior, resource policy, error taxonomy, worker request contract and compatibility strategy.
 - Files: blueprint; src/config/schema.ts; src/config/loader.ts; migration module; src/types/*; contracts/job.schema.json; Python contract.
 - Acceptance: decisions and rejected alternatives recorded in blueprint; one source of truth for effective configuration; TS/Python contract compatibility test plan.
 
 ### L0-04 — Define benchmark fixtures and evaluation thresholds
 
-- Status: READY
-- Owner: evaluation agent
+- Status: IN_PROGRESS
+- Owner: integration agent; evaluation agent/reviewer to validate
+- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Eight version-controlled scenario catalogs are present and JSON-validated: 20 coordinator, 12 planner, 12 tool-calling, 8 coder, 8 debugging, 10 reviewer, 8 summarizer and 10 embeddings cases. Concrete payloads/corpora for several suites and an executable runner remain outstanding.
 - Scope: create deterministic coordinator, planner, tool-call, coding, debugging, review, summarization and embedding fixtures; define repeat count and metrics before model comparison.
-- Files: proposed tests/evals/* or equivalent; docs/architecture/local-first-ai-plan.md.
+- Files: `tests/evals/fixtures/*.json`; `docs/architecture/local-first-evaluation.md`; future `scripts/eval*` / `tests/evals/**`.
+- Subtasks:
+  - L0-04a [DONE]: create eight scenario catalogs with stable IDs and expected oracle classes (20/12/12/8/8/10/8/10 cases); validate JSON and align tool names with the current worker registry.
+  - L0-04b [TODO]: create executable payloads/corpora for coder, debugging, reviewer, summarizer and embeddings; create a temporary-workspace harness; do not modify shared fixtures.
+  - L0-04c [TODO]: implement a repeatable eval runner after L1 provider interfaces are frozen; record provider/model digest, prompt version, context, timing and resource metrics; never auto-pull models.
+  - L0-04d [TODO]: independent review of thresholds and scoring oracles before comparing models.
 - Acceptance: fixtures contain no private repository/user data; expected outcomes are deterministic; thresholds are explicit and reviewed before claiming a model is recommended.
+
+## L0 integration handoff (2026-11-12)
+
+- Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
+- Base commit: `35c7300569df2568dbd2cec97a4f6cc232533cc5`.
+- Working branch: `work/local-first-l0-baseline`.
+- Documentation/fixture catalog, provider runtime, version-2 global model config, migration and initial role resolver commits are present on this branch. The authoritative current branch head is the live `head.sha` on [PR #1](https://github.com/radmanmilos/air/pull/1); re-check it before taking over.
+- Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
+- L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 has an integration-owner disposition but still lacks independent review and exact config/worker migration tests. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases); executable payloads/corpora and the evaluation runner remain outstanding.
+- L1 provider API/Ollama slice and L2 provider/model registries, global-only model config and role resolution are in progress on this same feature branch. Full CI run [43249500871](https://github.com/radmanmilos/air/actions/runs/43249500871) (run 282) passed on `46233ecd279c5e125295698b55464d74b04e9fe5`: Node 22 Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows, package smoke tests and real-binary smoke tests all green. The later `93e9426` commit changed only an AGENTS.md documentation pointer; this follow-up corrects that pointer and updates this ledger, so CI must be checked again on the resulting PR head before merge. They are not wired into CLI/MCP or the Python worker. No local tests were run because no clone/worktree is available in this session.
+- Current implementation includes typed provider contracts, Ollama chat/tool calls/embeddings/metadata/health, provider and model registries, v2 model-role defaults, v1 migration and a no-fallback role resolver. L0-03 still needs independent review; L0-04b/c/d remain outstanding.
+- Next: verify CI on the exact current PR head; then merge PR #1 if all jobs pass and no new blocking review findings appear. After merge, open a separate focused PR for L0-04b executable payloads/workspace harness and complete independent review of config/provider/worker boundaries before coordinator or worker-contract integration.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
+**Phase status:** IN_PROGRESS. The initial provider slice is isolated from config, role resolution, worker contract and conversation dispatch.
+
 ### L1-01 — Define normalized model API
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: src/models/types.ts and src/models/providers/provider.ts define typed messages, tool calls, chat/embedding requests and responses, model metadata, health, usage/timing and normalized provider errors. Implementation commit(s) are on PR #1; exact-head CI validation is pending.
 - Depends on: L0-03
 - Scope: request/response/message/tool/usage/capability/error types; cancellation and timeout semantics.
 - Likely files: src/models/types.ts; src/models/providers/provider.ts; tests.
 - Acceptance: contract is provider-neutral and does not assume every provider supports every capability.
 
 ### L1-02 — Implement Ollama provider
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: `src/models/providers/ollama.ts` implements native fetch transport for chat/tool calls, embeddings, health, installed/model metadata and optional running-model diagnostics. It does not start Ollama or pull models. See [model provider runtime](../adapters/model-providers.md).
 - Depends on: L1-01
 - Scope: wrap/refactor existing Ollama transport behind provider API; support chat, tool calls, structured output where supported, embeddings, tags/model info and health.
 - Likely files: src/models/providers/ollama.ts; packages/local-worker/air_local/ollama.py only if a shared worker concern requires it.
 - Acceptance: fake-provider unit tests plus gated live Ollama integration; consistent error taxonomy.
 
 ### L1-03 — Provider conformance and failure tests
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: `tests/models/ollama.test.ts` covers chat/tool-call mapping, embeddings, discovery, health/offline behavior, missing model, rate limiting, cancellation, timeout and malformed responses. Tests have not been run locally; exact-head GitHub CI is required before marking DONE.
 - Depends on: L1-01, L1-02
 - Scope: provider conformance suite; timeout, cancellation, offline, unsupported capability, malformed response and rate-limit behavior.
 - Acceptance: deterministic tests do not require a live Ollama service.
@@ -100,24 +126,26 @@
 ## L2 — Model registry, capabilities and role configuration
 
 ### L2-01 — Model registry and capability metadata
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: src/models/provider-registry.ts keeps model API providers separate from execution adapters and rejects duplicate/unknown provider IDs. src/models/model-registry.ts tracks discovered models with available/missing/unknown state, checked-at timestamps and provider-declared capabilities; missing metadata remains unknown and model names are never used to infer capability. Tests are in tests/models/registry.test.ts. Persistence, eligibility explanations and runtime integration remain open.
 - Depends on: L1
 - Scope: separate declared metadata from observed availability; provenance and verification timestamp; no capability inference solely from model name.
-- Likely files: src/models/registry.ts; src/models/capabilities.ts; tests.
 - Acceptance: resolver can explain why a model is eligible or rejected.
 
 ### L2-02 — Config v2 roles/providers and migration
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: version-2 Zod config adds global-only local model/provider settings and seven role assignments. Repo .airrc.yaml model settings are stripped; hosted provider IDs are rejected. The v1 migration validates before writing, preserves existing YAML/comments and file permission bits, is idempotent, refuses future versions, and never downloads models. See docs/configuration/model-roles.md. CI run 43249500871 (run 282) passed on commit 46233ecd279c5e125295698b55464d74b04e9fe5: Node 22 Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows, package smoke tests and real-binary smoke tests all green. An intermediate registry run caught one unused exported type, now made internal. Re-check exact-head CI after any further commits.
 - Depends on: L0-03, L1
 - Scope: add providers, role assignments, local-first policy, resource policy and external fallback consent; migrate v1 safely.
 - Likely files: src/config/schema.ts; src/config/loader.ts; current migration module; tests and config docs.
 - Acceptance: v1 migration is idempotent, non-destructive and preserves existing settings; untrusted repo config cannot self-authorize providers or external egress.
 
 ### L2-03 — Role resolver
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: src/models/role-resolver.ts resolves logical role to the configured Ollama model/endpoint/resource intent and fails closed when the provider is disabled. It does not probe model availability or silently fall back; registry/capability checks remain future work.
 - Depends on: L2-01, L2-02
 - Scope: role → provider/model selection with capability, availability, resource and user-policy filters; explainable decisions.
 - Acceptance: no silent paid fallback; role assignment is independent of execution adapter.

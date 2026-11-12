@@ -1,6 +1,6 @@
 # AIR Local-First Intelligence — Architecture and Implementation Blueprint
 
-**Status:** Proposed implementation blueprint; ready for cross-agent review  
+**Status:** L0 baseline documented; integration-owner boundary review recorded; L1 provider runtime implementation in progress. Independent review remains outstanding.  
 **Prepared:** 2026-11-12  
 **Repository baseline inspected:** main at 6fe3222cd6fcacbe8293b86a330a5e3138686006  
 **Purpose:** Make AIR's own intelligence local-first and model-driven while preserving deterministic control, safety, portability, and optional external providers.
@@ -83,6 +83,22 @@ The following describes code inspected at the baseline commit, not the target de
 - AGENTS.md contains an inconsistency: its six rules refer to docs/reviews/tasks_air_6.md, while its source-of-truth section and README identify docs/reviews/tasks_air_12.md. The active implementation ledger created alongside this blueprint should resolve this by becoming the explicit next task ledger; do not silently edit historical task ledgers.
 - At inspection time the latest commit's combined status endpoint returned no status entries, and the connector's commit-workflow wrapper returned no runs (it filters to pull-request-triggered runs). Therefore the latest commit's CI result was **not independently verified** in this task. Earlier task-ledger claims of green CI are historical claims, not proof for current HEAD.
 
+
+### 3.2 L0 live-code verification
+
+The baseline table above is a high-level summary. The detailed request call graph, exact current call sites, CLI/MCP differences, existing test coverage, recommended shared contracts and integration boundaries were verified at commit `35c7300569df2568dbd2cec97a4f6cc232533cc5` and are recorded in [the L0 baseline investigation](local-first-l0-baseline.md).
+
+Important refinements from that inspection:
+
+- CLI `air chat` does have a free-form answer path, but it is not a model-driven coordinator: `decide()` remains regex-based. The answer brain tries KiloCode and OpenCode before Ollama; Ollama is only considered when `AIR_BRAIN_MODEL_OLLAMA` is set.
+- MCP `chat_send` does not call that answer brain. It returns a fixed acknowledgement for `answer` actions and its `cancel_job` branch currently only reports that cancellation was requested.
+- The existing `ChatProvider` interface is a mock-tested seam only; it is not used by either conversation entrypoint and is too narrow for role-based tool/structured-output/embedding requests.
+- The Python Ollama client drives the bundled worker's ReAct loop. It is not yet the provider API for AIR's TypeScript coordinator/planner/reviewer roles.
+- CLI and MCP share the decision function but not a single conversation service. The MCP spawn path can save a stale in-memory conversation object after appending the user message.
+- Current tests exercise CLI chat scenarios and MCP task tools, but do not prove production Ollama coordinator behavior or full `chat_send` parity.
+
+See the baseline investigation for exact paths, call graph, current test evidence and recommended design decisions. These findings supersede any broader wording above that could be read as saying a local-first coordinator is already wired.
+
 ## 4. Reference hardware and model starting point
 
 ### 4.1 Reference development profile
@@ -117,6 +133,8 @@ Assignments are provisional. A model's disk download size is not its total runti
 - granite4:3b: candidate for structured instructions and tool-call reliability.
 - embeddinggemma:300m: comparison candidate for embeddings.
 - Other Ollama models may be added by users; AIR must not hardcode a closed model list.
+
+The repeatable fixture matrix, metrics, thresholds and reference-hardware protocol are specified in [the local-first evaluation plan](local-first-evaluation.md). Fixtures must be committed before model comparisons; the thresholds are proposed gates, not benchmark results.
 
 Useful upstream references (tags and capabilities can change; re-check before implementation and release):
 
@@ -799,12 +817,29 @@ A work package is complete only when:
 
 Do not block L1/L2 on optional Desert Ant or hosted-provider choices.
 
-## 18. Immediate next step
+### 17.1 Integration-owner recommendations for L0 review
 
-Start with **Phase L0** and create/maintain the active ledger in docs/reviews/tasks_air_13.md. Do not begin broad implementation until:
-- current branch/CI baseline is freshly verified;
-- end-to-end request path is mapped against live code;
-- provider, role, config and job-contract boundaries are agreed;
-- work packages are assigned with non-overlapping file ownership.
+The following recommendations are recorded in [the L0 baseline investigation](local-first-l0-baseline.md). They are proposals until independently reviewed and accepted in the active ledger:
 
-The first implementation vertical slice should be deliberately small: **a local Ollama-backed coordinator that can answer or emit one validated spawn_job action, with deterministic fallback and tests, while leaving existing execution and permission control intact.** Expand to LLM planning, role-aware coding and independent review only after that slice is stable.
+- Keep role/provider assignments in the existing global AIR config under a new `models` section; treat that section as global-only and ignore it in repository `.airrc.yaml`. Never let an untrusted repository choose a user's model, enable external egress or supply provider secrets.
+- Use the initial roles `coordinator`, `planner`, `coder`, `reviewer`, `reasoner`, `summarizer` and `embeddings`. Merge task analysis into `planner` until evaluations justify a separate role.
+- Keep reviewer output advisory in the first coordinator vertical slice. Add risk-tiered review only after seeded-defect evaluation; deterministic process/test/workspace evidence remains authoritative.
+- Default to one active generative model and serialized role switching. Probe Ollama installed/running model state where supported; host GPU/VRAM metrics remain best-effort and unknown values stay unknown.
+- Defer semantic retrieval, hosted providers and Desert Ant utilities until local Ollama behavior is stable and a measured requirement exists.
+- Replace the legacy `ChatProvider.complete() -> string` seam with a typed provider-neutral API that represents tool calls, structured output, embeddings, capability declarations, cancellation and canonical model-provider errors.
+- Extend the shared worker contract only through an explicit versioned compatibility path; TypeScript resolves the role/model and the Python worker must not independently choose AIR roles.
+
+## 18. Immediate implementation sequence
+
+The L0 baseline and request lifecycle map are recorded in docs/architecture/local-first-l0-baseline.md; the active work state is tracked in docs/reviews/tasks_air_13.md. The integration owner has reviewed and accepted the provider/role/config/control-plane boundaries as an implementation direction. This is not independent review, and exact config-v2 and worker-v2 compatibility contracts remain open.
+
+The first isolated L1 package is the provider-neutral TypeScript API and Ollama transport. It is intentionally not wired to CLI/MCP, role configuration, the Python worker or task execution. Validate it in exact-head CI before proceeding.
+
+Next sequence:
+1. Finish and validate L1 provider contracts, Ollama behavior and deterministic failure tests.
+2. Complete concrete evaluation payloads and a temporary-workspace harness; add the repeatable runner only after the provider API stabilizes.
+3. Obtain independent review of global-only config, role assignments, error taxonomy, provider API and worker versioning before L2 config/worker changes.
+4. Implement L2 config migration, model registry and role resolver with v1 preservation and repo-config trust tests.
+5. Build the first local Ollama-backed coordinator that can answer or propose one validated spawn_job action. Keep all dispatch, permissions, process lifecycle and success decisions deterministic.
+
+Do not add automatic model downloads, hosted fallback, or unreviewed worker-contract fields as part of the provider package.

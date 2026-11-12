@@ -10,7 +10,7 @@
 
 ## Current architecture direction (2026-11-12)
 
-The next major milestone is local-first AIR-owned intelligence. The detailed architecture, model roles, provider boundaries, resource policy, evaluation strategy, phased implementation plan and multi-AI handoff protocol live in [docs/architecture/local-first-ai-plan.md](docs/architecture/local-first-ai-plan.md). The active work-package ledger is [docs/reviews/tasks_air_13.md](docs/reviews/tasks_air_13.md). These documents describe planned work; they do not claim the roadmap is implemented.
+The next major milestone is local-first AIR-owned intelligence. The detailed architecture, model roles, provider boundaries, resource policy, evaluation strategy, phased implementation plan and multi-AI handoff protocol live in [docs/architecture/local-first-ai-plan.md](docs/architecture/local-first-ai-plan.md). The active work-package ledger is [docs/reviews/tasks_air_13.md](docs/reviews/tasks_air_13.md). The TypeScript provider runtime, Ollama transport, version-2 global model config and role resolver are now implemented on the feature branch; they are not yet integrated into the conversation coordinator or Python worker.
 
 
 ## Reviews applied

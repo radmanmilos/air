@@ -21,7 +21,7 @@ import {
   autoInstallMissing,
 } from '../src/installer/installer';
 import type { InstallEntry } from '../src/config/catalog';
-import type { Config } from '../src/config/schema';
+import { DEFAULT_CONFIG, type Config } from '../src/config/schema';
 
 const mockExecSync = vi.mocked(execSync);
 
@@ -58,7 +58,7 @@ function mockRecord(installed: boolean, version?: string): InstallRecord {
 
 function fullConfig(overrides: Partial<Config> = {}): Config {
   return {
-    version: 1,
+    version: DEFAULT_CONFIG.version,
     tools: [],
     failover: { mode: 'ask', maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false },
     permission: { mode: 'ask', broadApproval: false, autoCommit: false, allowShell: false, allowNetwork: false, allowInstall: false },
@@ -71,6 +71,7 @@ function fullConfig(overrides: Partial<Config> = {}): Config {
     timeouts: { defaultMs: 300_000, perTool: {} },
     buffers: { maxBytes: 1_000_000 },
     logging: { level: 'info', redact: true, rotation: { maxBytes: 10 * 1024 * 1024, maxBackups: 5 } },
+    models: structuredClone(DEFAULT_CONFIG.models),
     ...overrides,
   };
 }

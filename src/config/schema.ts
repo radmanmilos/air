@@ -6,7 +6,69 @@
 
 import { z } from 'zod';
 
-export const CONFIG_VERSION = 1;
+export const CONFIG_VERSION = 2;
+
+export const MODEL_ROLES = [
+  'coordinator',
+  'planner',
+  'coder',
+  'reviewer',
+  'reasoner',
+  'summarizer',
+  'embeddings',
+] as const;
+
+export type ModelRole = (typeof MODEL_ROLES)[number];
+
+const RoleAssignmentSchema = z.object({
+  provider: z.enum(['ollama']),
+  model: z.string().min(1),
+});
+
+const ProviderSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  baseUrl: z.string().url().default('http://127.0.0.1:11434'),
+});
+
+const DEFAULT_MODEL_ROLES = {
+  coordinator: { provider: 'ollama', model: 'qwen3.5:4b' },
+  planner: { provider: 'ollama', model: 'qwen3.5:4b' },
+  coder: { provider: 'ollama', model: 'qwen2.5-coder:7b' },
+  reviewer: { provider: 'ollama', model: 'qwen3.5:4b' },
+  reasoner: { provider: 'ollama', model: 'deepseek-r1:1.5b' },
+  summarizer: { provider: 'ollama', model: 'qwen3.5:4b' },
+  embeddings: { provider: 'ollama', model: 'nomic-embed-text:latest' },
+} as const;
+
+const DEFAULT_MODEL_PROVIDERS = {
+  ollama: { enabled: true, baseUrl: 'http://127.0.0.1:11434' },
+};
+
+const ModelsSchema = z.object({
+  localFirst: z.boolean().default(true),
+  maxConcurrentGenerative: z.number().int().min(1).max(8).default(1),
+  keepAlive: z.string().min(1).default('5m'),
+  providers: z.object({
+    ollama: ProviderSettingsSchema.default(DEFAULT_MODEL_PROVIDERS.ollama),
+  }).default(DEFAULT_MODEL_PROVIDERS),
+  roles: z.object({
+    coordinator: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.coordinator),
+    planner: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.planner),
+    coder: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.coder),
+    reviewer: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.reviewer),
+    reasoner: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.reasoner),
+    summarizer: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.summarizer),
+    embeddings: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.embeddings),
+  }).default(DEFAULT_MODEL_ROLES),
+});
+
+const DEFAULT_MODELS = {
+  localFirst: true,
+  maxConcurrentGenerative: 1,
+  keepAlive: '5m',
+  providers: DEFAULT_MODEL_PROVIDERS,
+  roles: DEFAULT_MODEL_ROLES,
+};
 
 const ToolConfigSchema = z.object({
   id: z.string(),
@@ -75,7 +137,7 @@ const DEFAULT_LOGGING = {
 };
 
 export const ConfigSchema = z.object({
-  version: z.number().int().min(1).default(CONFIG_VERSION),
+  version: z.number().int().min(1).max(CONFIG_VERSION).default(CONFIG_VERSION),
   tools: z.array(ToolConfigSchema).default([]),
   failover: FailoverSchema.default(DEFAULT_FAILOVER),
   permission: PermissionSchema.default(DEFAULT_PERMISSION),
@@ -96,6 +158,7 @@ export const ConfigSchema = z.object({
       maxBytes: z.number().int().min(1024).default(1_000_000),
     })
     .default(DEFAULT_BUFFERS),
+  models: ModelsSchema.default(DEFAULT_MODELS),
   logging: z
     .object({
       level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -112,6 +175,8 @@ export const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 export type ToolConfig = z.infer<typeof ToolConfigSchema>;
+export type ModelsConfig = z.infer<typeof ModelsSchema>;
+export type ModelRoleConfig = z.infer<typeof RoleAssignmentSchema>;
 
 export const DEFAULT_CONFIG: Config = ConfigSchema.parse({ version: CONFIG_VERSION });
 
