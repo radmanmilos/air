@@ -1,8 +1,8 @@
 # Independent AI Review Assignment — AIR Local-First L0
 
 **Review target:** [PR #1](https://github.com/radmanmilos/air/pull/1)  
-**Base:** \`main\` at \`35c7300569df2568dbd2cec97a4f6cc232533cc5\`  
-**Review branch:** \`work/local-first-l0-baseline\`  
+**Base:** `main` at `35c7300569df2568dbd2cec97a4f6cc232533cc5`  
+**Review branch:** `work/local-first-l0-baseline`  
 **Purpose:** Independent challenge of L0 architecture decisions before model runtime/config/worker-contract implementation begins.
 
 ## Role and boundaries
@@ -13,26 +13,26 @@ Do not approve a decision merely because it is already written in the blueprint.
 
 ## Read in this order
 
-1. \`AGENTS.md\`
-2. \`docs/architecture/local-first-ai-plan.md\`
-3. \`docs/reviews/tasks_air_13.md\`
-4. \`docs/architecture/local-first-l0-baseline.md\`
-5. \`docs/architecture/local-first-evaluation.md\`
-6. \`docs/adapters/chat-providers.md\`
+1. `AGENTS.md`
+2. `docs/architecture/local-first-ai-plan.md`
+3. `docs/reviews/tasks_air_13.md`
+4. `docs/architecture/local-first-l0-baseline.md`
+5. `docs/architecture/local-first-evaluation.md`
+6. `docs/adapters/chat-providers.md`
 7. The PR diff and the live source paths cited by the baseline investigation.
 
-Relevant current source includes \`src/config/schema.ts\`, \`src/config/loader.ts\`, \`src/config/paths.ts\`, \`src/conversation/actions.ts\`, \`src/conversation/decide.ts\`, \`src/conversation/chat-provider.ts\`, \`src/brain/index.ts\`, \`src/adapters/local.ts\`, \`src/orchestrator/orchestrator.ts\`, \`contracts/job.schema.json\`, \`src/contracts/job.ts\`, \`packages/local-worker/air_local/run.py\`, \`loop.py\`, \`models.py\`, \`ollama.py\` and \`config.yaml\`.
+Relevant current source includes `src/config/schema.ts`, `src/config/loader.ts`, `src/config/paths.ts`, `src/conversation/actions.ts`, `src/conversation/decide.ts`, `src/conversation/chat-provider.ts`, `src/brain/index.ts`, `src/adapters/local.ts`, `src/orchestrator/orchestrator.ts`, `contracts/job.schema.json`, `src/contracts/job.ts`, `packages/local-worker/air_local/run.py`, `loop.py`, `models.py`, `ollama.py` and `config.yaml`.
 
 ## Questions that must be answered
 
 ### A. Configuration and trust
 - Is global user config the correct single source for role/provider assignments?
-- Is the proposed \`models\` section correctly excluded from untrusted repository \`.airrc.yaml\`?
+- Is the proposed `models` section correctly excluded from untrusted repository `.airrc.yaml`?
 - Are provider secrets, external egress, local model URLs and user overrides protected?
 - Is the migration v1→v2 plan non-destructive, idempotent and compatible with existing settings?
 
 ### B. Role model
-- Are \`coordinator\`, \`planner\`, \`coder\`, \`reviewer\`, \`reasoner\`, \`summarizer\`, \`embeddings\` the right initial roles?
+- Are `coordinator`, `planner`, `coder`, `reviewer`, `reasoner`, `summarizer`, `embeddings` the right initial roles?
 - Should task analysis be a separate role or remain part of planner?
 - Are role selection and execution adapter selection cleanly separated?
 
@@ -45,8 +45,8 @@ Relevant current source includes \`src/config/schema.ts\`, \`src/config/loader.t
 ### D. Worker contract and configuration source of truth
 - Does the proposed versioned request carry enough information for role/model/provider settings without allowing the Python worker to re-resolve roles?
 - Should Ollama base URL/keep-alive be passed in the request or generated per-run config?
-- Is v1 compatibility/version negotiation safe given \`additionalProperties: false\` and separate TypeScript/Python validators?
-- Can worker-only settings remain in \`packages/local-worker/config.yaml\` without duplicating model/provider authority?
+- Is v1 compatibility/version negotiation safe given `additionalProperties: false` and separate TypeScript/Python validators?
+- Can worker-only settings remain in `packages/local-worker/config.yaml` without duplicating model/provider authority?
 
 ### E. Resource policy and safety
 - Is one active generative model the correct conservative default for the 16 GB RAM / 6 GB VRAM reference machine?
@@ -62,7 +62,7 @@ Relevant current source includes \`src/config/schema.ts\`, \`src/config/loader.t
 
 ### G. Lifecycle and test coverage
 - Does the CLI/MCP call graph match the actual code?
-- Are the documented \`chat_send\` acknowledgement/cancel/stale-object issues accurate?
+- Are the documented `chat_send` acknowledgement/cancel/stale-object issues accurate?
 - What tests must exist before the first coordinator vertical slice can be accepted?
 
 ## Required review output
