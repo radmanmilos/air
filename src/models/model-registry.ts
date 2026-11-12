@@ -1,6 +1,6 @@
 import type { ModelCapability, ModelDescriptor } from './types';
 
-export type ModelAvailability = 'available' | 'missing' | 'unknown';
+type ModelAvailability = 'available' | 'missing' | 'unknown';
 
 export interface ModelRegistryEntry extends ModelDescriptor {
   providerId: string;
