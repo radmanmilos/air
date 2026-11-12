@@ -370,13 +370,12 @@ export class OllamaProvider implements ModelProvider {
     }, timeoutMs);
 
     try {
+      const headers = new Headers(init.headers);
+      headers.set('accept', 'application/json');
+      if (init.body) headers.set('content-type', 'application/json');
       const response = await this.fetchImpl(this.baseUrl + path, {
         ...init,
-        headers: {
-          accept: 'application/json',
-          ...(init.body ? { 'content-type': 'application/json' } : {}),
-          ...init.headers,
-        },
+        headers,
         signal: controller.signal,
       });
       const text = await response.text();
