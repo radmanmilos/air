@@ -125,6 +125,17 @@ describe('config loader (G2-03)', () => {
     expect(result.message).toContain('No global config exists');
   });
 
+
+  it('rejects unimplemented hosted providers in the current local-first config', async () => {
+    const file = join(dir, 'hosted-provider.yaml');
+    await writeFile(
+      file,
+      'version: 2\nmodels:\n  roles:\n    coordinator:\n      provider: hosted\n      model: paid-model\n',
+    );
+    const errors = await validateConfigFile(file);
+    expect(errors.some((error) => error.includes('provider'))).toBe(true);
+  });
+
   it('redacts a token value present in repo config errors', async () => {
     const repo = join(dir, 'secret-token');
     await mkdir(repo, { recursive: true });
