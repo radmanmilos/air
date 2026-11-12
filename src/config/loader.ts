@@ -2,10 +2,11 @@
 // Repo config is untrusted by default: strict schema, unknown keys rejected,
 // verify.command never executed from repo config.
 
-import { readFile } from 'node:fs/promises';
-import { parse } from 'yaml';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { parse, parseDocument } from 'yaml';
 import { paths } from './paths';
-import { safeParseConfig, formatConfigError, type Config } from './schema';
+import { CONFIG_VERSION, DEFAULT_CONFIG, safeParseConfig, formatConfigError, type Config } from './schema';
 import { redact } from '../security/redact';
 
 // Keys that may only be set in the global (user) config, never in a repo
@@ -13,7 +14,7 @@ import { redact } from '../security/redact';
 const GLOBAL_ONLY_KEYS = [
   'failover', 'permission', 'redaction', 'trustedRepos', 'tools',
   'concurrency', 'verify', 'catalog', 'costOverrides', 'timeouts',
-  'buffers', 'logging',
+  'buffers', 'logging', 'models',
 ];
 
 export interface LoadOptions {
@@ -28,21 +29,7 @@ export async function loadConfig(options: LoadOptions = {}): Promise<{ config: C
   const errors: string[] = [];
 
   // 1. Defaults
-  let config: Config = {
-    version: 1,
-    tools: [],
-    failover: { mode: 'ask', maxHops: 3, cooldownMinutes: 60, allowProviderSwitch: false },
-    permission: { mode: 'ask', broadApproval: false, autoCommit: false, allowShell: false, allowNetwork: false, allowInstall: false },
-    verify: { enabled: false },
-    redaction: { enabled: true },
-    concurrency: { maxConcurrentAgents: 1 },
-    catalog: { remoteUrl: undefined, autoInstall: false },
-    costOverrides: {},
-    trustedRepos: [],
-    timeouts: { defaultMs: 300_000, perTool: {} },
-    buffers: { maxBytes: 1_000_000 },
-    logging: { level: 'info', redact: true, rotation: { maxBytes: 10 * 1024 * 1024, maxBackups: 5 } },
-  };
+  let config: Config = DEFAULT_CONFIG;
 
   // 2. Global config
   try {
@@ -111,6 +98,12 @@ function merge(base: Config, override: Partial<Config>): Config {
     timeouts: { ...base.timeouts, ...(override.timeouts || {}) },
     buffers: { ...base.buffers, ...(override.buffers || {}) },
     logging: { ...base.logging, ...(override.logging || {}) },
+    models: override.models ? {
+      ...base.models,
+      ...override.models,
+      providers: { ...base.models.providers, ...override.models.providers },
+      roles: { ...base.models.roles, ...override.models.roles },
+    } : base.models,
     tools: override.tools ?? base.tools,
   };
 }
@@ -132,7 +125,62 @@ export async function validateConfigFile(file: string): Promise<string[]> {
   }
 }
 
-export async function migrateConfig(): Promise<{ ok: boolean; message: string }> {
-  // MVP: current schema is version 1; nothing to migrate yet.
-  return { ok: true, message: 'Config is already at the current schema version (1).' };
+export async function migrateConfig(
+  options: { file?: string } = {},
+): Promise<{ ok: boolean; message: string }> {
+  const file = options.file ?? paths.globalConfigFile;
+  let raw: string;
+  try {
+    raw = await readFile(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { ok: true, message: 'No global config exists; AIR will use version ' + CONFIG_VERSION + ' defaults.' };
+    }
+    return { ok: false, message: redact('Could not read config: ' + (error as Error).message) };
+  }
+
+  const document = parseDocument(raw);
+  if (document.errors.length > 0) {
+    return { ok: false, message: 'Configuration YAML is invalid; fix it before migration.' };
+  }
+
+  const value = document.toJS() ?? {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, message: 'Configuration root must be a YAML mapping.' };
+  }
+  const record = value as Record<string, unknown>;
+  const currentVersion = typeof record.version === 'number' ? record.version : 1;
+  if (!Number.isInteger(currentVersion) || currentVersion < 1) {
+    return { ok: false, message: 'Configuration version must be a positive integer.' };
+  }
+  if (currentVersion > CONFIG_VERSION) {
+    return {
+      ok: false,
+      message: 'Config version ' + currentVersion + ' is newer than this AIR version supports (' + CONFIG_VERSION + ').',
+    };
+  }
+  if (currentVersion === CONFIG_VERSION) {
+    return { ok: true, message: 'Config is already at the current schema version (' + CONFIG_VERSION + ').' };
+  }
+
+  const validation = safeParseConfig(record, { strict: false });
+  if (!validation.success) {
+    return { ok: false, message: redact(formatConfigError(validation.error, file)) };
+  }
+
+  // Version 1 -> 2 adds global-only model/provider roles. Preserve all existing
+  // user keys and comments; only add the new defaults and update the version.
+  if (!document.has('models')) document.set('models', DEFAULT_CONFIG.models);
+  document.set('version', CONFIG_VERSION);
+
+  const temporaryFile = file + '.tmp-' + process.pid;
+  try {
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(temporaryFile, document.toString(), 'utf8');
+    await rename(temporaryFile, file);
+    return { ok: true, message: 'Migrated global config from version 1 to version ' + CONFIG_VERSION + '.' };
+  } catch (error) {
+    await rm(temporaryFile, { force: true }).catch(() => undefined);
+    return { ok: false, message: redact('Could not write migrated config: ' + (error as Error).message) };
+  }
 }
