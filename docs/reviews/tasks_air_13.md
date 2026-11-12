@@ -94,9 +94,12 @@
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
+**Phase status:** IN_PROGRESS. The initial provider slice is isolated from config, role resolution, worker contract and conversation dispatch.
+
 ### L1-01 — Define normalized model API
-- Status: TODO
-- Owner: unassigned
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Evidence: src/models/types.ts and src/models/providers/provider.ts define typed messages, tool calls, chat/embedding requests and responses, model metadata, health, usage/timing and normalized provider errors. Implementation commit(s) are on PR #1; exact-head CI validation is pending.
 - Depends on: L0-03
 - Scope: request/response/message/tool/usage/capability/error types; cancellation and timeout semantics.
 - Likely files: src/models/types.ts; src/models/providers/provider.ts; tests.
