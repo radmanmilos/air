@@ -61,6 +61,22 @@
       "id": "C12",
       "title": "Execution adapters",
       "text": "Execution adapters launch coding tools in isolated worktrees and are separate from model-serving providers."
+    },
+    {
+      "id": "C13",
+      "title": "Legacy worker model slots (superseded)",
+      "text": "The old Python worker configuration selected brain, coder, reasoner and embed model slots locally. This predates the canonical TypeScript global model-role resolver.",
+      "status": "superseded"
+    },
+    {
+      "id": "C14",
+      "title": "Banana smoothie recipe",
+      "text": "Blend ripe bananas with milk, yogurt and ice for a chilled fruit smoothie. This recipe is unrelated to software policy or model retrieval."
+    },
+    {
+      "id": "C15",
+      "title": "Model provider tests",
+      "text": "tests/models/ollama.test.ts and tests/models/registry.test.ts verify Ollama transport behavior, provider registration, model inventory and capability metadata."
     }
   ],
   "queries": [
@@ -139,7 +155,7 @@
       "query": "Find tests and source documentation for model provider registration",
       "expectedRelevantDocIds": [
         "C05",
-        "C12"
+        "C15"
       ],
       "oracle": "source_test_pair_retrieved"
     }
