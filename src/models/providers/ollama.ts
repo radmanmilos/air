@@ -147,11 +147,13 @@ function mapToolCalls(value: unknown, provider: string, model: string): ModelToo
   });
 }
 
+export type OllamaFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
 export interface OllamaProviderOptions {
   baseUrl?: string;
   defaultTimeoutMs?: number;
   keepAlive?: string | number;
-  fetch?: typeof fetch;
+  fetch?: OllamaFetch;
 }
 
 export class OllamaProvider implements ModelProvider {
@@ -159,7 +161,7 @@ export class OllamaProvider implements ModelProvider {
   private readonly baseUrl: string;
   private readonly defaultTimeoutMs: number;
   private readonly keepAlive: string | number;
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: OllamaFetch;
 
   constructor(options: OllamaProviderOptions = {}) {
     const rawUrl = options.baseUrl ?? 'http://127.0.0.1:11434';
