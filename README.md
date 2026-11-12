@@ -35,6 +35,10 @@ AIR is a single terminal entrypoint and MCP server that routes tasks across AI c
 - **Evidence over claims:** Success is computed from the actual workspace delta (`git status`/`git diff`) and verification output, never from a model saying "done".
 - **Cross-platform:** Windows, macOS, Linux. Self-contained: all config, model lists and data live inside `air/`.
 
+## Local-first intelligence roadmap
+
+AIR's next architecture milestone makes AIR's own coordinator, planner, coder and reviewer roles local-first, with configurable model/provider assignments and optional external tools/providers. The implementation blueprint, current-state assessment, phased work packages, hardware policy, evaluation plan and multi-agent handoff protocol are documented in [the local-first AI architecture plan](docs/architecture/local-first-ai-plan.md). Track implementation status in [tasks_air_13.md](docs/reviews/tasks_air_13.md). This is a roadmap, not a claim that those capabilities are already implemented.
+
 ## Architecture
 
 ```mermaid
