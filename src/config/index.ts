@@ -10,4 +10,8 @@ export {
   formatConfigError,
   type Config,
   type ToolConfig,
+  type ModelsConfig,
+  type ModelRoleConfig,
+  type ModelRole,
+  MODEL_ROLES,
 } from './schema';
