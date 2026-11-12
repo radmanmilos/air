@@ -8,6 +8,11 @@
 **Failover:** Ask before switching by default, with option to enable auto-switch
 **Development rule:** Develop and test entirely in E:\GitHub\air. No changes to existing projects until integration is ready.
 
+## Current architecture direction (2026-11-12)
+
+The next major milestone is local-first AIR-owned intelligence. The detailed architecture, model roles, provider boundaries, resource policy, evaluation strategy, phased implementation plan and multi-AI handoff protocol live in [docs/architecture/local-first-ai-plan.md](docs/architecture/local-first-ai-plan.md). The active work-package ledger is [docs/reviews/tasks_air_13.md](docs/reviews/tasks_air_13.md). These documents describe planned work; they do not claim the roadmap is implemented.
+
+
 ## Reviews applied
 
 This plan was updated after external reviews (see `docs/reviews/`). Conflicts were resolved as follows:
