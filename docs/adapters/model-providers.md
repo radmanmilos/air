@@ -45,10 +45,10 @@ External abort signals map to `CANCELLED`; the provider's own deadline maps to `
 
 ## Current limitations / next work
 
-- The provider registry, in-memory model inventory and role resolver exist, but they are not yet composed into an automatic discovery/eligibility service. Callers still construct \`OllamaProvider\` explicitly.
+- The provider registry, in-memory model inventory and role resolver exist, but they are not yet composed into an automatic discovery/eligibility service. Callers still construct `OllamaProvider` explicitly.
 - Config v2 exposes seven global-only roles but currently accepts only Ollama. The role resolver maps a configured role and fails closed when Ollama is disabled; it does not verify installed-model availability or capability support.
 - No streaming API, cross-provider conformance suite, persistent model inventory, resource scheduler or live-Ollama CI. Capability absence remains unknown rather than guessed.
 - The provider does not own model provisioning or daemon lifecycle.
-- The legacy \`src/conversation/chat-provider.ts\` mock seam remains in place until the coordinator migration replaces it.
+- The legacy `src/conversation/chat-provider.ts` mock seam remains in place until the coordinator migration replaces it.
 - Add cross-provider conformance tests before a second provider is introduced.
-- Verify \`/api/ps\` behavior against the user's installed Ollama version before relying on its diagnostics.
+- Verify `/api/ps` behavior against the user's installed Ollama version before relying on its diagnostics.
