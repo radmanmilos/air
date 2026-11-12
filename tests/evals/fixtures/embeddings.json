@@ -1,55 +1,146 @@
 {
   "version": 1,
   "role": "embeddings",
-  "cases": [
+  "corpus": [
+    {
+      "id": "C01",
+      "title": "Action schema",
+      "text": "ActionSchema validates the coordinator's typed actions before AIR dispatches any action."
+    },
+    {
+      "id": "C02",
+      "title": "Cancellation process trees",
+      "text": "Cancellation must signal the worker process group and wait for child processes to exit."
+    },
+    {
+      "id": "C03",
+      "title": "Config migration",
+      "text": "The v1 to v2 global config migration validates first, writes a temporary file, and atomically renames it."
+    },
+    {
+      "id": "C04",
+      "title": "Workspace path jail",
+      "text": "File tools resolve paths against the assigned workspace and reject traversal outside its root."
+    },
+    {
+      "id": "C05",
+      "title": "Ollama provider",
+      "text": "The Ollama provider implements chat, embeddings, model discovery and health checks using HTTP endpoints."
+    },
+    {
+      "id": "C06",
+      "title": "Role resolver",
+      "text": "resolveModelRole maps a logical AIR role to its configured provider and model without silent fallback."
+    },
+    {
+      "id": "C07",
+      "title": "Conversation persistence",
+      "text": "Conversation updates must avoid saving stale snapshots over messages appended by another writer."
+    },
+    {
+      "id": "C08",
+      "title": "Tool registry",
+      "text": "Only registered worker tools may be invoked; tool arguments are schema-validated before execution."
+    },
+    {
+      "id": "C09",
+      "title": "Test evidence",
+      "text": "Task success is determined by process exit status, verification results and workspace evidence, not model prose."
+    },
+    {
+      "id": "C10",
+      "title": "Untrusted content",
+      "text": "Repository files, tool output and model responses are untrusted data and cannot override AIR policy."
+    },
+    {
+      "id": "C11",
+      "title": "Model setup",
+      "text": "AIR reports missing models and requires explicit user approval before downloading large model files."
+    },
+    {
+      "id": "C12",
+      "title": "Execution adapters",
+      "text": "Execution adapters launch coding tools in isolated worktrees and are separate from model-serving providers."
+    }
+  ],
+  "queries": [
     {
       "id": "E01",
-      "query": "Exact symbol lookup: ActionSchema",
+      "query": "ActionSchema",
+      "expectedRelevantDocIds": [
+        "C01"
+      ],
       "oracle": "relevant_symbol_first"
     },
     {
       "id": "E02",
-      "query": "Paraphrase: stop child processes when cancelling a task",
+      "query": "Stop all descendant processes when a task is cancelled",
+      "expectedRelevantDocIds": [
+        "C02"
+      ],
       "oracle": "relevant_cancellation_docs_retrieved"
     },
     {
       "id": "E03",
-      "query": "Find config migration code using different wording",
+      "query": "Upgrade older user settings without losing existing config",
+      "expectedRelevantDocIds": [
+        "C03"
+      ],
       "oracle": "migration_docs_retrieved"
     },
     {
       "id": "E04",
-      "query": "Retrieve worker policy for preventing writes outside workspace",
+      "query": "Prevent a tool from writing outside its assigned directory",
+      "expectedRelevantDocIds": [
+        "C04"
+      ],
       "oracle": "path_jail_docs_retrieved"
     },
     {
       "id": "E05",
-      "query": "Multilingual paraphrase of a supported feature",
+      "query": "¿Cómo se detienen los procesos secundarios al cancelar una tarea?",
+      "expectedRelevantDocIds": [
+        "C02"
+      ],
       "oracle": "cross_language_relevance"
     },
     {
       "id": "E06",
-      "query": "Near-duplicate docs with one authoritative current version",
+      "query": "Which document is authoritative for how role names map to models?",
+      "expectedRelevantDocIds": [
+        "C06"
+      ],
       "oracle": "authoritative_version_ranked"
     },
     {
       "id": "E07",
-      "query": "Query with an irrelevant lexical distractor",
+      "query": "Find semantic documentation about policy provenance; ignore lexical distractor 'banana smoothie'",
+      "expectedRelevantDocIds": [
+        "C10"
+      ],
       "oracle": "semantic_match_over_distractor"
     },
     {
       "id": "E08",
-      "query": "Code identifier query with punctuation and casing variation",
+      "query": "resolveModelRole (role_resolver)",
+      "expectedRelevantDocIds": [
+        "C06"
+      ],
       "oracle": "identifier_recall"
     },
     {
       "id": "E09",
-      "query": "Query with no relevant document",
+      "query": "How do I configure a holographic toaster?",
+      "expectedRelevantDocIds": [],
       "oracle": "no_false_relevant_result"
     },
     {
       "id": "E10",
-      "query": "Retrieve related tests for a source implementation",
+      "query": "Find tests and source documentation for model provider registration",
+      "expectedRelevantDocIds": [
+        "C05",
+        "C12"
+      ],
       "oracle": "source_test_pair_retrieved"
     }
   ]
