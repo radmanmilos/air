@@ -71,7 +71,7 @@
 
 - Status: IN_PROGRESS
 - Owner: integration agent; evaluation agent/reviewer to validate
-- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Actual version-controlled fixture data and runner remain outstanding.
+- Evidence: [local-first evaluation plan](../architecture/local-first-evaluation.md) defines suites, minimum fixture counts, repeat protocol, metrics and provisional acceptance gates. Eight version-controlled scenario catalogs are present and JSON-validated: 20 coordinator, 12 planner, 12 tool-calling, 8 coder, 8 debugging, 10 reviewer, 8 summarizer and 10 embeddings cases. Concrete payloads/corpora for several suites and an executable runner remain outstanding.
 - Scope: create deterministic coordinator, planner, tool-call, coding, debugging, review, summarization and embedding fixtures; define repeat count and metrics before model comparison.
 - Files: proposed tests/evals/* or equivalent; docs/architecture/local-first-ai-plan.md.
 - Acceptance: fixtures contain no private repository/user data; expected outcomes are deterministic; thresholds are explicit and reviewed before claiming a model is recommended.
@@ -81,10 +81,10 @@
 - Integration owner: ChatGPT (current session); no other agent has been assigned or has write ownership.
 - Base commit: \`35c7300569df2568dbd2cec97a4f6cc232533cc5\`.
 - Working branch: \`work/local-first-l0-baseline\`.
-- Documentation commits are being prepared on this branch; no source implementation has started.
-- Current CI run: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531); six Node/Python jobs passed, smoke-test job pending at last poll.
+- Documentation/fixture catalog commits are present on this branch; no source implementation has started. Current branch head at handoff: `863c6a58a424986a74aee4c6ec7848fb8948a58b`.
+- Baseline CI: [43218386531](https://github.com/radmanmilos/air/actions/runs/43218386531) completed successfully; Node Ubuntu/Windows, Python 3.12/3.14 Ubuntu/Windows and real-binary smoke tests all passed.
 - L0-01 baseline and CI verified; L0-02 call graph documented. L0-03 decisions await independent review. L0-04 has eight scenario catalogs (20/12/12/8/8/10/8/10 cases) and proposed thresholds; concrete payloads/corpora for some suites and the evaluation runner remain outstanding.
-- Next: finish/poll CI; create stable fixture files; request independent AI review of provider/config/contract/security decisions; then freeze L1/L2 interfaces and begin the first Ollama coordinator vertical slice.
+- Next: complete executable fixture payloads and evaluation harness; request independent AI review of provider/config/contract/security decisions; freeze L1/L2 interfaces; then begin the first Ollama coordinator vertical slice.
 - No tests were run locally because no clone/worktree was available to this agent.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
