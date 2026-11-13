@@ -10,6 +10,7 @@ import type { ModelProvider } from '../models/providers/provider';
 import { ACTION_JSON_SCHEMA } from './contracts/coordinator';
 import { PLANNER_JSON_SCHEMA } from './contracts/planner';
 import { EVAL_TOOL_DEFINITIONS } from './contracts/tools';
+import { detectSandboxCapabilities, evaluateSafetyOracles } from './sandbox/capabilities';
 
 const EVAL_SUITES = [
   'coordinator', 'planner', 'tool-calling', 'coder',
@@ -27,6 +28,8 @@ export interface EvalRunnerOptions {
   context: number;
   promptVersion: string;
   timeoutMs: number;
+  /** Opt-in attempt to execute safety/acceptance oracles in a sandbox. Default false (proposal-only). */
+  executeSafetyOracles?: boolean;
 }
 interface EvalWorkspaceLike {
   path: string;
@@ -35,6 +38,8 @@ interface EvalWorkspaceLike {
 export interface EvalRunnerDependencies {
   provider?: ModelProvider;
   createWorkspace?: (fixtureName: string) => Promise<EvalWorkspaceLike>;
+  /** Optional override for tests/integration; defaults to platform capability detection. */
+  detectSandboxCapabilities?: (options: { executeSafetyOracles?: boolean }) => import('./sandbox/capabilities').EvalSandboxCapabilities;
 }
 export interface EvalFixtureCase extends Record<string, unknown> {
   id: string;
@@ -95,10 +100,11 @@ const HELP = [
   '  --context <tokens>        Requested context budget (default: 8192)',
   '  --timeout-ms <n>          Per-request timeout (default: 120000)',
   '  --prompt-version <id>     Prompt revision label (default: local-first-eval-v1)',
+  '  --execute-safety-oracles  Opt-in: attempt sandboxed safety/acceptance oracle execution (default: off, proposal-only; fail-closed if unsupported)',
   '  --help                    Show this help',
   '',
   'The runner never downloads models. Missing model tags fail with an actionable error.',
-  'Generation suites store raw proposals and deterministic validation metadata; they do not execute tool calls, apply code patches, or run fixture commands.',
+  'Generation suites store raw proposals and deterministic validation metadata by default; they do not execute tool calls, apply code patches, or run fixture commands. --execute-safety-oracles only runs checks when required sandbox capabilities are demonstrably enforced; otherwise oracles are reported as unsupported/blocked and nothing untrusted is executed.',
 ].join('\n');
 
 export function evalHelp(): string {
@@ -119,9 +125,14 @@ export function parseEvalArgs(args: string[]): EvalRunnerOptions | EvalCliHelp {
     '--suite', '--model', '--base-url', '--output', '--repetitions',
     '--warmups', '--context', '--timeout-ms', '--prompt-version',
   ]);
+  const booleanFlags = new Set(['--execute-safety-oracles']);
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
     if (flag === '--help' || flag === '-h') return { help: true };
+    if (booleanFlags.has(flag ?? '')) {
+      values.set(flag as string, 'true');
+      continue;
+    }
     if (!flags.has(flag ?? '')) throw new Error('Unknown argument: ' + flag);
     const value = args[index + 1];
     if (!value || value.startsWith('--')) throw new Error('Missing value for ' + flag);
@@ -140,6 +151,7 @@ export function parseEvalArgs(args: string[]): EvalRunnerOptions | EvalCliHelp {
   const timeoutMs = positiveInteger(values.get('--timeout-ms') ?? '120000', '--timeout-ms');
   if (timeoutMs < 1000) throw new Error('--timeout-ms must be at least 1000');
 
+  const executeSafetyOracles = values.get('--execute-safety-oracles') === 'true';
   const result: EvalRunnerOptions = {
     suite: suiteValue as EvalSuite,
     model,
@@ -149,6 +161,7 @@ export function parseEvalArgs(args: string[]): EvalRunnerOptions | EvalCliHelp {
     context,
     promptVersion: values.get('--prompt-version') ?? 'local-first-eval-v1',
     timeoutMs,
+    ...(executeSafetyOracles ? { executeSafetyOracles: true } : {}),
   };
   const output = values.get('--output');
   if (output) result.output = output;
@@ -432,8 +445,24 @@ async function runGenerationSuite(
         const rssAfter = process.memoryUsage().rss;
         const firstToolCall = response.message.toolCalls?.[0];
         const toolProposalValidation = suite === 'tool-calling' ? validateToolCallProposal(firstToolCall) : undefined;
-        const safetyOracles = suite === 'coder' || suite === 'tool-calling'
-          ? { executed: false, reason: 'proposal-only-runner-does-not-execute' }
+        const detectCaps = dependencies.detectSandboxCapabilities ?? detectSandboxCapabilities;
+        const sandboxCapabilities = detectCaps({ executeSafetyOracles: options.executeSafetyOracles === true });
+        const safetyOracleReport = suite === 'coder' || suite === 'tool-calling' || suite === 'debugging'
+          ? evaluateSafetyOracles({
+            suite,
+            fixture: fixture as unknown as Record<string, unknown>,
+            capabilities: sandboxCapabilities,
+            ...(toolProposalValidation ? { toolProposalValidation } : {}),
+          })
+          : undefined;
+        const legacySafetyExecuted = safetyOracleReport?.oracles.some((o) => o.executed) ?? false;
+        const safetyOracles = safetyOracleReport
+          ? {
+            executed: legacySafetyExecuted,
+            mode: safetyOracleReport.mode,
+            capabilities: safetyOracleReport.capabilities,
+            oracles: safetyOracleReport.oracles,
+          }
           : undefined;
         await writeRecord(outputPath, {
           recordType: 'case',
@@ -585,6 +614,8 @@ export async function runEvaluation(
   await mkdir(dirname(outputPath), { recursive: true });
   const runId = randomUUID();
   const contract = options.suite === 'embeddings' ? {} : suiteContract(options.suite as Exclude<EvalSuite, 'embeddings'>);
+  const detectCaps = dependencies.detectSandboxCapabilities ?? detectSandboxCapabilities;
+  const sandboxCapabilities = detectCaps({ executeSafetyOracles: options.executeSafetyOracles === true });
   await writeRecord(outputPath, {
     recordType: 'run',
     schemaVersion: 1,
@@ -607,6 +638,7 @@ export async function runEvaluation(
     repetitions: options.repetitions,
     warmups: options.warmups,
     timeoutMs: options.timeoutMs,
+    executeSafetyOracles: options.executeSafetyOracles === true,
     host: hostMetadata(),
     gpuVramBytes: null,
     gpuMetrics: 'unknown',
@@ -617,6 +649,7 @@ export async function runEvaluation(
       formatProvided: contract.format !== undefined,
       toolsProvided: Array.isArray(contract.tools),
     },
+    sandboxCapabilities,
   });
 
   const measuredCases = options.suite === 'embeddings'

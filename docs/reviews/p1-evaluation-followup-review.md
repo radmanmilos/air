@@ -73,31 +73,52 @@
 
 ## 7. P1-05 findings — Coder/tool/debugging safety oracles and sandboxed execution
 
-**Status: FAIL / NOT COMPLETE for sandboxed execution & safety-oracle execution (by design/open scope).**
+**Status: PARTIAL (fail-closed contract/capability boundary implemented). Sandboxed execution & executed safety/acceptance oracles remain NOT COMPLETE.**
 
-| Area | Evidence (Verified) |
+### 7.1 Implemented (this increment, fail-closed)
+- **Typed boundary contract:** `src/evals/sandbox/capabilities.ts` defines explicit oracle statuses (`not_run|unsupported|blocked|timed_out|failed|passed`), per-oracle evidence, platform capability detection, and `evaluateSafetyOracles()` reporting. Exported API baselined in `scripts/check-dead-code.mjs`.
+- **Runner integration:** `src/evals/runner.ts` adds opt-in `--execute-safety-oracles` (default off). Run records include `executeSafetyOracles` and `sandboxCapabilities`; coder/tool-calling/debugging case records include structured `safetyOracles { executed, mode, capabilities, oracles[] }`. Proposal/schema validation remains separate from executed safety/acceptance.
+- **Fail-closed behavior:** by default oracles are `not_run`/`executed:false` (`proposal_only`). When opt-in is requested, capability detection reports required controls unavailable (untrusted patch application, fixture-command sandbox, proposed tool dispatch, filesystem confinement, network isolation) on **Windows/Linux/macOS in this implementation**, so oracles are reported `unsupported`/`executed:false` (`sandbox_attempted`) with reasons/details. No untrusted patches are applied, no fixture commands run, and no proposed tools are dispatched.
+- **Tests (focused, locally run):** `tests/evals/sandbox-capabilities.test.ts` (5) verifies default fail-closed, opt-in still unsupported, truthful statuses, and proposal-validation separation; existing eval suites updated-compatible (`tests/evals/runner.test.ts`, fixtures/schema/tool/workspace) all passed in focused run (39 tests total). No real OS-enforced execution path is claimed or exercised.
+
+### 7.2 Threat model (concise)
+
+| Threat | Concern |
 |---|---|
-| Runner execution boundary | `src/evals/runner.ts`: generation suites store proposals/validation metadata only; no tool dispatch, no diff application, no fixture command execution. Records `safetyOracles: { executed:false, reason:"proposal-only-runner-does-not-execute" }` for coder/tool-calling; planner validate cases record deterministic validation without model call. Help text states proposals not executed. |
-| Tool-calling fixtures/oracles | `tests/evals/fixtures/tool-calling.json`: includes policy/safety cases (T08 outside workspace, T09 path escape, T10 unregistered/disallowed, T11 invalid args, T12 untrusted tool output) as **expected/hidden oracle metadata** (`policyOracle`, `expectedTool`) — not executed. |
-| Coder fixtures/oracles | `tests/evals/fixtures/coder.json`: workspace-based tasks with acceptance/commands implied; runner does not apply diff or run `node --test`. K06/K07 safety-oriented cases exist as fixture intent/oracles only in proposal-only mode. |
-| Debugging | `tests/evals/fixtures/debugging.json`: diagnostic evidence/repair oracles present; no automatic repair execution/scoring in runner. |
-| Workspace harness (existing) | `tests/evals/helpers/workspace.ts` / `tests/evals/workspace.test.ts` provide isolated temp workspace copy/cleanup and path/symlink checks for fixture staging (Verified by file presence/tests referenced in prior state); **not** a sandboxed execution engine for applying untrusted model patches or running arbitrary commands. |
+| Untrusted model artifacts | Malicious/accidental patches and tool proposals; prompt/tool output treated as untrusted data, not authorization. |
+| Filesystem escape | Absolute/`..` traversal, symlink/junction/reparse-point escapes, TOCTOU/races, writes outside per-case workspace or to protected/host paths. |
+| Command/process abuse | Shell injection/metacharacters, PATH/executable substitution, arg injection, unexpected child processes, process-tree survival after timeout/cancel. |
+| Environment/host leakage | Inherited secrets/credentials/tokens, sensitive env vars, host paths, open handles/sockets. |
+| Network/egress | Outbound HTTP/DNS, localhost/service access, data exfiltration during fixture execution. |
+| Execution control | Hangs, unbounded CPU/memory/output, cleanup failures, cross-case/shared-temp contamination, concurrent interference. |
+| Oracle integrity | Reporting `executed`/`passed` without an actually run, auditable check; confusing proposal validity with execution safety. |
+| Platform differences | Windows junctions/reparse/`taskkill` semantics, Unix symlinks/process groups/namespaces; CI environment variability (no container/namespace/sandbox-exec guarantees assumed). |
 
-**Not verified / open:** isolated apply-and-run sandbox with enforced filesystem/process/network boundaries, symlink/path-traversal enforcement during untrusted write application, subprocess allowlisting/timeout/cleanup guarantees, destructive-op and egress prevention tests, and distinction of proposal validation vs actual execution safety outcomes.
+### 7.3 Architecture decision and per-OS enforceability
 
-**Proposed sandbox architecture (Recommendation, not implemented):**
-1. **Isolated executor per case:** ephemeral temp workspace copied from fixture; no writes outside workspace root (canonical-path + symlink-aware checks before/after).
-2. **Patch application stage (coder):** accept only bounded patch/diff format; apply via deterministic applier; reject path escapes, absolute/protected paths, symlinks escaping root; record applied files/deltas.
-3. **Command execution stage:** run only fixture-declared/allowlisted verification commands with explicit cwd, env scrub, timeout, output capture, and killed process tree; default **no network** and no shell unless explicitly modeled and denied by policy tests.
-4. **Policy/safety checks:** assert no file mutations outside workspace, no disallowed/protected paths touched, no tool executed for denied cases; treat tool output/model text as untrusted.
-5. **Oracles & reporting:** record `executed:true/false` per oracle with pass/fail/violation reasons, distinguishing proposal-schema validity from executed safety/acceptance.
+**Selected (implemented now):** explicit capability-detected, opt-in, fail-closed oracle boundary with truthful status evidence; **proposal-only execution remains default**. Application-level validation/workspace copying is treated as organization only, never as a security sandbox.
 
-**Minimum safe implementation sequence & fail-closed behavior (Recommendation):**
-- Step 1: executor contract + deterministic diff applier with strict path/symlink confinement tests (fail closed on any escape/ambiguity).
-- Step 2: allowlisted command runner (timeout, cwd jail, env/network restrictions where feasible) + cleanup guarantees.
-- Step 3: coder acceptance oracles (apply diff, run fixture command, compare expected outcomes) separated from safety violations.
-- Step 4: tool-calling/debugging execution oracles with deny-by-default policy checks and explicit `executed` evidence.
-- **Fail closed:** on parse/apply ambiguity, boundary violation, disallowed command/tool, timeout, or unverifiable environment, record failure/violation (never success) and never execute outside the allowed sandbox.
+**Rejected for now (not claimed/silently downgraded):** executing untrusted patches/commands in temp dirs without OS-enforced confinement/network denial; host-shell or interpolated command execution; inheriting full host environment; enabling network by default; wiring eval execution into normal CLI/MCP workflows.
+
+| Security property | Enforcement mechanism (if implemented) | OS genuinely enforced today | Tests demonstrating | Residual/bypass/limitation |
+|---|---|---|---|---|
+| No untrusted execution by default | Opt-in flag off, capability gate, fail-closed statuses | All (application control) | `sandbox-capabilities.test.ts`, runner behavior (`not_run`) | Cannot prevent misuse outside runner; CLI flag exposed to devs only. |
+| Truthful oracle reporting (no false pass) | Status enum + `executed` evidence; unsupported/not_run cannot be passed | All (application control) | `sandbox-capabilities.test.ts` | Depends on future executors to emit correct evidence. |
+| Untrusted patch application confinement | **Not implemented** (requires deterministic applier + canonical/symlink-safe confinement checks) | **None** | None (unsupported by design) | Patches not applied; future impl must fail closed on ambiguity/escape/TOCTOU. |
+| Fixture command allowlist/no-shell argv | **Not implemented** as eval executor boundary | **None** (not wired) | None | `src/execution/runner.ts` provides no-shell argv/tree-kill primitives for trusted contexts but not an untrusted sandbox. |
+| Filesystem confinement (OS) | **Not implemented** (needs platform jail/container/namespace/mandatory policy) | **None proven** | None | Temp workspace isolation is not confinement. |
+| Network isolation/egress denial | **Not implemented** (needs OS firewall/namespace/seccomp/sandbox policy) | **None proven** | None | Default is no execution, so no egress path introduced. |
+| Process-tree timeout/cancellation/cleanup | **Not implemented** for eval sandbox executions | **None proven** for untrusted eval exec | None | Shared trusted runner has tree-kill behavior but not evaluated as sandbox boundary. |
+| Environment/credential isolation | **Not implemented** for eval sandbox executions | **None proven** | None | No execution path; future must use minimal sanitized env. |
+| Cross-case isolation/cleanup | Workspace-per-run copy helper exists (staging) | Partial (filesystem separation only) | Existing `workspace.test.ts` (copy/cleanup), not adversarial sandbox proof | Not a security boundary against escapes/malicious processes. |
+
+**Conclusion:** full cross-platform OS-enforced sandboxing for untrusted eval execution cannot be demonstrated with available in-repo mechanisms/dependencies/CI guarantees; therefore execution remains disabled/fail-closed. Any future execution path must be platform-capability-gated, deny-by-default, and separately tested per-OS with real enforcement evidence.
+
+### 7.4 Remaining gaps / follow-up
+- Implement and prove (per-OS) deterministic patch applier + path/symlink/reparse confinement, fixture-declared command allowlist executor, env sanitization, timeout/output bounds, process-tree cleanup, and network/filesystem denial where enforceable.
+- Execute coder/tool-calling/debugging safety/acceptance oracles only under proven boundaries; record auditable evidence per oracle.
+- Revisit T11/T12-like tool-calling cases to distinguish proposal-validation outcomes from executed tool sandbox outcomes.
+- Preserve P1-03 residuals: worker-registry parity/drift not machine-proven; proposal arg validation not a complete execution boundary. L0-05 remains IN_PROGRESS; L3/L4 remain BLOCKED.
 
 ## 8. P1-06 findings — Planner adversarial fixtures and deterministic validation
 
@@ -125,8 +146,9 @@
 | P1-03 proposal validation rejects unknown tool/missing required args (proposal-only) | **PASS** | `src/evals/runner.ts`, `tests/evals/tool-contracts.test.ts` (Verified by tests/source). |
 | P1-03 proposal validation enforces full arg types/extra-key rejection/execution safety | **FAIL** (not claimed complete) | Value types/enums/nesting not validated; extras accepted/recorded; runner proposal-only, not execution boundary (Verified by source). |
 | P1-04 reviewer fixture/prompt oracle leakage (severity/expected/seed labels) | **PASS** | Neutralized `tests/evals/fixtures/reviewer.json`, sanitizer, real-fixture prompt leak test in `tests/evals/runner.test.ts` (Verified by source/tests). |
-| P1-05 sandboxed coder/tool/debugging execution and safety oracles executed | **FAIL** | Runner records `safetyOracles.executed:false` (proposal-only); no apply/run/deny-enforcement executor (Verified by source). |
-| P1-05 safety fixtures/oracles exist as metadata | **PARTIAL** | Coder/tool-calling/debugging fixtures include safety/acceptance oracle intent but unexecuted (Verified by fixtures/source). |
+| P1-05 fail-closed capability contract, opt-in flag, truthful oracle statuses, no unsafe execution by default | **PASS** (for implemented increment) | `src/evals/sandbox/capabilities.ts`, `src/evals/runner.ts`, `tests/evals/sandbox-capabilities.test.ts` + focused eval tests (39 passed locally). Opt-in reports `unsupported`/`executed:false` when controls unavailable; no patch apply/command/tool execution implemented. |
+| P1-05 sandboxed coder/tool/debugging execution and safety oracles executed with OS-enforced evidence | **FAIL** (open) | No demonstrable cross-platform OS-enforced sandbox boundary; execution remains disabled/fail-closed. |
+| P1-05 safety fixtures/oracles exist as metadata | **PARTIAL** | Coder/tool-calling/debugging fixtures include safety/acceptance oracle intent; runtime records structured not_run/unsupported evidence, but no executed oracle checks. |
 | P1-06 planner generation vs validator cases separated | **PASS** | `tests/evals/fixtures/planner.json` modes P01–P06 generate, P07–P12 validate (Verified). |
 | P1-06 invalid plans validated via `validatePlanDetailed()` without model call | **PASS** | `src/evals/runner.ts` validate-mode path + deterministic validation (Verified by source). |
 | P1-06 duplicate/unknown/self/cycle/limits/criteria/bounds covered | **PASS** | Fixture cases P07–P12, `tests/evals/schema-contracts.test.ts`, `src/planner/index.ts` (Verified by tests/source). |
@@ -147,13 +169,13 @@
 3. **P1-04 residual confidence (if required by review).**
    - *Depends on:* none. *Unit:* extend reviewer prompt-leak tests to all nested/text fields and add fixture-lint guard; optional rubric/fixture-count note (no oracle leakage regressions).
 
-4. **P1-05 sandboxed execution engine (largest, gated).**
-   - *Depends on:* isolated workspace primitives (existing) + strict policy design. *Units (sequential):*
-     - 4a. Deterministic diff/patch applier with canonical-path + symlink confinement, fail-closed rejection tests.
-     - 4b. Allowlisted command executor (cwd jail, timeout, process-tree cleanup, restricted env/network posture per platform capability) with tests.
-     - 4c. Coder execution oracles: apply+run fixture acceptance in sandbox; record executed safety outcomes.
+4. **P1-05 sandboxed execution engine (largest, gated).** *(increment completed: fail-closed contract/capability detection + truthful statuses + opt-in flag; execution still disabled where unenforced)*
+   - *Depends on:* isolated workspace primitives (existing) + strict policy design + per-OS enforcement proof. *Units (sequential):*
+     - 4a. Deterministic diff/patch applier with canonical-path + symlink/reparse confinement and TOCTOU-safe checks; fail-closed rejection tests.
+     - 4b. Allowlisted argv-only command executor (no shell), minimal sanitized env, cwd jail, bounded output/time, process-tree cleanup; network/filesystem denial only where OS-enforced and tested.
+     - 4c. Coder execution oracles: apply+run fixture acceptance in proven sandbox; record executed safety outcomes/evidence.
      - 4d. Tool-calling/debugging executed policy oracles with deny-by-default enforcement and explicit proposal-vs-execution reporting.
-   - *Must not:* enable real/unsafe tool execution outside sandbox; must distinguish proposal validity from execution safety.
+   - *Must not:* enable real/unsafe tool execution outside proven sandbox; must distinguish proposal validity from execution safety; unsupported platforms/capabilities remain proposal-only.
 
 5. **P1-07 provider assistant tool-call contract.**
    - *Depends on:* provider API freeze decisions; independent of P1-05 runner sandbox but relevant for coordinator/tool loops.

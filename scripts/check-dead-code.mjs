@@ -67,13 +67,19 @@ const BASELINE = new Set([
 	'src/contracts/job.ts#JobRequest',
 	'src/contracts/job.ts#JobToolCall',
 	'src/contracts/job.ts#JobResult',
-	// evaluation contracts/helpers (P1-03 schema/tool-context integrity)
+	// evaluation contracts/helpers (P1-03 schema/tool-context integrity, P1-05 sandbox boundary contract)
 	'src/evals/runner.ts#suiteContract',
 	'src/evals/contracts/coordinator.ts#ACTION_SCHEMA',
 	'src/evals/contracts/coordinator.ts#coordinatorFormat',
 	'src/evals/contracts/planner.ts#PLANNER_SCHEMA',
 	'src/evals/contracts/planner.ts#plannerFormat',
 	'src/evals/contracts/tools.ts#EVAL_TOOL_REGISTRY',
+	'src/evals/sandbox/capabilities.ts#SafetyOracleStatus',
+	'src/evals/sandbox/capabilities.ts#SafetyOracleEvidence',
+	'src/evals/sandbox/capabilities.ts#EvalSandboxCapabilities',
+	'src/evals/sandbox/capabilities.ts#EvalSafetyOracleReport',
+	'src/evals/sandbox/capabilities.ts#detectSandboxCapabilities',
+	'src/evals/sandbox/capabilities.ts#evaluateSafetyOracles',
 	'src/conversation/actions.ts#parseActions',
 	'src/conversation/actions.ts#Action',
 ]);
