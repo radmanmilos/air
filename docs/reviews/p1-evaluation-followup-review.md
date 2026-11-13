@@ -1,22 +1,21 @@
 # P1 Evaluation Follow-up Review (P1-03 CI, P1-04/P1-05/P1-06 Investigation)
 
-**Scope:** Verification, ledger correction, and investigation only. No P1-04/P1-05/P1-06 implementation was performed. No source, fixture, or test behavior was changed.
+**Scope:** Verification and investigation record (doc-only reconciliation). Historical P1-03/P1-04/P1-06 investigation snapshots are preserved below; P1-05 now includes a CI-verified fail-closed boundary increment (`02cbaad`) with no sandboxed untrusted execution implemented.
 
 ## 1. Exact repository / commit reviewed
 
 - **Repository:** `https://github.com/radmanmilos/air`
 - **Local checkout:** `E:\GitHub\air`
-- **Branch:** `fix/l0-05-p0-conversation-atomic` (tracks `origin/fix/l0-05-p0-conversation-atomic`) — *Verified by `git branch -vv`/`git status`*.
-- **Local HEAD / PR head:** `42ee626809446d4cd17c44633db890401b2d9688` (`fix(evals): provide authoritative schemas and tool context (P1-03)`) — local == origin == PR #5 head. *Verified by git/GitHub (`gh pr view 5`)*.
-- **PR:** [#5](https://github.com/radmanmilos/air/pull/5) (OPEN, base `main`). *Verified by GitHub*.
-- **`main` HEAD:** `f5e45a345f430b96d66933838944469886879689`. *Verified by git*.
-- **Worktree state (pre-edit):** only untracked `?? .kilo/tmp/`; preserved. Unrelated worktrees present and untouched (`air/run-mw3wal87-imma95`, `air/run-mw4vz2cg-zl4qjp`). *Verified by `git status --short`, `git branch -vv`*.
-- **P1-03 implementation diff reviewed:** commit `42ee626` (14 files: eval runner/contracts/planner/model type/fixtures/tests/dead-code baseline/ledger). *Verified by `git show --name-only` and source inspection*.
+- **Branch:** `fix/l0-05-p0-conversation-atomic` (tracks `origin/fix/l0-05-p0-conversation-atomic`).
+- **Current recorded head (this reconciliation):** `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (`fix(evals): add fail-closed P1-05 safety oracle boundary contract`) — local == origin == PR [#5](https://github.com/radmanmilos/air/pull/5) head (OPEN, draft, base `main`). CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success, 7/7 jobs**. *Verified by git/GitHub CI.*
+- **Prior reviewed head (historical snapshot, sections 2–6/8 baseline):** `42ee626809446d4cd17c44633db890401b2d9688` (P1-03 implementation), CI [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) success, 7/7. Subsequent heads: `1d83ed0` CI [43382851018](https://github.com/radmanmilos/air/actions/runs/43382851018), `f16ee78` CI [43383888852](https://github.com/radmanmilos/air/actions/runs/43383888852).
+- **`main` HEAD:** `f5e45a345f430b96d66933838944469886879689`.
+- **Worktree state:** `.kilo/tmp/` and untracked build artifacts may exist locally; unrelated worktrees preserved. *Verified by preflight.*
 
-## 2. P1-03 exact-SHA CI evidence
+## 2. Exact-SHA CI evidence (P1-03 and P1-05)
 
-- **Exact SHA:** `42ee626809446d4cd17c44633db890401b2d9688`
-- **Workflow run:** [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) — **completed, conclusion: success**. *Verified by GitHub CI (`gh run view`)*.
+### P1-03 implementation (`42ee626809446d4cd17c44633db890401b2d9688`, historical)
+- Run [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) — **completed, success, 7/7 jobs**. *Verified by GitHub CI.*
 
 | Job | Conclusion | URL |
 |---|---|---|
@@ -28,7 +27,20 @@
 | Python worker (windows-latest, 3.14) | success | [131603085381](https://github.com/radmanmilos/air/actions/runs/43339234872/job/131603085381) |
 | Real-binary smoke tests | success | [131604525364](https://github.com/radmanmilos/air/actions/runs/43339234872/job/131604525364) |
 
-**Count:** 7/7 required jobs green for the exact SHA.
+### P1-05 fail-closed boundary contract (`02cbaadf9b03aeec0009315f71d0b69ef44fabcb`)
+- Run [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) — **completed, success, 7/7 jobs**. *Verified by GitHub CI (`gh run view`).*
+
+| Job | Conclusion |
+|---|---|
+| test (ubuntu-24.04, 22) | success |
+| test (windows-latest, 22) | success |
+| Python worker (ubuntu-24.04, 3.12) | success |
+| Python worker (ubuntu-24.04, 3.14) | success |
+| Python worker (windows-latest, 3.12) | success |
+| Python worker (windows-latest, 3.14) | success |
+| Real-binary smoke tests | success |
+
+**Local validation reported for `02cbaad`:** focused eval tests 39 passed; full suite rerun 69 files passed/2 skipped, 430 tests passed/16 skipped (initial run had 1 unrelated e2e timing failure, rerun green); `npm run typecheck`, `npm run typecheck:test`, `npm run lint`, `npm run build`, `npm pack --dry-run`, `python -m ruff check .`, `python -m mypy air_local`, `python -m pytest -q` (102 passed), `git diff --check` passed.
 
 ## 3. P1-03 ledger correction
 
@@ -79,7 +91,7 @@
 - **Typed boundary contract:** `src/evals/sandbox/capabilities.ts` defines explicit oracle statuses (`not_run|unsupported|blocked|timed_out|failed|passed`), per-oracle evidence, platform capability detection, and `evaluateSafetyOracles()` reporting. Exported API baselined in `scripts/check-dead-code.mjs`.
 - **Runner integration:** `src/evals/runner.ts` adds opt-in `--execute-safety-oracles` (default off). Run records include `executeSafetyOracles` and `sandboxCapabilities`; coder/tool-calling/debugging case records include structured `safetyOracles { executed, mode, capabilities, oracles[] }`. Proposal/schema validation remains separate from executed safety/acceptance.
 - **Fail-closed behavior:** by default oracles are `not_run`/`executed:false` (`proposal_only`). When opt-in is requested, capability detection reports required controls unavailable (untrusted patch application, fixture-command sandbox, proposed tool dispatch, filesystem confinement, network isolation) on **Windows/Linux/macOS in this implementation**, so oracles are reported `unsupported`/`executed:false` (`sandbox_attempted`) with reasons/details. No untrusted patches are applied, no fixture commands run, and no proposed tools are dispatched.
-- **Tests (focused, locally run):** `tests/evals/sandbox-capabilities.test.ts` (5) verifies default fail-closed, opt-in still unsupported, truthful statuses, and proposal-validation separation; existing eval suites updated-compatible (`tests/evals/runner.test.ts`, fixtures/schema/tool/workspace) all passed in focused run (39 tests total). No real OS-enforced execution path is claimed or exercised.
+- **Tests/evidence:** focused `tests/evals/sandbox-capabilities.test.ts` (5) plus existing eval suites updated-compatible (39 passed locally). Local full rerun reported: 69 files passed/2 skipped, 430 tests passed/16 skipped (initial run had 1 unrelated e2e timing failure, rerun green); checklist commands passed per report. Exact-SHA CI for `02cbaad`: [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success, 7/7 jobs**. No real OS-enforced execution path is claimed or exercised.
 
 ### 7.2 Threat model (concise)
 
