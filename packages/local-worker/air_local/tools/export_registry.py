@@ -30,6 +30,7 @@ def _install_import_stubs() -> None:
     """
     if "requests" not in sys.modules:
         requests_stub = types.ModuleType("requests")
+        req: Any = requests_stub
 
         class _RequestException(Exception):
             pass
@@ -40,15 +41,16 @@ def _install_import_stubs() -> None:
         class _Timeout(_RequestException):
             pass
 
-        requests_stub.RequestException = _RequestException
-        requests_stub.ConnectionError = _ConnectionError
-        requests_stub.Timeout = _Timeout
-        requests_stub.get = lambda *args, **kwargs: None
-        requests_stub.post = lambda *args, **kwargs: None
+        req.RequestException = _RequestException
+        req.ConnectionError = _ConnectionError
+        req.Timeout = _Timeout
+        req.get = lambda *args, **kwargs: None
+        req.post = lambda *args, **kwargs: None
         sys.modules["requests"] = requests_stub
 
     if "yaml" not in sys.modules:
         yaml_stub = types.ModuleType("yaml")
+        yml: Any = yaml_stub
 
         def _safe_load(*_args: Any, **_kwargs: Any) -> Any:
             return {}
@@ -56,8 +58,8 @@ def _install_import_stubs() -> None:
         def _safe_dump(*_args: Any, **_kwargs: Any) -> str:
             return ""
 
-        yaml_stub.safe_load = _safe_load
-        yaml_stub.safe_dump = _safe_dump
+        yml.safe_load = _safe_load
+        yml.safe_dump = _safe_dump
         sys.modules["yaml"] = yaml_stub
 
 
