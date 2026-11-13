@@ -71,6 +71,26 @@ describe('evaluation prompt and scoring helpers', () => {
     expect(prompt).not.toContain('falsePositiveControl');
   });
 
+  it('recursively sanitizes hidden oracle fields and redacts secret-like fixture text in model payloads (P1-04/P2-03)', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const messages = buildEvalMessages('summarizer', {
+      id: 'S04',
+      input: 'Summarize this ' + secret,
+      messages: [{ role: 'user', content: 'token ' + secret }],
+      required: ['must redact'],
+      forbidden: [secret],
+      nested: { oracle: 'hidden', expected: { severity: 'high' }, note: 'has ' + secret },
+    } as any);
+    const prompt = messages.map((m) => m.content).join('\n');
+    expect(prompt).toContain('[REDACTED]');
+    expect(prompt).not.toContain(secret);
+    expect(prompt).not.toContain('"oracle"');
+    expect(prompt).not.toContain('"expected"');
+    expect(prompt).not.toContain('"required"');
+    expect(prompt).not.toContain('"forbidden"');
+    expect(prompt).not.toContain('"severity"');
+  });
+
   it('includes copied workspace files for coder prompts but not expected file lists', () => {
     const messages = buildEvalMessages('coder', {
       id: 'K01',

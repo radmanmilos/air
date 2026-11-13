@@ -270,16 +270,20 @@ export class OllamaProvider implements ModelProvider {
   }
 
   async health(options: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<ProviderHealth> {
+    const timeoutMs = options.timeoutMs ?? 5000;
     try {
       const raw = await this.request<Record<string, unknown>>(
         '/api/version',
         { method: 'GET' },
-        options.timeoutMs,
+        timeoutMs,
         options.signal,
       );
       return { provider: this.id, online: true, version: stringValue(raw.version) };
     } catch (error) {
-      if (error instanceof ModelProviderError && error.code === 'PROVIDER_UNAVAILABLE') {
+      if (
+        error instanceof ModelProviderError &&
+        (error.code === 'PROVIDER_UNAVAILABLE' || error.code === 'TIMEOUT')
+      ) {
         return { provider: this.id, online: false };
       }
       throw error;
@@ -366,6 +370,16 @@ export class OllamaProvider implements ModelProvider {
     if (message.name) result.name = message.name;
     if (message.images) result.images = message.images;
     if (message.toolCallId) result.tool_call_id = message.toolCallId;
+    if (message.role === 'assistant' && Array.isArray(message.toolCalls) && message.toolCalls.length > 0) {
+      result.tool_calls = message.toolCalls.map((call) => ({
+        ...(call.id ? { id: call.id } : {}),
+        type: 'function',
+        function: {
+          name: call.function.name,
+          arguments: call.function.arguments,
+        },
+      }));
+    }
     return result;
   }
 

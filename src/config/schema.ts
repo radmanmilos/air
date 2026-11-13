@@ -27,7 +27,18 @@ const RoleAssignmentSchema = z.object({
 
 const ProviderSettingsSchema = z.object({
   enabled: z.boolean().default(true),
-  baseUrl: z.string().url().default('http://127.0.0.1:11434'),
+  baseUrl: z.string().url().refine((value) => {
+    try {
+      const parsed = new URL(value);
+      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+        parsed.username.length === 0 &&
+        parsed.password.length === 0 &&
+        parsed.search.length === 0 &&
+        parsed.hash.length === 0;
+    } catch {
+      return false;
+    }
+  }, 'Ollama base URL must be an absolute HTTP(S) URL without credentials, query, or fragment').default('http://127.0.0.1:11434'),
 });
 
 const DEFAULT_MODEL_ROLES = {

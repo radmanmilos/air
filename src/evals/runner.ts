@@ -12,6 +12,7 @@ import { PLANNER_JSON_SCHEMA } from './contracts/planner';
 import { EVAL_TOOL_DEFINITIONS } from './contracts/tools';
 import { detectSandboxCapabilities, evaluateSafetyOracles } from './sandbox/capabilities';
 import type { EvalToolProposalValidation } from './sandbox/capabilities';
+import { redact } from '../security/redact';
 
 const EVAL_SUITES = [
   'coordinator', 'planner', 'tool-calling', 'coder',
@@ -90,7 +91,8 @@ const HIDDEN_ORACLE_FIELDS = [
   'oracle', 'expectedAction', 'expectedTool', 'policyOracle',
   'expectedRootCause', 'requiredRepair', 'expectedFinding',
   'falsePositiveControl', 'expectedRelevantDocIds', 'required',
-  'forbidden', 'expectedFiles',
+  'forbidden', 'expectedFiles', 'expected', 'rubric', 'scoring',
+  'gold', 'label', 'labels', 'severity', 'seeded',
 ] as const;
 
 const SYSTEM_PROMPTS: Record<Exclude<EvalSuite, 'embeddings'>, string> = {
@@ -195,10 +197,25 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function sanitizeValue(value: unknown, depth = 0): unknown {
+  if (depth > 8 || value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, depth + 1));
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(record)) {
+      if ((HIDDEN_ORACLE_FIELDS as readonly string[]).includes(key)) continue;
+      if (key === 'workspace') continue;
+      out[key] = sanitizeValue(child, depth + 1);
+    }
+    return out;
+  }
+  if (typeof value === 'string') return redact(value);
+  return value;
+}
+
 function sanitizeFixtureCase(fixture: EvalFixtureCase): Record<string, unknown> {
-  const sanitized: Record<string, unknown> = { ...fixture };
-  for (const key of HIDDEN_ORACLE_FIELDS) delete sanitized[key];
-  delete sanitized.workspace;
+  const sanitized = sanitizeValue({ ...fixture }) as Record<string, unknown>;
   return sanitized;
 }
 
@@ -235,9 +252,12 @@ export function buildEvalMessages(
   if (suite === 'tool-calling') {
     payload.availableTools = EVAL_TOOL_DEFINITIONS.map((t) => ({ name: t.function.name, description: t.function.description, parameters: t.function.parameters }));
   }
+  const task = typeof (asString(fixture.input) ?? asString(fixture.query)) === 'string'
+    ? String(sanitizeValue(asString(fixture.input) ?? asString(fixture.query) ?? ''))
+    : '';
   const userPayload: Record<string, unknown> = {
     caseId: fixture.id,
-    task: asString(fixture.input) ?? asString(fixture.query) ?? '',
+    task,
     payload,
   };
   if (contract.schemaName && contract.schemaHash) {
