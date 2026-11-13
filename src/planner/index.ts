@@ -1,39 +1,78 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 export const WorkItemSchema = z.object({
-  id: z.string(),
-  objective: z.string(),
+  id: z.string().min(1).max(64),
+  objective: z.string().min(1).max(500),
   taskType: z.enum(['code_edit','code_review','explain','research','summarize','plan','test','other']),
   readOnly: z.boolean(),
   requiresWrite: z.boolean(),
   requiresCode: z.boolean(),
-  dependsOn: z.array(z.string()),
-  acceptanceCriteria: z.array(z.string()),
+  dependsOn: z.array(z.string().min(1).max(64)).max(16),
+  acceptanceCriteria: z.array(z.string().min(1).max(300)).min(1).max(16),
 });
 
-export const PlanSchema = z.object({ workItems: z.array(WorkItemSchema) });
-
-export function validatePlan(plan: Plan): Plan {
-  return PlanSchema.parse(plan) as Plan;
-}
-// Turns a user request into a small typed work graph using front-agent
-// hints + light heuristics. No heavy LLM classifier.
+export const PlanSchema = z.object({ workItems: z.array(WorkItemSchema).min(1).max(32) });
 
 export type TaskType = 'code_edit' | 'code_review' | 'explain' | 'research' | 'summarize' | 'plan' | 'test' | 'other';
+export type WorkItem = z.infer<typeof WorkItemSchema>;
+export type Plan = z.infer<typeof PlanSchema>;
 
-export interface WorkItem {
-  id: string;
-  objective: string;
-  taskType: TaskType;
-  readOnly: boolean;
-  requiresWrite: boolean;
-  requiresCode: boolean;
-  dependsOn: string[];
-  acceptanceCriteria: string[];
+export interface PlanValidationResult {
+  valid: boolean;
+  plan?: Plan;
+  errors: string[];
 }
 
-export interface Plan {
-  workItems: WorkItem[];
+function hasCycle(items: WorkItem[]): boolean {
+  const deps = new Map(items.map((i) => [i.id, i.dependsOn]));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string): boolean => {
+    if (visited.has(id)) return false;
+    if (visiting.has(id)) return true;
+    visiting.add(id);
+    for (const dep of deps.get(id) ?? []) {
+      if (visit(dep)) return true;
+    }
+    visiting.delete(id);
+    visited.add(id);
+    return false;
+  };
+  for (const id of deps.keys()) if (visit(id)) return true;
+  return false;
+}
+
+export function validatePlanDetailed(input: unknown): PlanValidationResult {
+  const parsed = PlanSchema.safeParse(input);
+  if (!parsed.success) {
+    return { valid: false, errors: parsed.error.issues.map((i) => `${i.path.join('.') || 'plan'}: ${i.message}`) };
+  }
+  const plan = parsed.data;
+  const errors: string[] = [];
+  const ids = plan.workItems.map((w) => w.id);
+  const idSet = new Set(ids);
+  if (idSet.size !== ids.length) errors.push('duplicate work item ids');
+  const known = idSet;
+  let totalDeps = 0;
+  for (const item of plan.workItems) {
+    if (item.dependsOn.includes(item.id)) errors.push(`self-dependency: ${item.id}`);
+    for (const dep of item.dependsOn) {
+      if (!known.has(dep)) errors.push(`unknown dependency: ${item.id} -> ${dep}`);
+    }
+    totalDeps += item.dependsOn.length;
+  }
+  if (totalDeps > 64) errors.push('dependency count exceeds limit');
+  if (hasCycle(plan.workItems)) errors.push('dependency cycle detected');
+  if (errors.length > 0) return { valid: false, errors };
+  return { valid: true, plan, errors: [] };
+}
+
+export function validatePlan(plan: Plan): Plan {
+  const result = validatePlanDetailed(plan);
+  if (!result.valid || !result.plan) {
+    throw new Error(result.errors.join('; ') || 'invalid plan');
+  }
+  return result.plan;
 }
 
 export interface PlanHints {

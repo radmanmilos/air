@@ -1,13 +1,15 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+﻿import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildEvalMessages,
+  buildEvalChatRequest,
   cosineSimilarity,
   parseEvalArgs,
   rankTopDocuments,
   runEvaluation,
+  validateToolCallProposal,
   type EvalRunnerOptions,
 } from '../../src/evals/runner';
 import type { ModelChatRequest, ModelChatResponse, ModelDescriptor, ModelEmbeddingRequest, ModelEmbeddingResponse, ProviderHealth, RunningModelDescriptor } from '../../src/models/types';
@@ -196,6 +198,49 @@ describe('evaluation runner execution boundary', () => {
       expect(provider.chat).not.toHaveBeenCalled();
     } finally {
       await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+
+describe('P1-03 evaluation request integrity', () => {
+  it('supplies ActionSchema format for coordinator requests', () => {
+    const msgs = buildEvalMessages('coordinator', { id: 'C01', input: 'Explain promises', expectedAction: 'answer' });
+    const req = buildEvalChatRequest('coordinator', 'm', msgs, 8192, 1000);
+    expect(req.format).toBeDefined();
+    expect(JSON.stringify(req.format)).toContain('"answer"');
+    expect(JSON.stringify(msgs)).not.toContain('"expectedAction"');
+  });
+
+  it('supplies PlanSchema format for planner requests', () => {
+    const msgs = buildEvalMessages('planner', { id: 'P01', input: 'Plan x', oracle: ['x'] });
+    const req = buildEvalChatRequest('planner', 'm', msgs, 8192, 1000);
+    expect(req.format).toBeDefined();
+    expect(JSON.stringify(req.format)).toContain('workItems');
+    expect(JSON.stringify(msgs)).not.toContain('"oracle"');
+  });
+
+  it('supplies actual tool definitions for tool-calling requests and hides expected tool', () => {
+    const msgs = buildEvalMessages('tool-calling', { id: 'T01', input: 'Read src/index.ts', expectedTool: 'read_file', policyOracle: 'allow' });
+    const req = buildEvalChatRequest('tool-calling', 'm', msgs, 8192, 1000);
+    expect(Array.isArray(req.tools)).toBe(true);
+    expect(req.tools?.some((t) => t.function.name === 'read_file')).toBe(true);
+    const prompt = msgs.map((m) => m.content).join('\n');
+    expect(prompt).toContain('read_file');
+    expect(prompt).not.toContain('expectedTool');
+    expect(prompt).not.toContain('policyOracle');
+  });
+
+  it('does not leak reviewer oracle labels in real fixture prompts', async () => {
+    const raw = await readFile(join(process.cwd(), 'tests', 'evals', 'fixtures', 'reviewer.json'), 'utf8');
+    const catalog = JSON.parse(raw) as { cases: Array<{ id: string; input: string; expectedFinding?: unknown }> };
+    for (const fixture of catalog.cases) {
+      const msgs = buildEvalMessages('reviewer', fixture as any);
+      const prompt = msgs.map((m) => m.content).join('\n');
+      expect(prompt).not.toMatch(/Seeded critical|Seeded high|Seeded medium|Clean control/i);
+      expect(prompt).not.toContain('expectedFinding');
+      expect(prompt).not.toContain('falsePositiveControl');
+      expect(prompt).not.toContain('"oracle"');
     }
   });
 });

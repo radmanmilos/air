@@ -16,7 +16,7 @@ export interface ModelMessage {
   images?: string[];
 }
 
-interface ModelToolDefinition {
+export interface ModelToolDefinition {
   type: 'function';
   function: {
     name: string;

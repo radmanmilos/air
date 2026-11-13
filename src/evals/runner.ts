@@ -1,12 +1,15 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID, createHash } from 'node:crypto';
 import { appendFile, mkdir, readFile, readdir } from 'node:fs/promises';
 import { arch, cpus, hostname, platform, release, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { OllamaProvider } from '../models/providers/ollama';
 import { ModelProviderError } from '../models/types';
-import type { ModelDescriptor, ModelMessage, RunningModelDescriptor } from '../models/types';
+import type { ModelChatRequest, ModelDescriptor, ModelMessage, ModelToolCall, ModelToolDefinition, RunningModelDescriptor } from '../models/types';
 import type { ModelProvider } from '../models/providers/provider';
+import { ACTION_JSON_SCHEMA } from './contracts/coordinator';
+import { PLANNER_JSON_SCHEMA } from './contracts/planner';
+import { EVAL_TOOL_DEFINITIONS } from './contracts/tools';
 
 const EVAL_SUITES = [
   'coordinator', 'planner', 'tool-calling', 'coder',
@@ -63,9 +66,9 @@ const HIDDEN_ORACLE_FIELDS = [
 ] as const;
 
 const SYSTEM_PROMPTS: Record<Exclude<EvalSuite, 'embeddings'>, string> = {
-  coordinator: 'You are being evaluated as AIR coordinator. Return one candidate typed action as JSON. Do not execute actions, call tools, change permissions, or claim that work was performed.',
-  planner: 'You are being evaluated as AIR planner. Return a bounded JSON work plan with stable item IDs, dependencies and acceptance criteria. Do not execute tasks or bypass deterministic validation.',
-  'tool-calling': 'You are being evaluated for tool selection. Return JSON naming the best registered tool and its arguments. Do not invoke the tool or claim it ran.',
+  coordinator: 'You are being evaluated as AIR coordinator. Return one candidate typed action as JSON matching the provided schema. Do not execute actions, call tools, change permissions, or claim that work was performed.',
+  planner: 'You are being evaluated as AIR planner. Return a bounded JSON work plan matching the provided schema with stable item IDs, dependencies and acceptance criteria. Do not execute tasks or bypass deterministic validation.',
+  'tool-calling': 'You are being evaluated for tool selection. Choose the best registered tool and provide its arguments. Do not invoke the tool or claim it ran. If no tool is appropriate, respond without a tool call.',
   coder: 'You are being evaluated as a coding model. Return a minimal unified diff for the supplied workspace. Do not execute commands, apply the diff, or claim tests passed.',
   debugging: 'You are being evaluated as a debugging model. Diagnose only from supplied evidence, distinguish facts from hypotheses, and propose the smallest safe repair. Ask for missing evidence rather than inventing it.',
   reviewer: 'You are being evaluated as an advisory code reviewer. Return structured findings with severity and exact evidence. Do not modify task state, permissions, files, or success status.',
@@ -95,7 +98,7 @@ const HELP = [
   '  --help                    Show this help',
   '',
   'The runner never downloads models. Missing model tags fail with an actionable error.',
-  'Generation suites store raw proposals; they do not execute tool calls or apply code patches.',
+  'Generation suites store raw proposals and deterministic validation metadata; they do not execute tool calls, apply code patches, or run fixture commands.',
 ].join('\n');
 
 export function evalHelp(): string {
@@ -163,21 +166,73 @@ function sanitizeFixtureCase(fixture: EvalFixtureCase): Record<string, unknown> 
   return sanitized;
 }
 
+function stableHash(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+export function suiteContract(suite: Exclude<EvalSuite, 'embeddings'>): {
+  format?: 'json' | Record<string, unknown>;
+  tools?: ModelToolDefinition[];
+  schemaName?: string;
+  schemaHash?: string;
+  toolSetHash?: string;
+} {
+  if (suite === 'coordinator') {
+    return { format: ACTION_JSON_SCHEMA, schemaName: 'ActionSchema', schemaHash: stableHash(ACTION_JSON_SCHEMA) };
+  }
+  if (suite === 'planner') {
+    return { format: PLANNER_JSON_SCHEMA, schemaName: 'PlanSchema', schemaHash: stableHash(PLANNER_JSON_SCHEMA) };
+  }
+  if (suite === 'tool-calling') {
+    return { tools: EVAL_TOOL_DEFINITIONS, schemaName: 'worker-tool-registry', toolSetHash: stableHash(EVAL_TOOL_DEFINITIONS) };
+  }
+  return {};
+}
+
 export function buildEvalMessages(
   suite: Exclude<EvalSuite, 'embeddings'>,
   fixture: EvalFixtureCase,
   workspaceFiles: Record<string, string> = {},
 ): ModelMessage[] {
+  const contract = suiteContract(suite);
+  const payload = sanitizeFixtureCase(fixture);
+  if (suite === 'tool-calling') {
+    payload.availableTools = EVAL_TOOL_DEFINITIONS.map((t) => ({ name: t.function.name, description: t.function.description, parameters: t.function.parameters }));
+  }
   const userPayload: Record<string, unknown> = {
     caseId: fixture.id,
     task: asString(fixture.input) ?? asString(fixture.query) ?? '',
-    payload: sanitizeFixtureCase(fixture),
+    payload,
   };
+  if (contract.schemaName && contract.schemaHash) {
+    userPayload.expectedSchema = { name: contract.schemaName, hash: contract.schemaHash, jsonSchema: contract.format };
+  }
+  if (contract.toolSetHash) {
+    userPayload.toolSet = { name: contract.schemaName, hash: contract.toolSetHash };
+  }
   if (Object.keys(workspaceFiles).length > 0) userPayload.workspaceFiles = workspaceFiles;
   return [
     { role: 'system', content: SYSTEM_PROMPTS[suite] },
     { role: 'user', content: JSON.stringify(userPayload, null, 2) },
   ];
+}
+
+export function buildEvalChatRequest(
+  suite: Exclude<EvalSuite, 'embeddings'>,
+  model: string,
+  messages: ModelMessage[],
+  context: number,
+  timeoutMs: number,
+): ModelChatRequest {
+  const contract = suiteContract(suite);
+  return {
+    model,
+    messages,
+    ...(contract.format ? { format: contract.format } : {}),
+    ...(contract.tools ? { tools: contract.tools } : {}),
+    options: { num_ctx: context, temperature: 0 },
+    timeoutMs,
+  };
 }
 
 export function cosineSimilarity(left: number[], right: number[]): number {
@@ -217,6 +272,29 @@ export function rankTopDocuments(
     }))
     .sort((left, right) => right.score - left.score)
     .slice(0, limit);
+}
+
+export function validateToolCallProposal(
+  toolCall: ModelToolCall | undefined,
+  allowed: ModelToolDefinition[] = EVAL_TOOL_DEFINITIONS,
+): { valid: boolean; reasons: string[] } {
+  if (!toolCall) return { valid: true, reasons: [] };
+  const def = allowed.find((t) => t.function.name === toolCall.function.name);
+  if (!def) return { valid: false, reasons: ['unknown_tool'] };
+  if (toolCall.type !== 'function') return { valid: false, reasons: ['invalid_tool_call_type'] };
+  const params = def.function.parameters as { required?: unknown; properties?: Record<string, unknown> };
+  const required = Array.isArray(params.required) ? params.required.filter((v): v is string => typeof v === 'string') : [];
+  const args = toolCall.function.arguments;
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return { valid: false, reasons: ['arguments_not_object'] };
+  const missing = required.filter((k) => !(k in args));
+  if (missing.length > 0) return { valid: false, reasons: ['missing_required_arguments:' + missing.join(',')] };
+  if (params.properties && typeof params.properties === 'object') {
+    const allowedKeys = new Set(Object.keys(params.properties));
+    const extra = Object.keys(args).filter((k) => !allowedKeys.has(k));
+    // extra keys tolerated by many APIs, but record; not a hard rejection
+    if (extra.length > 0) return { valid: true, reasons: ['extra_arguments:' + extra.join(',')] };
+  }
+  return { valid: true, reasons: [] };
 }
 
 async function readWorkspaceFiles(root: string): Promise<Record<string, string>> {
@@ -289,6 +367,8 @@ async function runGenerationSuite(
   if (options.suite === 'coder' && !dependencies.createWorkspace) {
     throw new Error('Coder evaluation requires the isolated workspace helper');
   }
+  const suite = options.suite as Exclude<EvalSuite, 'embeddings'>;
+  const contract = suiteContract(suite);
   let measured = 0;
   for (const fixture of cases) {
     const workspaceName = asString(fixture.workspace);
@@ -299,29 +379,62 @@ async function runGenerationSuite(
     for (const run of phases) {
       let workspace: EvalWorkspaceLike | undefined;
       try {
+        if (suite === 'planner' && fixture.mode === 'validate') {
+          const { validatePlanDetailed } = await import('../planner');
+          const validation = validatePlanDetailed(fixture.plan);
+          await writeRecord(outputPath, {
+            recordType: 'case',
+            suite: options.suite,
+            caseId: fixture.id,
+            phase: run.phase,
+            repetition: run.repetition,
+            promptVersion: options.promptVersion,
+            contextTokens: options.context,
+            provider: provider.id,
+            model: options.model,
+            durationMs: 0,
+            output: null,
+            toolCalls: [],
+            finishReason: null,
+            usage: null,
+            tokensPerSecond: null,
+            timing: null,
+            rssBeforeBytes: process.memoryUsage().rss,
+            rssAfterBytes: process.memoryUsage().rss,
+            requestContract: {
+              schemaName: contract.schemaName ?? null,
+              schemaHash: contract.schemaHash ?? null,
+              toolSetHash: contract.toolSetHash ?? null,
+              formatProvided: contract.format !== undefined,
+              toolsProvided: Array.isArray(contract.tools),
+            },
+            deterministicValidation: { mode: 'validate', valid: validation.valid, errors: validation.errors },
+            safetyOracles: { executed: false, reason: 'planner-validator-case-no-model-call' },
+          });
+          if (run.phase === 'measured') measured += 1;
+          continue;
+        }
+
         let workspaceFiles: Record<string, string> = {};
-        if (options.suite === 'coder') {
+        if (suite === 'coder') {
           if (!workspaceName || !dependencies.createWorkspace) {
             throw new Error('Coder case ' + fixture.id + ' has no valid workspace fixture');
           }
           workspace = await dependencies.createWorkspace(workspaceName);
           workspaceFiles = await readWorkspaceFiles(workspace.path);
         }
-        const messages = buildEvalMessages(
-          options.suite as Exclude<EvalSuite, 'embeddings'>,
-          fixture,
-          workspaceFiles,
-        );
+        const messages = buildEvalMessages(suite, fixture, workspaceFiles);
+        const chatRequest = buildEvalChatRequest(suite, options.model, messages, options.context, options.timeoutMs);
         const rssBefore = process.memoryUsage().rss;
         const started = performance.now();
-        const response = await provider.chat({
-          model: options.model,
-          messages,
-          options: { num_ctx: options.context, temperature: 0 },
-          timeoutMs: options.timeoutMs,
-        });
+        const response = await provider.chat(chatRequest);
         const durationMs = performance.now() - started;
         const rssAfter = process.memoryUsage().rss;
+        const firstToolCall = response.message.toolCalls?.[0];
+        const toolProposalValidation = suite === 'tool-calling' ? validateToolCallProposal(firstToolCall) : undefined;
+        const safetyOracles = suite === 'coder' || suite === 'tool-calling'
+          ? { executed: false, reason: 'proposal-only-runner-does-not-execute' }
+          : undefined;
         await writeRecord(outputPath, {
           recordType: 'case',
           suite: options.suite,
@@ -341,6 +454,15 @@ async function runGenerationSuite(
           timing: response.timing ?? null,
           rssBeforeBytes: rssBefore,
           rssAfterBytes: rssAfter,
+          requestContract: {
+            schemaName: contract.schemaName ?? null,
+            schemaHash: contract.schemaHash ?? null,
+            toolSetHash: contract.toolSetHash ?? null,
+            formatProvided: contract.format !== undefined,
+            toolsProvided: Array.isArray(contract.tools),
+          },
+          ...(toolProposalValidation ? { toolProposalValidation } : {}),
+          ...(safetyOracles ? { safetyOracles } : {}),
         });
         if (run.phase === 'measured') measured += 1;
       } finally {
@@ -462,6 +584,7 @@ export async function runEvaluation(
   const outputPath = resolve(options.output ?? defaultOutputPath(options));
   await mkdir(dirname(outputPath), { recursive: true });
   const runId = randomUUID();
+  const contract = options.suite === 'embeddings' ? {} : suiteContract(options.suite as Exclude<EvalSuite, 'embeddings'>);
   await writeRecord(outputPath, {
     recordType: 'run',
     schemaVersion: 1,
@@ -487,6 +610,13 @@ export async function runEvaluation(
     host: hostMetadata(),
     gpuVramBytes: null,
     gpuMetrics: 'unknown',
+    requestContract: {
+      schemaName: contract.schemaName ?? null,
+      schemaHash: contract.schemaHash ?? null,
+      toolSetHash: contract.toolSetHash ?? null,
+      formatProvided: contract.format !== undefined,
+      toolsProvided: Array.isArray(contract.tools),
+    },
   });
 
   const measuredCases = options.suite === 'embeddings'

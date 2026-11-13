@@ -67,6 +67,15 @@ const BASELINE = new Set([
 	'src/contracts/job.ts#JobRequest',
 	'src/contracts/job.ts#JobToolCall',
 	'src/contracts/job.ts#JobResult',
+	// evaluation contracts/helpers (P1-03 schema/tool-context integrity)
+	'src/evals/runner.ts#suiteContract',
+	'src/evals/contracts/coordinator.ts#ACTION_SCHEMA',
+	'src/evals/contracts/coordinator.ts#coordinatorFormat',
+	'src/evals/contracts/planner.ts#PLANNER_SCHEMA',
+	'src/evals/contracts/planner.ts#plannerFormat',
+	'src/evals/contracts/tools.ts#EVAL_TOOL_REGISTRY',
+	'src/conversation/actions.ts#parseActions',
+	'src/conversation/actions.ts#Action',
 ]);
 
 let output = '';

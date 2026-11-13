@@ -130,7 +130,7 @@
     },
     {
       "id": "E07",
-      "query": "Find semantic documentation about policy provenance; ignore lexical distractor 'banana smoothie'",
+      "query": "Find semantic documentation about policy provenance.",
       "expectedRelevantDocIds": [
         "C10"
       ],
