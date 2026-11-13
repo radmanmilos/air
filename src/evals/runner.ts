@@ -368,7 +368,7 @@ async function loadCatalog(suite: EvalSuite): Promise<EvalCatalog> {
   return JSON.parse(await readFile(path, 'utf8')) as EvalCatalog;
 }
 
-async function runGenerationSuite(
+export async function runGenerationSuite(
   options: EvalRunnerOptions,
   catalog: EvalCatalog,
   provider: ModelProvider,

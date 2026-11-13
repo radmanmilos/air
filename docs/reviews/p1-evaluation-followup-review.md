@@ -178,7 +178,7 @@
 | P1-06 planner generation vs validator cases separated | **PASS** | `tests/evals/fixtures/planner.json` modes P01–P06 generate, P07–P12 validate (Verified). |
 | P1-06 invalid plans validated via `validatePlanDetailed()` without model call | **PASS** | `src/evals/runner.ts` validate-mode path + deterministic validation (Verified by source). |
 | P1-06 duplicate/unknown/self/cycle/limits/criteria/bounds covered | **PASS** | Fixture cases P07–P12, `tests/evals/schema-contracts.test.ts`, `src/planner/index.ts` (Verified by tests/source). |
-| P1-06 explicit runner-level proof that validate cases make zero model calls | **PARTIAL** | Control flow prevents chat call; no dedicated test asserting zero provider invocations for validate case found (Verified by inspection). |
+| P1-06 explicit runner-level proof that validate cases make zero model calls | **PASS** (for audited runner-path criterion) | `tests/evals/runner.test.ts` ("P1-06 planner validate cases (runner-level)") exercises `runGenerationSuite` with a throwing `provider.chat` spy over planner `mode:"validate"` cases (one valid bounded plan, one invalid self-dependency): asserts zero `provider.chat` calls, deterministic `validatePlanDetailed()` outcomes/metadata recorded (`mode:"validate"`, valid/invalid with expected errors), `safetyOracles { executed:false, reason:"planner-validator-case-no-model-call" }`, and request contract metadata. Focused run: 14/14 in runner suite; relevant eval suite `npx vitest run tests/evals tests/planner-compiler.test.ts tests/models` 59/59. (Verified by tests/source.) |
 | P1-07 Ollama assistant tool-call request/response contract | **FAIL** (open, not changed) | Still open per ledger/review; out of scope (Reported by prior review/ledger). |
 | P2-01/P2-02/P2-03 and L3/L4 | **NOT CHANGED** | Open/blocked per ledger; unchanged in this task (Verified). |
 
@@ -190,7 +190,7 @@
    - *Depends on:* none. *Unit:* add automated parity check (generated shared contract from `packages/local-worker/air_local/tools` or normalized snapshot + TS comparison test) and document hash semantics. *Evidence needed:* CI test proves parity or fails on drift.
 
 2. **P1-06 hardening (small).**
-   - *Depends on:* none. *Unit:* add runner-level test asserting planner `mode:"validate"` performs no `provider.chat` and records deterministic validation/safety markers; adjust docs if needed.
+   - *Depends on:* none. *Status:* runner-level no-model-call criterion now evidenced by `tests/evals/runner.test.ts` (P1-06 planner validate cases). Remaining: keep evidence current; no broader P1-06 completion claimed beyond audited criteria.
 
 3. **P1-04 residual confidence (if required by review).**
    - *Depends on:* none. *Unit:* extend reviewer prompt-leak tests to all nested/text fields and add fixture-lint guard; optional rubric/fixture-count note (no oracle leakage regressions).
@@ -213,4 +213,4 @@
 ## 11. Confirmation
 
 - **P1-07, P2, and L3/L4 were not changed** by this documentation-only reconciliation. Ledger preserves their open/blocked status. **P1-05: PARTIAL / NOT DONE. L0-05: IN_PROGRESS. L3/L4: BLOCKED.** No OS-enforced sandbox or untrusted patch/command/tool execution is implemented; P1-05 execution oracles have not been run. P1-03 registry-parity and proposal-validator limitations remain open.
-- **This documentation-only task did not add further runtime implementation.** The P1-05 fail-closed contract was implemented in `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944), 7/7). Latest documentation/branch SHA before this correction: `4bd48db041a3b01c7251ceab7055264ffff5a8bf` (CI [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962), 7/7). No source, test, fixture, or runtime behavior was modified. Unrelated work (`.kilo/tmp/`, untracked `dist/` artifacts, other worktrees) untouched. *Verified by diff inspection (intended docs only for this correction).*
+- **This reconciliation did not add further runtime implementation.** The P1-05 fail-closed contract was implemented in `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944), 7/7). Latest documentation/branch SHA before this correction: `4bd48db041a3b01c7251ceab7055264ffff5a8bf` (CI [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962), 7/7). No source, test, fixture, or runtime behavior was modified. Unrelated work (`.kilo/tmp/`, untracked `dist/` artifacts, other worktrees) untouched. *Verified by diff inspection (intended docs only for this correction).*
