@@ -237,6 +237,34 @@
 
 **E2E baseline-vs-working-tree comparison (controlled):** target `tests/e2e/scenarios/groups.test.ts > group G: failure and recovery > a hung job is cancelled and leaves no orphans` (chat driver executes `dist/bin/air.js`). **Working tree:** failed (exit 1) — `waitForLine timeout after 20000ms for /Cancelled/` (~33.65s run) with pre-existing modified `dist/*` present (untouched/unrelated). **Baseline clean detached worktree at `e870573` (separate temp checkout, node_modules linked):** passed (exit 0, 1 passed/23 skipped, 4.27s). **Assessment:** failure is not attributable to this increment's staged src/test changes (no cancellation/MCP/orchestrator/conversation modifications); evidence indicates pre-existing local working-tree `dist` drift/environmental sensitivity rather than a regression introduced by this increment. Authoritative result requires clean-checkout/CI execution on the committed SHA.
 
+## 13. E2E cancellation investigation and fix (2026-11-13)
+
+### 13.1 Root cause
+
+The E2E test `tests/e2e/scenarios/groups.test.ts > group G: failure and recovery > a hung job is cancelled and leaves no orphans` failed with `waitForLine timeout after 20000ms for /Cancelled/`. Output showed `air: thinking...` followed by `air: Acknowledged.` instead of `Cancelled`.
+
+**Root cause:** In `bin/air.ts`, the chat REPL's `conv` variable is a closure snapshot that is never updated when `runJob` pushes the job ID to `activeWorkIds` via `mutateConversation`. When the user sends bare `/cancel`, `decide('/cancel', conv)` reads the stale `conv.activeWorkIds` (empty), returns `{ type: 'answer' }` instead of `{ type: 'cancel_job' }`, triggering `brainAnswer` → "thinking..." → "Acknowledged." instead of cancellation.
+
+Additionally, `runJob` pushed `activeWorkIds` only after printing "Started job", creating a race window where `/cancel` could arrive before the push completed.
+
+### 13.2 Fix
+
+1. **Bare `/cancel` handling:** Added direct handling in the `rl.on('line')` callback using `jobHandles` (a `Map` populated before "Started job" is printed) as the source of truth, bypassing the stale `conv.activeWorkIds`. Cancels via `entry.orch.cancel(id)` + `entry.controller.abort()`, cleans up `activeWorkIds`, and prints "Cancelled".
+2. **`runJob` ordering:** Moved `mutateConversation` (push `activeWorkIds`) to before `console.log("Started job")` and reloads `conv` afterward.
+3. **Cleanup:** Added `jobHandles.delete(session.runId)` in the background waiter's `finally` block.
+4. **Decision loop:** Reloads `conv` from disk before calling `decide` to reduce staleness for other commands.
+
+### 13.3 Evidence
+
+- **Before fix:** E2E test failed (timeout after 20s, "thinking..."/"Acknowledged." output).
+- **After fix:** E2E test passes (3.3s, "Cancelled" output, no orphans).
+- **Full suite:** 70 files passed, 2 skipped; 445 tests passed, 16 skipped.
+- **Validation:** typecheck, typecheck:test, lint, build, pack --dry-run, Python worker (ruff/mypy/pytest) all pass.
+
+### 13.4 Scope
+
+This fix addresses the cancellation lifecycle race in the chat REPL. It does not change MCP cancellation (already fixed in P1-01), orchestrator logic, or conversation persistence. The root cause was specific to the chat REPL's stale closure variable.
+
 ## 12. Confirmation
 
 - **P1-05, L3/L4 were not changed** by this increment except preserved status/limitations. **P1-05: PARTIAL / NOT DONE. L0-05: IN_PROGRESS. L3/L4: BLOCKED.** No OS-enforced sandbox or untrusted patch/command/tool execution implemented; proposal-only/fail-closed boundaries preserved.
