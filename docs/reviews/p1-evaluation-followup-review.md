@@ -1,20 +1,21 @@
 # P1 Evaluation Follow-up Review (P1-03 CI, P1-04/P1-05/P1-06 Investigation)
 
-**Scope:** Verification and investigation record (doc-only reconciliation). Historical P1-03/P1-04/P1-06 investigation snapshots are preserved below; P1-05 now includes a CI-verified fail-closed boundary increment (`02cbaad`) with no sandboxed untrusted execution implemented.
+**Scope:** Verification and investigation record (documentation-only reconciliation). Clearly distinguished below: the **P1-05 implementation SHA reviewed** (`02cbaad`), the **latest documentation/branch SHA before this correction** (`4bd48db`, with exact-SHA CI), and historical snapshots with their corresponding CI evidence. P1-05 remains PARTIAL/NOT DONE (fail-closed boundary contract only; no sandboxed untrusted execution implemented).
 
 ## 1. Exact repository / commit reviewed
 
 - **Repository:** `https://github.com/radmanmilos/air`
 - **Local checkout:** `E:\GitHub\air`
-- **Branch:** `fix/l0-05-p0-conversation-atomic` (tracks `origin/fix/l0-05-p0-conversation-atomic`).
-- **Current recorded head (this reconciliation):** `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (`fix(evals): add fail-closed P1-05 safety oracle boundary contract`) — local == origin == PR [#5](https://github.com/radmanmilos/air/pull/5) head (OPEN, draft, base `main`). CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success, 7/7 jobs**. *Verified by git/GitHub CI.*
-- **Prior reviewed head (historical snapshot, sections 2–6/8 baseline):** `42ee626809446d4cd17c44633db890401b2d9688` (P1-03 implementation), CI [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) success, 7/7. Subsequent heads: `1d83ed0` CI [43382851018](https://github.com/radmanmilos/air/actions/runs/43382851018), `f16ee78` CI [43383888852](https://github.com/radmanmilos/air/actions/runs/43383888852).
+- **Branch:** `fix/l0-05-p0-conversation-atomic` (tracks `origin/fix/l0-05-p0-conversation-atomic`), PR [#5](https://github.com/radmanmilos/air/pull/5) (OPEN, draft, base `main`, unmerged). *Verified by GitHub/git preflight.*
+- **P1-05 implementation SHA reviewed (runtime increment):** `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (`fix(evals): add fail-closed P1-05 safety oracle boundary contract`). CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success, 7/7 jobs**. *Verified by GitHub CI.*
+- **Latest documentation/branch SHA before this correction:** `4bd48db041a3b01c7251ceab7055264ffff5a8bf` (`docs(review): record P1-05 fail-closed CI evidence`) — local == origin == PR #5 head before this reconciliation commit. CI [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962) **completed success, 7/7 jobs** for exact SHA `4bd48db`. *Verified by git/GitHub CI.*
+- **Historical snapshots (preserved):** P1-03 implementation `42ee626809446d4cd17c44633db890401b2d9688`, CI [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) success (7/7) — baseline for sections 3–6/8 as recorded; follow-up docs/housekeeping heads `1d83ed0` CI [43382851018](https://github.com/radmanmilos/air/actions/runs/43382851018), `f16ee78` CI [43383888852](https://github.com/radmanmilos/air/actions/runs/43383888852).
 - **`main` HEAD:** `f5e45a345f430b96d66933838944469886879689`.
 - **Worktree state:** `.kilo/tmp/` and untracked build artifacts may exist locally; unrelated worktrees preserved. *Verified by preflight.*
 
-## 2. Exact-SHA CI evidence (P1-03 and P1-05)
+## 2. Exact-SHA CI evidence
 
-### P1-03 implementation (`42ee626809446d4cd17c44633db890401b2d9688`, historical)
+### P1-03 implementation — historical snapshot (`42ee626809446d4cd17c44633db890401b2d9688`)
 - Run [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) — **completed, success, 7/7 jobs**. *Verified by GitHub CI.*
 
 | Job | Conclusion | URL |
@@ -27,7 +28,7 @@
 | Python worker (windows-latest, 3.14) | success | [131603085381](https://github.com/radmanmilos/air/actions/runs/43339234872/job/131603085381) |
 | Real-binary smoke tests | success | [131604525364](https://github.com/radmanmilos/air/actions/runs/43339234872/job/131604525364) |
 
-### P1-05 fail-closed boundary contract (`02cbaadf9b03aeec0009315f71d0b69ef44fabcb`)
+### P1-05 implementation SHA reviewed (`02cbaadf9b03aeec0009315f71d0b69ef44fabcb`)
 - Run [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) — **completed, success, 7/7 jobs**. *Verified by GitHub CI (`gh run view`).*
 
 | Job | Conclusion |
@@ -41,6 +42,19 @@
 | Real-binary smoke tests | success |
 
 **Local validation reported for `02cbaad`:** focused eval tests 39 passed; full suite rerun 69 files passed/2 skipped, 430 tests passed/16 skipped (initial run had 1 unrelated e2e timing failure, rerun green); `npm run typecheck`, `npm run typecheck:test`, `npm run lint`, `npm run build`, `npm pack --dry-run`, `python -m ruff check .`, `python -m mypy air_local`, `python -m pytest -q` (102 passed), `git diff --check` passed.
+
+### Latest documentation/branch SHA before this correction (`4bd48db041a3b01c7251ceab7055264ffff5a8bf`)
+- Run [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962) — **completed, success, 7/7 jobs** (exact SHA `4bd48db`, documentation-only commit). *Verified by GitHub CI (`gh run view`).*
+
+| Job | Conclusion |
+|---|---|
+| test (ubuntu-24.04, 22) | success |
+| test (windows-latest, 22) | success |
+| Python worker (ubuntu-24.04, 3.12) | success |
+| Python worker (ubuntu-24.04, 3.14) | success |
+| Python worker (windows-latest, 3.12) | success |
+| Python worker (windows-latest, 3.14) | success |
+| Real-binary smoke tests | success |
 
 ## 3. P1-03 ledger correction
 
@@ -198,4 +212,5 @@
 
 ## 11. Confirmation
 
-- **P1-07, P2, and L3/L4 were not changed** by this task. Ledger preserves their open/blocked status. No P1-04/P1-05/P1-06 implementation was started. No source/fixture/test runtime behavior was modified. Unrelated work (`.kilo/tmp/`, other worktrees) untouched. *Verified by `git diff --stat`/inspection of edited files (docs only).*
+- **P1-07, P2, and L3/L4 were not changed** by this documentation-only reconciliation. Ledger preserves their open/blocked status. **P1-05: PARTIAL / NOT DONE. L0-05: IN_PROGRESS. L3/L4: BLOCKED.** No OS-enforced sandbox or untrusted patch/command/tool execution is implemented; P1-05 execution oracles have not been run. P1-03 registry-parity and proposal-validator limitations remain open.
+- **This documentation-only task did not add further runtime implementation.** The P1-05 fail-closed contract was implemented in `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944), 7/7). Latest documentation/branch SHA before this correction: `4bd48db041a3b01c7251ceab7055264ffff5a8bf` (CI [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962), 7/7). No source, test, fixture, or runtime behavior was modified. Unrelated work (`.kilo/tmp/`, untracked `dist/` artifacts, other worktrees) untouched. *Verified by diff inspection (intended docs only for this correction).*
