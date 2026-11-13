@@ -26,6 +26,19 @@ export interface EvalSafetyOracleReport {
   oracles: SafetyOracleEvidence[];
 }
 
+export interface EvalToolProposalValidation {
+  valid: boolean;
+  reasons: string[];
+  diagnostics?: Array<{
+    code: string;
+    path: string;
+    tool?: string;
+    expected?: string;
+    actual?: string;
+    message: string;
+  }>;
+}
+
 export function detectSandboxCapabilities(options: { executeSafetyOracles?: boolean } = {}): EvalSandboxCapabilities {
   const executionOptIn = options.executeSafetyOracles === true;
   const reasons: string[] = [];
@@ -66,7 +79,7 @@ export function evaluateSafetyOracles(params: {
   suite: string;
   fixture: Record<string, unknown>;
   capabilities: EvalSandboxCapabilities;
-  toolProposalValidation?: { valid: boolean; reasons: string[] };
+  toolProposalValidation?: EvalToolProposalValidation;
 }): EvalSafetyOracleReport {
   const { suite, fixture, capabilities, toolProposalValidation } = params;
   const mode: EvalSafetyOracleReport['mode'] = capabilities.executionOptIn ? 'sandbox_attempted' : 'proposal_only';

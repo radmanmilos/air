@@ -11,6 +11,7 @@ import { ACTION_JSON_SCHEMA } from './contracts/coordinator';
 import { PLANNER_JSON_SCHEMA } from './contracts/planner';
 import { EVAL_TOOL_DEFINITIONS } from './contracts/tools';
 import { detectSandboxCapabilities, evaluateSafetyOracles } from './sandbox/capabilities';
+import type { EvalToolProposalValidation } from './sandbox/capabilities';
 
 const EVAL_SUITES = [
   'coordinator', 'planner', 'tool-calling', 'coder',
@@ -58,6 +59,28 @@ interface EvalCatalog {
 interface RankedDocument {
   id: string;
   score: number;
+}
+
+type ToolProposalDiagnosticCode =
+  | 'missing_tool_call'
+  | 'malformed_tool_call'
+  | 'unknown_tool'
+  | 'invalid_tool_call_type'
+  | 'arguments_not_object'
+  | 'missing_required'
+  | 'unexpected_property'
+  | 'type_mismatch'
+  | 'invalid_enum'
+  | 'unsupported_schema'
+  | 'invalid_schema';
+
+interface ToolProposalDiagnostic {
+  code: ToolProposalDiagnosticCode | string;
+  path: string;
+  tool?: string;
+  expected?: string;
+  actual?: string;
+  message: string;
 }
 export interface EvalCliHelp {
   help: true;
@@ -287,27 +310,217 @@ export function rankTopDocuments(
     .slice(0, limit);
 }
 
-export function validateToolCallProposal(
-  toolCall: ModelToolCall | undefined,
-  allowed: ModelToolDefinition[] = EVAL_TOOL_DEFINITIONS,
-): { valid: boolean; reasons: string[] } {
-  if (!toolCall) return { valid: true, reasons: [] };
-  const def = allowed.find((t) => t.function.name === toolCall.function.name);
-  if (!def) return { valid: false, reasons: ['unknown_tool'] };
-  if (toolCall.type !== 'function') return { valid: false, reasons: ['invalid_tool_call_type'] };
-  const params = def.function.parameters as { required?: unknown; properties?: Record<string, unknown> };
-  const required = Array.isArray(params.required) ? params.required.filter((v): v is string => typeof v === 'string') : [];
-  const args = toolCall.function.arguments;
-  if (!args || typeof args !== 'object' || Array.isArray(args)) return { valid: false, reasons: ['arguments_not_object'] };
-  const missing = required.filter((k) => !(k in args));
-  if (missing.length > 0) return { valid: false, reasons: ['missing_required_arguments:' + missing.join(',')] };
-  if (params.properties && typeof params.properties === 'object') {
-    const allowedKeys = new Set(Object.keys(params.properties));
-    const extra = Object.keys(args).filter((k) => !allowedKeys.has(k));
-    // extra keys tolerated by many APIs, but record; not a hard rejection
-    if (extra.length > 0) return { valid: true, reasons: ['extra_arguments:' + extra.join(',')] };
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeToolCallObject(raw: unknown): { ok: true; value: Record<string, unknown> } | { ok: false; diagnostic: ToolProposalDiagnostic } {
+  if (!isPlainObject(raw)) {
+    return { ok: false, diagnostic: { code: 'malformed_tool_call', path: '$', expected: 'object', actual: Array.isArray(raw) ? 'array' : typeof raw, message: 'Tool call must be an object' } };
   }
-  return { valid: true, reasons: [] };
+  if (!Object.prototype.hasOwnProperty.call(raw, 'type') || !Object.prototype.hasOwnProperty.call(raw, 'function')) {
+    return { ok: false, diagnostic: { code: 'malformed_tool_call', path: '$', expected: '{type:"function",function:{name,arguments}}', actual: 'object', message: 'Tool call must include type and function' } };
+  }
+  return { ok: true, value: raw };
+}
+
+function summarizeActual(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number';
+  return typeof value;
+}
+
+function typeMatches(type: unknown, value: unknown): boolean | 'unsupported' {
+  if (Array.isArray(type)) {
+    let sawSupported = false;
+    for (const entry of type) {
+      const result = typeMatches(entry, value);
+      if (result === true) return true;
+      if (result === false) sawSupported = true;
+    }
+    return sawSupported ? false : 'unsupported';
+  }
+  if (typeof type !== 'string') return 'unsupported';
+  switch (type) {
+    case 'string': return typeof value === 'string';
+    case 'boolean': return typeof value === 'boolean';
+    case 'integer': return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value);
+    case 'number': return typeof value === 'number' && Number.isFinite(value);
+    case 'object': return isPlainObject(value);
+    case 'array': return Array.isArray(value);
+    case 'null': return value === null;
+    default: return 'unsupported';
+  }
+}
+
+const SUPPORTED_SCHEMA_KEYS = new Set([
+  'type', 'properties', 'required', 'additionalProperties', 'items', 'enum', 'description', 'default', 'title',
+]);
+
+function schemaIssue(schema: unknown): string | null {
+  if (!isPlainObject(schema)) return 'schema_not_object';
+  for (const key of Object.keys(schema)) {
+    if (!SUPPORTED_SCHEMA_KEYS.has(key)) return 'unsupported_schema_keyword:' + key;
+  }
+  if ('type' in schema) {
+    const t = schema.type;
+    const allowed = new Set(['string', 'boolean', 'integer', 'number', 'object', 'array', 'null']);
+    if (typeof t === 'string') {
+      if (!allowed.has(t)) return 'unsupported_schema_type:' + t;
+    } else if (Array.isArray(t)) {
+      if (t.length === 0 || t.some((v) => typeof v !== 'string' || !allowed.has(v))) return 'unsupported_schema_type';
+    } else {
+      return 'invalid_schema_type';
+    }
+  }
+  if ('required' in schema && (!Array.isArray(schema.required) || schema.required.some((v) => typeof v !== 'string'))) return 'invalid_required';
+  if ('properties' in schema && !isPlainObject(schema.properties)) return 'invalid_properties';
+  if ('additionalProperties' in schema && typeof schema.additionalProperties !== 'boolean' && !isPlainObject(schema.additionalProperties)) return 'unsupported_additionalProperties';
+  if ('items' in schema && !(isPlainObject(schema.items) || Array.isArray(schema.items))) return 'unsupported_items';
+  if ('enum' in schema && !Array.isArray(schema.enum)) return 'invalid_enum';
+  return null;
+}
+
+// Intentionally no value preview in diagnostics to avoid leaking large argument values or secrets.
+
+function validateAgainstSchema(value: unknown, schema: unknown, path: string, toolName: string, diagnostics: ToolProposalDiagnostic[]): void {
+  if (diagnostics.length > 0) return;
+  const issue = schemaIssue(schema);
+  if (issue) {
+    diagnostics.push({ code: issue.startsWith('unsupported') ? 'unsupported_schema' : 'invalid_schema', path, tool: toolName, expected: 'supported schema', actual: issue, message: 'Schema cannot be safely evaluated: ' + issue });
+    return;
+  }
+  const s = schema as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(s, 'enum')) {
+    const allowed = s.enum as unknown[];
+    const matched = allowed.some((item) => Object.is(item, value));
+    if (!matched) {
+      diagnostics.push({ code: 'invalid_enum', path, tool: toolName, expected: 'one of allowed enum values', actual: summarizeActual(value), message: 'Value is not in enum' });
+      return;
+    }
+  }
+
+  if ('type' in s) {
+    const match = typeMatches(s.type, value);
+    if (match === 'unsupported') {
+      diagnostics.push({ code: 'unsupported_schema', path, tool: toolName, expected: 'supported JSON Schema type', actual: String(s.type), message: 'Schema type cannot be safely evaluated' });
+      return;
+    }
+    if (match === false) {
+      diagnostics.push({ code: 'type_mismatch', path, tool: toolName, expected: Array.isArray(s.type) ? s.type.join('|') : String(s.type), actual: summarizeActual(value), message: 'Value has incorrect type' });
+      return;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    if (Object.prototype.hasOwnProperty.call(s, 'items')) {
+      const items = s.items;
+      if (Array.isArray(items)) {
+        diagnostics.push({ code: 'unsupported_schema', path: path + '.items', tool: toolName, expected: 'single items schema', actual: 'tuple', message: 'Tuple item schemas are not supported' });
+        return;
+      }
+      for (let i = 0; i < value.length; i++) {
+        validateAgainstSchema(value[i], items, path + '[' + i + ']', toolName, diagnostics);
+        if (diagnostics.length > 0) return;
+      }
+    }
+    return;
+  }
+
+  if (isPlainObject(value)) {
+    const properties = isPlainObject(s.properties) ? s.properties : {};
+    const required = Array.isArray(s.required) ? s.required.filter((v): v is string => typeof v === 'string') : [];
+    for (const key of required) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) {
+        diagnostics.push({ code: 'missing_required', path: path + '.' + key, tool: toolName, expected: 'required property', actual: 'missing', message: 'Missing required property "' + key + '"' });
+        return;
+      }
+    }
+    for (const [key, propValue] of Object.entries(value)) {
+      const childPath = path + '.' + key;
+      if (Object.prototype.hasOwnProperty.call(properties, key)) {
+        validateAgainstSchema(propValue, properties[key], childPath, toolName, diagnostics);
+        if (diagnostics.length > 0) return;
+        continue;
+      }
+      const additional = s.additionalProperties;
+      if (additional === false) {
+        diagnostics.push({ code: 'unexpected_property', path: childPath, tool: toolName, expected: 'declared property', actual: 'undeclared', message: 'Property "' + key + '" is not allowed by schema' });
+        return;
+      }
+      if (isPlainObject(additional)) {
+        validateAgainstSchema(propValue, additional, childPath, toolName, diagnostics);
+        if (diagnostics.length > 0) return;
+        continue;
+      }
+      // additionalProperties true/omitted => allowed for declared schema features
+    }
+  }
+}
+
+export function validateToolCallProposal(
+  toolCall: ModelToolCall | undefined | unknown,
+  allowed: ModelToolDefinition[] = EVAL_TOOL_DEFINITIONS,
+): EvalToolProposalValidation & { diagnostics: ToolProposalDiagnostic[] } {
+  if (toolCall === undefined) return { valid: true, reasons: [], diagnostics: [] };
+  const normalized = normalizeToolCallObject(toolCall);
+  if (!normalized.ok) {
+    return { valid: false, reasons: [normalized.diagnostic.code], diagnostics: [normalized.diagnostic] };
+  }
+  const call = normalized.value as Record<string, unknown>;
+  const type = call.type;
+  if (type !== 'function') {
+    const diagnostic: ToolProposalDiagnostic = { code: 'invalid_tool_call_type', path: '$.type', expected: 'function', actual: typeof type === 'string' ? type : summarizeActual(type), message: 'Tool call type must be "function"' };
+    return { valid: false, reasons: [diagnostic.code], diagnostics: [diagnostic] };
+  }
+  const fn = call.function;
+  if (!isPlainObject(fn)) {
+    const diagnostic: ToolProposalDiagnostic = { code: 'malformed_tool_call', path: '$.function', expected: 'object', actual: summarizeActual(fn), message: 'Tool call function payload must be an object' };
+    return { valid: false, reasons: [diagnostic.code], diagnostics: [diagnostic] };
+  }
+  const toolName = fn.name;
+  if (typeof toolName !== 'string' || toolName.length === 0) {
+    const diagnostic: ToolProposalDiagnostic = { code: 'malformed_tool_call', path: '$.function.name', expected: 'non-empty string', actual: summarizeActual(toolName), message: 'Tool call must specify a function name' };
+    return { valid: false, reasons: [diagnostic.code], diagnostics: [diagnostic] };
+  }
+  const def = allowed.find((t) => t.function.name === toolName);
+  if (!def) {
+    const diagnostic: ToolProposalDiagnostic = { code: 'unknown_tool', path: '$.function.name', tool: toolName, expected: 'registered tool name', actual: toolName, message: 'Tool is not registered' };
+    return { valid: false, reasons: [diagnostic.code], diagnostics: [diagnostic] };
+  }
+  const args = fn.arguments;
+  if (!isPlainObject(args)) {
+    const diagnostic: ToolProposalDiagnostic = { code: 'arguments_not_object', path: '$.function.arguments', tool: toolName, expected: 'object', actual: summarizeActual(args), message: 'Tool arguments must be a JSON object' };
+    return { valid: false, reasons: [diagnostic.code], diagnostics: [diagnostic] };
+  }
+
+  const schema = def.function.parameters;
+  const diagnostics: ToolProposalDiagnostic[] = [];
+  const schemaRootIssue = schemaIssue(schema);
+  if (schemaRootIssue) {
+    diagnostics.push({ code: schemaRootIssue.startsWith('unsupported') ? 'unsupported_schema' : 'invalid_schema', path: '$.function.parameters', tool: toolName, expected: 'supported parameter schema', actual: schemaRootIssue, message: 'Tool parameter schema cannot be safely evaluated: ' + schemaRootIssue });
+  } else {
+    const s = schema as Record<string, unknown>;
+    const rootType = s.type;
+    if (rootType !== 'object' && !(Array.isArray(rootType) && rootType.includes('object') && rootType.length === 1)) {
+      // Only object-shaped argument schemas are meaningful for tool arguments; fail closed for other supported-but-unexpected roots.
+      if (rootType === undefined && (isPlainObject(s.properties) || Array.isArray(s.required))) {
+        // tolerate implicit object schema shape used in practice
+      } else if (rootType !== undefined) {
+        diagnostics.push({ code: 'unsupported_schema', path: '$.function.parameters.type', tool: toolName, expected: 'object', actual: String(rootType), message: 'Tool argument schema root must be an object schema' });
+      }
+    }
+    if (diagnostics.length === 0) {
+      validateAgainstSchema(args, s.type === undefined ? { ...s, type: 'object' } : s, '$.function.arguments', toolName, diagnostics);
+    }
+  }
+
+  if (diagnostics.length > 0) {
+    const reasons = diagnostics.map((d) => d.code + (d.path && d.path !== '$' ? ':' + d.path.replace(/^\$\.function\.arguments\.?/, '') : ''));
+    return { valid: false, reasons, diagnostics };
+  }
+  return { valid: true, reasons: [], diagnostics: [] };
 }
 
 async function readWorkspaceFiles(root: string): Promise<Record<string, string>> {
