@@ -1,1 +1,1 @@
-export { redact, containsSecret, redactEnvContents, type RedactionOptions } from './redact';
+export { redact, containsSecret, redactEnvContents, redactValue, type RedactionOptions } from './redact';

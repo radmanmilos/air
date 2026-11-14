@@ -463,3 +463,13 @@ Copy this into the PR description or update the relevant package entry at the en
 | L9 | — | — | — | — |
 | L10 | — | — | — | — |
 
+
+## Incremental progress note (this session)
+
+- Added recursive secret-redaction helper edactValue to src/security/redact.ts (exported from src/security/index.ts) covering strings, arrays, objects, Error messages/stacks, and malformed/circular values with depth guard.
+- Applied edact() to Ollama provider error messages sourced from response bodies (P2-03).
+- Added regression tests in 	ests/redaction.test.ts (P2-03 recursive/nested/malformed).
+- P1-05 remains PARTIAL/NOT DONE: no OS-enforced sandbox implemented; fail-closed boundary contract retained.
+- P1-04/P1-06/P1-07/P2-01/P2-02 remain PARTIAL per ledger acceptance criteria.
+- L3/L4 remain BLOCKED.
+- Validation: typecheck, typecheck:test, lint, build, pack --dry-run, python ruff/mypy/pytest all pass; full npm test not rerun after this minimal change beyond targeted redaction suite.
