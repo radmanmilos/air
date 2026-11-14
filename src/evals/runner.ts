@@ -11,6 +11,7 @@ import { ACTION_JSON_SCHEMA } from './contracts/coordinator';
 import { PLANNER_JSON_SCHEMA } from './contracts/planner';
 import { EVAL_TOOL_DEFINITIONS } from './contracts/tools';
 import { detectSandboxCapabilities, evaluateSafetyOracles } from './sandbox/capabilities';
+import { executeCoderOracle } from './sandbox/eval-executor';
 import type { EvalToolProposalValidation } from './sandbox/capabilities';
 import { redact } from '../security/redact';
 
@@ -197,16 +198,16 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function sanitizeValue(value: unknown, depth = 0): unknown {
+function sanitizeModelVisibleValue(value: unknown, depth = 0): unknown {
   if (depth > 8 || value === null || value === undefined) return value;
-  if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, depth + 1));
+  if (Array.isArray(value)) return value.map((item) => sanitizeModelVisibleValue(item, depth + 1));
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(record)) {
       if ((HIDDEN_ORACLE_FIELDS as readonly string[]).includes(key)) continue;
       if (key === 'workspace') continue;
-      out[key] = sanitizeValue(child, depth + 1);
+      out[key] = sanitizeModelVisibleValue(child, depth + 1);
     }
     return out;
   }
@@ -215,8 +216,23 @@ function sanitizeValue(value: unknown, depth = 0): unknown {
 }
 
 function sanitizeFixtureCase(fixture: EvalFixtureCase): Record<string, unknown> {
-  const sanitized = sanitizeValue({ ...fixture }) as Record<string, unknown>;
-  return sanitized;
+  return sanitizeModelVisibleValue({ ...fixture }) as Record<string, unknown>;
+}
+
+/** Redact secret-like strings in persisted/diagnostic records without removing evaluation evidence fields. */
+function redactSecretsForRecord(value: unknown, depth = 0): unknown {
+  if (depth > 12 || value === null || value === undefined) return value;
+  if (typeof value === 'string') return redact(value);
+  if (Array.isArray(value)) return value.map((item) => redactSecretsForRecord(item, depth + 1));
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(record)) {
+      out[key] = redactSecretsForRecord(child, depth + 1);
+    }
+    return out;
+  }
+  return value;
 }
 
 function stableHash(value: unknown): string {
@@ -242,6 +258,8 @@ export function suiteContract(suite: Exclude<EvalSuite, 'embeddings'>): {
   return {};
 }
 
+export { redactSecretsForRecord as sanitizeEvalRecordValue };
+
 export function buildEvalMessages(
   suite: Exclude<EvalSuite, 'embeddings'>,
   fixture: EvalFixtureCase,
@@ -253,7 +271,7 @@ export function buildEvalMessages(
     payload.availableTools = EVAL_TOOL_DEFINITIONS.map((t) => ({ name: t.function.name, description: t.function.description, parameters: t.function.parameters }));
   }
   const task = typeof (asString(fixture.input) ?? asString(fixture.query)) === 'string'
-    ? String(sanitizeValue(asString(fixture.input) ?? asString(fixture.query) ?? ''))
+    ? String(sanitizeModelVisibleValue(asString(fixture.input) ?? asString(fixture.query) ?? ''))
     : '';
   const userPayload: Record<string, unknown> = {
     caseId: fixture.id,
@@ -266,7 +284,9 @@ export function buildEvalMessages(
   if (contract.toolSetHash) {
     userPayload.toolSet = { name: contract.schemaName, hash: contract.toolSetHash };
   }
-  if (Object.keys(workspaceFiles).length > 0) userPayload.workspaceFiles = workspaceFiles;
+  if (Object.keys(workspaceFiles).length > 0) {
+    userPayload.workspaceFiles = sanitizeModelVisibleValue(workspaceFiles) as Record<string, string>;
+  }
   return [
     { role: 'system', content: SYSTEM_PROMPTS[suite] },
     { role: 'user', content: JSON.stringify(userPayload, null, 2) },
@@ -573,7 +593,8 @@ function defaultOutputPath(options: EvalRunnerOptions): string {
 }
 
 async function writeRecord(path: string, record: Record<string, unknown>): Promise<void> {
-  await appendFile(path, JSON.stringify(record) + '\n', 'utf8');
+  const sanitized = redactSecretsForRecord(record) as Record<string, unknown>;
+  await appendFile(path, JSON.stringify(sanitized) + '\n', 'utf8');
 }
 
 function hostMetadata(): Record<string, unknown> {
@@ -689,14 +710,51 @@ export async function runGenerationSuite(
           })
           : undefined;
         const legacySafetyExecuted = safetyOracleReport?.oracles.some((o) => o.executed) ?? false;
-        const safetyOracles = safetyOracleReport
+        let safetyOracles = safetyOracleReport
           ? {
-            executed: legacySafetyExecuted,
-            mode: safetyOracleReport.mode,
-            capabilities: safetyOracleReport.capabilities,
-            oracles: safetyOracleReport.oracles,
-          }
+              executed: legacySafetyExecuted,
+              mode: safetyOracleReport.mode,
+              capabilities: safetyOracleReport.capabilities,
+              oracles: safetyOracleReport.oracles,
+            }
           : undefined;
+
+        // Execute coder safety oracle under the OS sandbox when explicitly opted in.
+        if (suite === 'coder' && options.executeSafetyOracles === true && run.phase === 'measured' && workspace) {
+          const command = asString(fixture.command) ?? '';
+          const execResult = await executeCoderOracle({
+            workspacePath: workspace.path,
+            patch: response.message.content ?? '',
+            command,
+            timeoutMs: options.timeoutMs,
+          });
+          const execOracle: { oracle: string; status: string; executed: boolean; reason?: string; details?: Record<string, unknown> } = {
+            oracle: (typeof fixture.oracle === 'string' ? fixture.oracle : 'coder_execution'),
+            status: execResult.executed ? (execResult.passed ? 'passed' : 'failed') : (execResult.reason.startsWith('unsupported') ? 'unsupported' : 'blocked'),
+            executed: execResult.executed && execResult.passed,
+            reason: execResult.reason,
+            details: {
+              exitCode: execResult.exitCode,
+              timedOut: execResult.timedOut,
+              patchApplied: execResult.patchApplied,
+              patchError: execResult.patchError,
+              sandboxMechanism: execResult.sandboxMechanism,
+              sandboxAvailable: execResult.sandboxAvailable,
+            },
+          };
+          if (!safetyOracles) {
+            const detectCaps = dependencies.detectSandboxCapabilities ?? detectSandboxCapabilities;
+            safetyOracles = {
+              executed: execOracle.executed,
+              mode: 'sandbox_attempted',
+              capabilities: detectCaps({ executeSafetyOracles: true }),
+              oracles: [execOracle as any],
+            };
+          } else {
+            safetyOracles.oracles = [...safetyOracles.oracles, execOracle as any];
+            safetyOracles.executed = safetyOracles.executed || execOracle.executed;
+          }
+        }
         await writeRecord(outputPath, {
           recordType: 'case',
           suite: options.suite,

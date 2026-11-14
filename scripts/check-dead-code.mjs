@@ -72,6 +72,8 @@ const BASELINE = new Set([
 	'src/evals/sandbox/os-sandbox.ts#detectPlatform',
 	'src/evals/sandbox/os-sandbox.ts#probeOsSandbox',
 	'src/evals/sandbox/os-sandbox.ts#runOsSandboxed',
+	'src/evals/sandbox/patch-applier.ts#applyUnifiedDiff',
+	'src/evals/sandbox/eval-executor.ts#executeCoderOracle',
 	'src/evals/runner.ts#suiteContract',
 	'src/evals/runner.ts#sanitizeEvalRecordValue',
 	'src/evals/contracts/coordinator.ts#ACTION_SCHEMA',
