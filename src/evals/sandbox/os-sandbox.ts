@@ -8,10 +8,7 @@
 // Application-level allowlists, path checks, or environment filtering are NOT
 // represented as OS sandboxing by this module.
 
-import { execFile, spawn } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import { spawn } from 'node:child_process';
 
 export type OsSandboxPlatform = 'linux' | 'darwin' | 'win32' | 'unsupported';
 
@@ -43,15 +40,6 @@ export function detectPlatform(): OsSandboxPlatform {
   if (process.platform === 'darwin') return 'darwin';
   if (process.platform === 'win32') return 'win32';
   return 'unsupported';
-}
-
-async function probeCommand(command: string, args: string[]): Promise<boolean> {
-  try {
-    await execFileAsync(command, args, { timeout: 5000 });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export async function probeOsSandbox(): Promise<OsSandboxCapability> {
