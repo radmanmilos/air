@@ -57,27 +57,21 @@ async function probeCommand(command: string, args: string[]): Promise<boolean> {
 export async function probeOsSandbox(): Promise<OsSandboxCapability> {
   const platform = detectPlatform();
   if (platform === 'linux') {
-    const available = await probeCommand('unshare', ['--net', 'true']);
     return {
       platform,
-      mechanism: 'unshare --net/--pid/--mount-proc (user namespace)',
-      available,
-      details: available
-        ? 'unshare network namespace probe succeeded'
-        : 'unshare --net probe failed (insufficient privileges or unsupported kernel)',
-      enforced: { filesystem: false, network: available, process: available },
+      mechanism: 'none (Linux sandbox deferred; fail-closed)',
+      available: false,
+      details: 'Linux untrusted execution disabled in this release; deferred to later phase',
+      enforced: { filesystem: false, network: false, process: false },
     };
   }
   if (platform === 'darwin') {
-    const available = await probeCommand('sandbox-exec', ['-p', '(version 1)(allow default)', 'true']);
     return {
       platform,
-      mechanism: 'sandbox-exec (Seatbelt profile)',
-      available,
-      details: available
-        ? 'sandbox-exec probe succeeded'
-        : 'sandbox-exec unavailable or unusable',
-      enforced: { filesystem: true, network: true, process: true },
+      mechanism: 'none (macOS sandbox deferred; fail-closed)',
+      available: false,
+      details: 'macOS untrusted execution disabled in this release; deferred to later phase',
+      enforced: { filesystem: false, network: false, process: false },
     };
   }
   if (platform === 'win32') {
