@@ -1,86 +1,39 @@
-// Brain: front-agent reasoning via kilocode/opencode/ollama CLI.
-// Uses cross-spawn (no shell) to prevent command injection (P-01).
+// Brain: local-first CLI chat answer path (P1-02).
+// External coding CLIs (kilo/opencode) are not invoked from the default answer
+// path to prevent unauthorized data egress. Answers use the configured local
+// Ollama coordinator role (or explicit local AIR_BRAIN_MODEL_OLLAMA override).
 process.noDeprecation = true;
-const KILO_MODEL = process.env.AIR_BRAIN_MODEL || 'kilo/kilo-auto/free';
-const OPENCODE_MODEL = process.env.AIR_BRAIN_MODEL_OPENCODE || 'opencode/glm-5.3-flash-free';
-async function spawnAsync(cmd, args, timeoutMs) {
-    const crossSpawnMod = await import('cross-spawn');
-    const crossSpawn = crossSpawnMod.default || crossSpawnMod;
-    return new Promise((resolve) => {
-        const child = crossSpawn(cmd, args, {
-            stdio: ['ignore', 'pipe', 'pipe'],
-            timeout: timeoutMs,
-        });
-        let stdout = '';
-        child.stdout?.on('data', (d) => { stdout += d.toString(); });
-        child.stderr?.on('data', () => { });
-        const timer = setTimeout(() => {
-            try {
-                child.kill();
-            }
-            catch { /* noop */ }
-            resolve({ stdout, status: null, error: new Error('timeout') });
-        }, timeoutMs);
-        child.on('close', (code) => {
-            clearTimeout(timer);
-            resolve({ stdout, status: code, error: child.error || null });
-        });
-        child.on('error', (err) => {
-            clearTimeout(timer);
-            resolve({ stdout, status: null, error: err });
-        });
-    });
-}
-async function tryKilo(prompt) {
+import { loadConfig } from '../config/loader.js';
+import { resolveModelRole } from '../models/role-resolver.js';
+import { OllamaProvider } from '../models/providers/ollama.js';
+async function tryOllamaCli(prompt, model) {
     try {
-        const r = await spawnAsync('kilo', ['run', '--model', KILO_MODEL, '--format', 'json', prompt], 120000);
-        if (r.error || r.status !== 0)
-            return null;
-        const lines = (r.stdout || '').split('\n').filter(Boolean);
-        const texts = [];
-        for (const line of lines) {
-            try {
-                const obj = JSON.parse(line);
-                if (obj.type === 'text' && obj.part?.text)
-                    texts.push(obj.part.text);
-            }
-            catch { /* skip */ }
-        }
-        const text = texts.join(' ').trim();
-        if (text)
-            return { text, model: KILO_MODEL, provider: 'kilocode' };
-    }
-    catch { /* noop */ }
-    return null;
-}
-async function tryOpencode(prompt) {
-    try {
-        const r = await spawnAsync('opencode', ['run', '--format', 'json', '--model', OPENCODE_MODEL, prompt], 120000);
-        if (r.error || r.status !== 0)
-            return null;
-        const lines = (r.stdout || '').split('\n').filter(Boolean);
-        const texts = [];
-        for (const line of lines) {
-            try {
-                const obj = JSON.parse(line);
-                if (obj.type === 'text' && obj.part?.text)
-                    texts.push(obj.part.text);
-            }
-            catch { /* skip */ }
-        }
-        const text = texts.join(' ').trim();
-        if (text)
-            return { text, model: OPENCODE_MODEL, provider: 'opencode' };
-    }
-    catch { /* noop */ }
-    return null;
-}
-async function tryOllama(prompt) {
-    const model = process.env.AIR_BRAIN_MODEL_OLLAMA;
-    if (!model)
-        return null;
-    try {
-        const r = await spawnAsync('ollama', ['run', model, prompt], 120000);
+        const crossSpawnMod = await import('cross-spawn');
+        const crossSpawn = crossSpawnMod.default || crossSpawnMod;
+        const r = await new Promise((resolve) => {
+            const child = crossSpawn('ollama', ['run', model, prompt], {
+                stdio: ['ignore', 'pipe', 'pipe'],
+                timeout: 120000,
+            });
+            let stdout = '';
+            child.stdout?.on('data', (d) => { stdout += d.toString(); });
+            child.stderr?.on('data', () => { });
+            const timer = setTimeout(() => {
+                try {
+                    child.kill();
+                }
+                catch { /* noop */ }
+                resolve({ stdout, status: null, error: new Error('timeout') });
+            }, 120000);
+            child.on('close', (code) => {
+                clearTimeout(timer);
+                resolve({ stdout, status: code, error: child.error || null });
+            });
+            child.on('error', (err) => {
+                clearTimeout(timer);
+                resolve({ stdout, status: null, error: err });
+            });
+        });
         if (r.error || r.status !== 0)
             return null;
         const text = (r.stdout || '').trim();
@@ -89,6 +42,28 @@ async function tryOllama(prompt) {
     }
     catch { /* noop */ }
     return null;
+}
+async function resolveLocalBrain() {
+    const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
+    if (envModel) {
+        const baseUrl = process.env.AIR_BRAIN_OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+        return { provider: new OllamaProvider({ baseUrl }), model: envModel, cliOnly: false };
+    }
+    try {
+        const { config, errors } = await loadConfig();
+        if (errors.some((e) => !e.startsWith('Warning:')))
+            return null;
+        const resolved = resolveModelRole(config, 'coordinator');
+        if (!resolved.localFirst)
+            return null;
+        return {
+            provider: new OllamaProvider({ baseUrl: resolved.baseUrl, keepAlive: resolved.keepAlive }),
+            model: resolved.model,
+        };
+    }
+    catch {
+        return null;
+    }
 }
 export async function brainAnswer(prompt, ctx) {
     const parts = [];
@@ -99,29 +74,41 @@ export async function brainAnswer(prompt, ctx) {
         parts.push('Active jobs: ' + ctx.jobs.join(', '));
     }
     const fullPrompt = parts.length > 0 ? parts.join('\n\n') + '\n\nUser: ' + prompt : prompt;
-    const kilo = await tryKilo(fullPrompt);
-    if (kilo)
-        return kilo;
-    const opencode = await tryOpencode(fullPrompt);
-    if (opencode)
-        return opencode;
-    const ollama = await tryOllama(fullPrompt);
-    if (ollama)
-        return ollama;
+    const local = await resolveLocalBrain();
+    if (!local)
+        return { text: 'Acknowledged.', model: 'none', provider: 'none' };
+    const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
+    if (envModel) {
+        const cli = await tryOllamaCli(fullPrompt, envModel);
+        if (cli)
+            return cli;
+    }
+    try {
+        const result = await local.provider.chat({
+            model: local.model,
+            messages: [{ role: 'user', content: fullPrompt }],
+        });
+        const content = result.message?.content;
+        const text = typeof content === 'string' ? content.trim() : '';
+        if (text)
+            return { text, model: result.model || local.model, provider: 'ollama' };
+    }
+    catch {
+        // Local provider unavailable or failed: do not fall back to external CLIs.
+    }
     return { text: 'Acknowledged.', model: 'none', provider: 'none' };
 }
 export async function isBrainAvailable() {
+    if (process.env.AIR_BRAIN_MODEL_OLLAMA)
+        return true;
     try {
-        const r = await spawnAsync('kilo', ['--version'], 5000);
-        if (!r.error && r.status === 0)
-            return true;
+        const { config, errors } = await loadConfig();
+        if (errors.some((e) => !e.startsWith('Warning:')))
+            return false;
+        resolveModelRole(config, 'coordinator');
+        return true;
     }
-    catch { /* noop */ }
-    try {
-        const r = await spawnAsync('opencode', ['--version'], 5000);
-        if (!r.error && r.status === 0)
-            return true;
+    catch {
+        return false;
     }
-    catch { /* noop */ }
-    return !!process.env.AIR_BRAIN_MODEL_OLLAMA;
 }

@@ -101,6 +101,41 @@ describe('OllamaProvider', () => {
     expect(result.message.toolCalls[1]).toMatchObject({ id: 'call-2', type: 'function', function: { name: 'git_status', arguments: {} } });
   });
 
+  it('omits invalid tool-result correlation ids and rejects invalid assistant tool-call history (P1-07)', async () => {
+    const fetchMock = vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({
+      model: 'm', message: { role: 'assistant', content: 'ok' }, done_reason: 'stop',
+    }));
+    const provider = new OllamaProvider({ fetch: fetchMock });
+    await provider.chat({
+      model: 'm',
+      messages: [
+        { role: 'tool', content: 'result', toolCallId: '' },
+        { role: 'tool', content: 'result2', toolCallId: 123 as unknown as string },
+      ],
+    });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.messages[0]).not.toHaveProperty('tool_call_id');
+    expect(body.messages[1]).not.toHaveProperty('tool_call_id');
+
+    await expect(provider.chat({
+      model: 'm',
+      messages: [{
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ type: 'function', function: { name: '', arguments: {} } }],
+      }],
+    })).rejects.toMatchObject({ code: 'PROVIDER_ERROR', provider: 'ollama' });
+
+    await expect(provider.chat({
+      model: 'm',
+      messages: [{
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ type: 'function', function: { name: 'x', arguments: [] as unknown as Record<string, unknown> } }],
+      }],
+    })).rejects.toMatchObject({ code: 'PROVIDER_ERROR' });
+  });
+
   it('rejects malformed/incomplete assistant tool-call responses and invalid argument payloads (P1-07)', async () => {
     const base = { model: 'm', messages: [{ role: 'user' as const, content: 'hi' }] };
 
@@ -193,6 +228,31 @@ describe('OllamaProvider', () => {
     await expect(timedOutProvider.health({ timeoutMs: 1 })).resolves.toMatchObject({ online: false, provider: 'ollama' });
   });
 
+  it('does not convert cancelled health probes into offline results (P2-01)', async () => {
+    const cancelled = new AbortController();
+    cancelled.abort();
+    const provider = new OllamaProvider({
+      fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockRejectedValue(new Error('aborted')),
+    });
+    await expect(provider.health({ signal: cancelled.signal })).rejects.toMatchObject({
+      code: 'CANCELLED',
+      provider: 'ollama',
+    });
+  });
+
+  it('rejects unsafe or malformed Ollama base URLs and normalizes trailing slashes (P2-02)', async () => {
+    expect(() => new OllamaProvider({ baseUrl: 'file:///tmp/ollama' })).toThrow(ModelProviderError);
+    expect(() => new OllamaProvider({ baseUrl: 'http://user:pass@127.0.0.1:11434' })).toThrow(ModelProviderError);
+    expect(() => new OllamaProvider({ baseUrl: 'http://127.0.0.1:11434/path?q=1' })).toThrow(ModelProviderError);
+    expect(() => new OllamaProvider({ baseUrl: 'http://127.0.0.1:11434#frag' })).toThrow(ModelProviderError);
+    expect(() => new OllamaProvider({ baseUrl: 'not a url' })).toThrow(ModelProviderError);
+
+    const fetchMock = vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({ version: '0.5.0' }));
+    const provider = new OllamaProvider({ baseUrl: 'http://127.0.0.1:11434/', fetch: fetchMock });
+    await provider.health();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://127.0.0.1:11434/api/version');
+  });
+
   it('normalizes missing models and rate limits', async () => {
     const missing = new OllamaProvider({
       fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(jsonResponse({ error: 'model not found' }, 404)),
@@ -236,8 +296,7 @@ describe('OllamaProvider', () => {
     })).rejects.toMatchObject({ code: 'TIMEOUT' });
   });
 
-  it('rejects invalid endpoint configuration and malformed responses', async () => {
-    expect(() => new OllamaProvider({ baseUrl: 'file:///tmp/ollama' })).toThrow(ModelProviderError);
+  it('rejects malformed JSON responses', async () => {
     const invalid = new OllamaProvider({
       fetch: vi.fn<FetchMock, ReturnType<OllamaFetch>>().mockResolvedValue(new Response('not-json')),
     });

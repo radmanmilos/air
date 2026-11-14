@@ -1,5 +1,69 @@
 import { z } from 'zod';
-export declare const CONFIG_VERSION = 1;
+export declare const CONFIG_VERSION = 2;
+export declare const MODEL_ROLES: readonly ["coordinator", "planner", "coder", "reviewer", "reasoner", "summarizer", "embeddings"];
+export type ModelRole = (typeof MODEL_ROLES)[number];
+declare const RoleAssignmentSchema: z.ZodObject<{
+    provider: z.ZodEnum<{
+        ollama: "ollama";
+    }>;
+    model: z.ZodString;
+}, z.core.$strip>;
+export declare function normalizeOllamaBaseUrlConfig(value: string): string;
+declare const ModelsSchema: z.ZodObject<{
+    localFirst: z.ZodDefault<z.ZodBoolean>;
+    maxConcurrentGenerative: z.ZodDefault<z.ZodNumber>;
+    keepAlive: z.ZodDefault<z.ZodString>;
+    providers: z.ZodDefault<z.ZodObject<{
+        ollama: z.ZodDefault<z.ZodObject<{
+            enabled: z.ZodDefault<z.ZodBoolean>;
+            baseUrl: z.ZodDefault<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
+    roles: z.ZodDefault<z.ZodObject<{
+        coordinator: z.ZodDefault<z.ZodObject<{
+            provider: z.ZodEnum<{
+                ollama: "ollama";
+            }>;
+            model: z.ZodString;
+        }, z.core.$strip>>;
+        planner: z.ZodDefault<z.ZodObject<{
+            provider: z.ZodEnum<{
+                ollama: "ollama";
+            }>;
+            model: z.ZodString;
+        }, z.core.$strip>>;
+        coder: z.ZodDefault<z.ZodObject<{
+            provider: z.ZodEnum<{
+                ollama: "ollama";
+            }>;
+            model: z.ZodString;
+        }, z.core.$strip>>;
+        reviewer: z.ZodDefault<z.ZodObject<{
+            provider: z.ZodEnum<{
+                ollama: "ollama";
+            }>;
+            model: z.ZodString;
+        }, z.core.$strip>>;
+        reasoner: z.ZodDefault<z.ZodObject<{
+            provider: z.ZodEnum<{
+                ollama: "ollama";
+            }>;
+            model: z.ZodString;
+        }, z.core.$strip>>;
+        summarizer: z.ZodDefault<z.ZodObject<{
+            provider: z.ZodEnum<{
+                ollama: "ollama";
+            }>;
+            model: z.ZodString;
+        }, z.core.$strip>>;
+        embeddings: z.ZodDefault<z.ZodObject<{
+            provider: z.ZodEnum<{
+                ollama: "ollama";
+            }>;
+            model: z.ZodString;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
 declare const ToolConfigSchema: z.ZodObject<{
     id: z.ZodString;
     enabled: z.ZodDefault<z.ZodBoolean>;
@@ -62,6 +126,61 @@ export declare const ConfigSchema: z.ZodObject<{
     buffers: z.ZodDefault<z.ZodObject<{
         maxBytes: z.ZodDefault<z.ZodNumber>;
     }, z.core.$strip>>;
+    models: z.ZodDefault<z.ZodObject<{
+        localFirst: z.ZodDefault<z.ZodBoolean>;
+        maxConcurrentGenerative: z.ZodDefault<z.ZodNumber>;
+        keepAlive: z.ZodDefault<z.ZodString>;
+        providers: z.ZodDefault<z.ZodObject<{
+            ollama: z.ZodDefault<z.ZodObject<{
+                enabled: z.ZodDefault<z.ZodBoolean>;
+                baseUrl: z.ZodDefault<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
+        roles: z.ZodDefault<z.ZodObject<{
+            coordinator: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            planner: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            coder: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            reviewer: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            reasoner: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            summarizer: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            embeddings: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
     logging: z.ZodDefault<z.ZodObject<{
         level: z.ZodDefault<z.ZodEnum<{
             error: "error";
@@ -78,6 +197,8 @@ export declare const ConfigSchema: z.ZodObject<{
 }, z.core.$strip>;
 export type Config = z.infer<typeof ConfigSchema>;
 export type ToolConfig = z.infer<typeof ToolConfigSchema>;
+export type ModelsConfig = z.infer<typeof ModelsSchema>;
+export type ModelRoleConfig = z.infer<typeof RoleAssignmentSchema>;
 export declare const DEFAULT_CONFIG: Config;
 /** Strict variant that rejects unknown top-level keys (used for repo config). */
 export declare const StrictConfigSchema: z.ZodObject<{
@@ -134,6 +255,61 @@ export declare const StrictConfigSchema: z.ZodObject<{
     }, z.core.$strip>>;
     buffers: z.ZodDefault<z.ZodObject<{
         maxBytes: z.ZodDefault<z.ZodNumber>;
+    }, z.core.$strip>>;
+    models: z.ZodDefault<z.ZodObject<{
+        localFirst: z.ZodDefault<z.ZodBoolean>;
+        maxConcurrentGenerative: z.ZodDefault<z.ZodNumber>;
+        keepAlive: z.ZodDefault<z.ZodString>;
+        providers: z.ZodDefault<z.ZodObject<{
+            ollama: z.ZodDefault<z.ZodObject<{
+                enabled: z.ZodDefault<z.ZodBoolean>;
+                baseUrl: z.ZodDefault<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
+        roles: z.ZodDefault<z.ZodObject<{
+            coordinator: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            planner: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            coder: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            reviewer: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            reasoner: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            summarizer: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+            embeddings: z.ZodDefault<z.ZodObject<{
+                provider: z.ZodEnum<{
+                    ollama: "ollama";
+                }>;
+                model: z.ZodString;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
     }, z.core.$strip>>;
     logging: z.ZodDefault<z.ZodObject<{
         level: z.ZodDefault<z.ZodEnum<{

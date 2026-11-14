@@ -25,20 +25,36 @@ const RoleAssignmentSchema = z.object({
   model: z.string().min(1),
 });
 
+export function normalizeOllamaBaseUrlConfig(value: string): string {
+  const trimmed = value.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error('Ollama base URL must be an absolute HTTP(S) URL');
+  }
+  if (
+    (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+    parsed.username.length > 0 ||
+    parsed.password.length > 0 ||
+    parsed.search.length > 0 ||
+    parsed.hash.length > 0
+  ) {
+    throw new Error('Ollama base URL must be an absolute HTTP(S) URL without credentials, query, or fragment');
+  }
+  return parsed.toString().replace(/\/+$/, '');
+}
+
 const ProviderSettingsSchema = z.object({
   enabled: z.boolean().default(true),
-  baseUrl: z.string().url().refine((value) => {
+  baseUrl: z.string().transform((value, ctx) => {
     try {
-      const parsed = new URL(value);
-      return (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
-        parsed.username.length === 0 &&
-        parsed.password.length === 0 &&
-        parsed.search.length === 0 &&
-        parsed.hash.length === 0;
-    } catch {
-      return false;
+      return normalizeOllamaBaseUrlConfig(value);
+    } catch (err) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: err instanceof Error ? err.message : 'Invalid Ollama base URL' });
+      return z.NEVER;
     }
-  }, 'Ollama base URL must be an absolute HTTP(S) URL without credentials, query, or fragment').default('http://127.0.0.1:11434'),
+  }).default('http://127.0.0.1:11434'),
 });
 
 const DEFAULT_MODEL_ROLES = {

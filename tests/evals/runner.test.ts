@@ -1,4 +1,4 @@
-﻿import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,7 @@ import {
   rankTopDocuments,
   runEvaluation,
   runGenerationSuite,
+  sanitizeEvalRecordValue,
   validateToolCallProposal,
   type EvalRunnerOptions,
 } from '../../src/evals/runner';
@@ -91,7 +92,8 @@ describe('evaluation prompt and scoring helpers', () => {
     expect(prompt).not.toContain('"severity"');
   });
 
-  it('includes copied workspace files for coder prompts but not expected file lists', () => {
+  it('includes copied workspace files for coder prompts but not expected file lists and redacts secrets in workspace content', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
     const messages = buildEvalMessages('coder', {
       id: 'K01',
       input: 'Fix the percentage calculation',
@@ -99,13 +101,55 @@ describe('evaluation prompt and scoring helpers', () => {
       workspace: 'coder-discount',
       expectedFiles: ['src/discount.js'],
       acceptance: ['all tests pass'],
-    }, { 'src/discount.js': 'return price - price * percent;' });
+    }, { 'src/discount.js': 'return price - price * percent; // ' + secret });
     const prompt = messages[1]?.content ?? '';
     expect(prompt).toContain('src/discount.js');
     expect(prompt).toContain('return price');
     expect(prompt).toContain('all tests pass');
+    expect(prompt).toContain('[REDACTED]');
+    expect(prompt).not.toContain(secret);
     expect(prompt).not.toContain('focused_diff_and_test');
     expect(prompt).not.toContain('expectedFiles');
+  });
+
+  it('sanitizes model-visible payloads without mutating authoritative fixture objects', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const fixture = {
+      id: 'S99',
+      input: 'task ' + secret,
+      oracle: 'hidden',
+      nested: { expected: ['x'], note: secret, arr: [{ forbidden: 'y' }] },
+    };
+    const original = JSON.parse(JSON.stringify(fixture));
+    const prompt = buildEvalMessages('summarizer', fixture as any).map((m) => m.content).join('\n');
+    expect(fixture).toEqual(original);
+    expect(prompt).not.toContain(secret);
+    expect(prompt).not.toContain('"oracle"');
+    expect(prompt).not.toContain('"expected"');
+    expect(prompt).not.toContain('"forbidden"');
+  });
+
+  it('redacts secret-like values in persisted records recursively (incl. arrays/errors/diagnostics) while preserving evidence fields (P1-04/P2-03)', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const record = {
+      recordType: 'case',
+      caseId: 'K01',
+      output: 'token=' + secret,
+      toolCalls: [{ function: { name: 'read_file', arguments: { path: 'a', auth: secret } } }],
+      deterministicValidation: { valid: false, errors: [{ message: 'bad ' + secret, path: '$.x' }] },
+      safetyOracles: { oracles: [{ reason: secret }] },
+      error: { message: 'boom ' + secret, stack: 'stack ' + secret },
+      nested: [{ note: secret }],
+    };
+    const sanitized = sanitizeEvalRecordValue(record) as typeof record;
+    const text = JSON.stringify(sanitized);
+    expect(text).not.toContain(secret);
+    expect(text).toContain('[REDACTED]');
+    expect(sanitized.recordType).toBe('case');
+    expect(sanitized.caseId).toBe('K01');
+    expect(sanitized.deterministicValidation.valid).toBe(false);
+    expect(sanitized.deterministicValidation.errors[0]?.path).toBe('$.x');
+    expect(sanitized.toolCalls[0]?.function.name).toBe('read_file');
   });
 
   it('calculates cosine similarity and ranks labelled documents', () => {
