@@ -8,7 +8,7 @@
 // Application-level allowlists, path checks, or environment filtering are NOT
 // represented as OS sandboxing by this module.
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -104,8 +104,39 @@ export interface SandboxRunSpec {
   cwd: string;
   env?: Record<string, string>;
   timeoutMs?: number;
+  signal?: AbortSignal;
   network?: 'deny' | 'allow';
   allowWritePaths?: string[];
+}
+
+function minimalEnv(override?: Record<string, string>): Record<string, string> {
+  const base: Record<string, string> = {
+    PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
+    TMPDIR: process.env.TMPDIR ?? '/tmp',
+    TEMP: process.env.TEMP ?? '/tmp',
+    TMP: process.env.TMP ?? '/tmp',
+  };
+  if (override) Object.assign(base, override);
+  // Never inherit secret-like env vars from the host.
+  for (const key of Object.keys(base)) {
+    if (/(KEY|TOKEN|SECRET|PASSWORD)/i.test(key) && !(override && Object.prototype.hasOwnProperty.call(override, key))) {
+      delete base[key];
+    }
+  }
+  return base;
+}
+
+function killTree(pid: number | undefined): void {
+  if (!pid) return;
+  try {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } else {
+      try { process.kill(-pid, 'SIGKILL'); } catch { process.kill(pid, 'SIGKILL'); }
+    }
+  } catch {
+    // best-effort
+  }
 }
 
 export async function runOsSandboxed(spec: SandboxRunSpec): Promise<OsSandboxRunResult> {
@@ -137,35 +168,74 @@ export async function runOsSandboxed(spec: SandboxRunSpec): Promise<OsSandboxRun
     args = ['-p', profile, spec.executable, ...spec.args];
   }
 
-  try {
-    const { stdout, stderr } = await execFileAsync(command, args, {
+  const env = minimalEnv(spec.env);
+
+  return new Promise<OsSandboxRunResult>((resolve) => {
+    const child = spawn(command, args, {
       cwd: spec.cwd,
-      env: spec.env ? { ...process.env, ...spec.env } : process.env,
-      timeout: timeoutMs,
-      maxBuffer: 1024 * 1024,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: process.platform !== 'win32',
     });
-    return {
-      ok: true,
-      exitCode: 0,
-      stdout,
-      stderr,
-      timedOut: false,
-      cancelled: false,
-      capability,
+
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    let cancelled = false;
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killTree(child.pid);
+    }, timeoutMs);
+
+    const onAbort = () => {
+      cancelled = true;
+      killTree(child.pid);
     };
-  } catch (err: any) {
-    const timedOut = err?.killed === true || err?.signal === 'SIGTERM';
-    return {
-      ok: false,
-      exitCode: typeof err?.code === 'number' ? err.code : null,
-      stdout: err?.stdout ?? '',
-      stderr: err?.stderr ?? String(err?.message ?? err),
-      timedOut,
-      cancelled: false,
-      capability,
-      reason: timedOut ? 'timeout' : 'execution_failed',
-    };
-  }
+    if (spec.signal) {
+      if (spec.signal.aborted) onAbort();
+      else spec.signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
+    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
+
+    child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      spec.signal?.removeEventListener('abort', onAbort);
+      resolve({
+        ok: false,
+        exitCode: null,
+        stdout,
+        stderr: stderr + String(err?.message ?? err),
+        timedOut,
+        cancelled,
+        capability,
+        reason: 'spawn_error',
+      });
+    });
+
+    child.on('close', (code, _signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      spec.signal?.removeEventListener('abort', onAbort);
+      const ok = code === 0 && !timedOut && !cancelled;
+      resolve({
+        ok,
+        exitCode: code,
+        stdout,
+        stderr,
+        timedOut,
+        cancelled,
+        capability,
+        reason: timedOut ? 'timeout' : cancelled ? 'cancelled' : (code === 0 ? 'passed' : 'failed'),
+      });
+    });
+  });
 }
 
 function buildSeatbeltProfile(writePaths: string[], network: 'deny' | 'allow'): string {

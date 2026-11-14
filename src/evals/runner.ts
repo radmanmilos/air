@@ -731,7 +731,7 @@ export async function runGenerationSuite(
           const execOracle: { oracle: string; status: string; executed: boolean; reason?: string; details?: Record<string, unknown> } = {
             oracle: (typeof fixture.oracle === 'string' ? fixture.oracle : 'coder_execution'),
             status: execResult.executed ? (execResult.passed ? 'passed' : 'failed') : (execResult.reason.startsWith('unsupported') ? 'unsupported' : 'blocked'),
-            executed: execResult.executed && execResult.passed,
+            executed: execResult.executed,
             reason: execResult.reason,
             details: {
               exitCode: execResult.exitCode,
