@@ -51,6 +51,7 @@ const BASELINE = new Set([
 	// security
 	'src/security/allowlist.ts#isProviderAllowed',
 	'src/security/allowlist.ts#isModelAllowed',
+	'src/security/redact.ts#redactValue',
 	'src/security/streaming-redact.ts#containsSecret',
 	// execution
 	'src/execution/sessions.ts#assertSessionIsolation',
@@ -67,8 +68,9 @@ const BASELINE = new Set([
 	'src/contracts/job.ts#JobRequest',
 	'src/contracts/job.ts#JobToolCall',
 	'src/contracts/job.ts#JobResult',
-	// evaluation contracts/helpers (P1-03 schema/tool-context integrity, P1-05 sandbox boundary contract)
+	// evaluation contracts/helpers (P1-03 schema/tool-context integrity, P1-05 sandbox boundary contract, P1-04/P2-03 record redaction)
 	'src/evals/runner.ts#suiteContract',
+	'src/evals/runner.ts#sanitizeEvalRecordValue',
 	'src/evals/contracts/coordinator.ts#ACTION_SCHEMA',
 	'src/evals/contracts/coordinator.ts#coordinatorFormat',
 	'src/evals/contracts/planner.ts#PLANNER_SCHEMA',
@@ -80,6 +82,8 @@ const BASELINE = new Set([
 	'src/evals/sandbox/capabilities.ts#EvalSafetyOracleReport',
 	'src/evals/sandbox/capabilities.ts#detectSandboxCapabilities',
 	'src/evals/sandbox/capabilities.ts#evaluateSafetyOracles',
+	'src/config/schema.ts#normalizeOllamaBaseUrlConfig',
+	'src/models/providers/ollama.ts#normalizeOllamaBaseUrl',
 	'src/conversation/actions.ts#parseActions',
 	'src/conversation/actions.ts#Action',
 ]);
