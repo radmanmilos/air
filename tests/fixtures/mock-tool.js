@@ -14,12 +14,27 @@
 //
 // Optional: MOCK_DELAY_MS, MOCK_CHUNK_BYTES (chunked stdout), MOCK_SLEEP_MS
 
+import { existsSync, writeFileSync } from 'node:fs';
+
 const mode = process.env.MOCK_MODE || 'succeed';
 const delayMs = parseInt(process.env.MOCK_DELAY_MS || '0', 10);
 const chunkBytes = parseInt(process.env.MOCK_CHUNK_BYTES || '0', 10);
+const barrierFile = process.env.MOCK_BARRIER_FILE;
+const readyFile = process.env.MOCK_READY_FILE;
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitForBarrier() {
+  if (!barrierFile) return;
+  if (readyFile) {
+    try { writeFileSync(readyFile, 'ready'); } catch {}
+  }
+  while (true) {
+    try { if (existsSync(barrierFile)) return; } catch {}
+    await sleep(20);
+  }
 }
 
 function writeChunked(str) {
@@ -37,6 +52,15 @@ function writeChunked(str) {
       writeChunked('Mock tool: editing src/example.js\n');
       process.stderr.write('Mock tool: all good\n');
       process.exit(0);
+    case 'barrier_succeed':
+      await waitForBarrier();
+      writeChunked('Mock tool: editing src/example.js\n');
+      process.stderr.write('Mock tool: all good\n');
+      process.exit(0);
+    case 'barrier_crash':
+      await waitForBarrier();
+      process.stderr.write('Mock tool: process crashed\n');
+      process.exit(134);
     case 'rate_limit':
       process.stderr.write('Error: 429 rate limit exceeded for model\n');
       process.exit(42);

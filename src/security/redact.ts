@@ -68,6 +68,29 @@ export function redact(text: string, options: RedactionOptions = {}): string {
   return out;
 }
 
+export function redactValue(value: unknown, depth = 0): unknown {
+  if (depth > 12) return value;
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'string') return redact(value);
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return value;
+  if (Array.isArray(value)) return value.map((item) => redactValue(item, depth + 1));
+  if (typeof value === 'object') {
+    // Preserve Error objects minimally: redact their message.
+    if (value instanceof Error) {
+      const err = new Error(redact(value.message));
+      err.name = value.name;
+      err.stack = value.stack ? redact(value.stack) : value.stack;
+      return err;
+    }
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = redactValue(child, depth + 1);
+    }
+    return out;
+  }
+  return value;
+}
+
 export function containsSecret(text: string): boolean {
   if (!text) return false;
   return TOKEN_DETECT.test(text) || JWT_DETECT.test(text) || PEM_DETECT.test(text) ||

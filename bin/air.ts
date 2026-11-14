@@ -646,7 +646,7 @@ program
   .option('--resume <id>', 'Resume a conversation')
   .option('--free-only', 'Prefer free models (default true)')
   .action(async (options: { resume?: string; freeOnly?: boolean }) => {
-    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult } = await import('../src/conversation');
+    const { createConversation, loadConversation, saveConversation, appendMessage, injectResult, mutateConversation } = await import('../src/conversation');
     const { decide } = await import('../src/conversation/decide');
     const { planFromRequest } = await import('../src/planner');
     const { compileJobResult } = await import('../src/result-compiler');
@@ -686,12 +686,14 @@ program
       const item = plan.workItems[0];
       const session = await orch.start(item.objective, cwd, { mode: 'auto', readOnly: !requiresWrite, freeOnly: conv!.userPreferences.freeOnly, controller });
       jobHandles.set(session.runId, { orch, controller });
+      // Push activeWorkIds before printing so /cancel can find the job.
+      await mutateConversation(conv!.id, (c) => { c.activeWorkIds.push(session.runId); });
+      const freshConvAfterStart = loadConversation(conv!.id);
+      if (freshConvAfterStart) conv = freshConvAfterStart;
       await appendMessage(conv!.id, { role: 'assistant', content: `Started job ${session.runId}.` });
       logEvent('job_started', session.runId);
       logEvent('notice_printed', `Started job ${session.runId}`);
       console.log(chalk.green(`Started job ${session.runId}`));
-      conv!.activeWorkIds.push(session.runId);
-      saveConversation(conv!);
       // Background waiter.
       const p = (async () => {
         try {
@@ -717,15 +719,17 @@ program
           };
           const summary = compileJobResult(facts as any);
           await injectResult(conv!.id, summary, session.runId);
-          conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== session.runId);
-          // update facts
-          const bullet = `Job ${session.runId} ${facts.result}: ${facts.changedFiles?.length ?? 0} changed`;
-          if (!conv!.facts.includes(bullet)) conv!.facts.push(bullet);
-          saveConversation(conv!);
+          await mutateConversation(conv!.id, (c) => {
+            c.activeWorkIds = c.activeWorkIds.filter((x) => x !== session.runId);
+            const bullet = `Job ${session.runId} ${facts.result}: ${facts.changedFiles?.length ?? 0} changed`;
+            if (!c.facts.includes(bullet)) c.facts.push(bullet);
+          });
           logEvent('job_finished', `${session.runId}: ${summary.split('.')[0]}`);
           console.log(chalk.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
         } catch (err) {
           console.log(chalk.red(`job ${session.runId} error: ${String(err)}`));
+        } finally {
+          jobHandles.delete(session.runId);
         }
       })();
       waiters.set(session.runId, p);
@@ -765,8 +769,8 @@ program
         }
         try { await entry.orch.cancel(id); } catch { /* noop */ }
         entry.controller.abort();
-        conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== id);
-        saveConversation(conv!);
+        await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== id); });
+        jobHandles.delete(id);
         console.log(chalk.yellow(`Cancelled ${id}`));
         return;
       }
@@ -776,7 +780,25 @@ program
         void runJob(task);
         return;
       }
+      // Handle bare /cancel directly using jobHandles (avoids stale conv.activeWorkIds).
+      if (trimmed === '/cancel') {
+        const last = [...jobHandles.keys()].pop();
+        if (last) {
+          const entry = jobHandles.get(last);
+          if (entry) {
+            try { await entry.orch.cancel(last); } catch { /* noop */ }
+            entry.controller.abort();
+          }
+          await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== last); });
+          jobHandles.delete(last);
+          console.log(chalk.yellow(`Cancelled ${last}`));
+          return;
+        }
+      }
       // Decision loop.
+      // Reload conv from disk to avoid stale state.
+      const freshConv = loadConversation(conv!.id);
+      if (freshConv) conv = freshConv;
       await appendMessage(conv!.id, { role: 'user', content: trimmed });
       const actions = decide(trimmed, conv!);
       for (const a of actions) {
@@ -812,8 +834,7 @@ program
             try { await entry.orch.cancel(a.jobId); } catch { /* noop */ }
             entry.controller.abort();
           }
-          conv!.activeWorkIds = conv!.activeWorkIds.filter((x) => x !== a.jobId);
-          saveConversation(conv!);
+          await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== a.jobId); });
           console.log(chalk.yellow(`Cancelled ${a.jobId}`));
         }
       }

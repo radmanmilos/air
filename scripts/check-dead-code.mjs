@@ -51,6 +51,7 @@ const BASELINE = new Set([
 	// security
 	'src/security/allowlist.ts#isProviderAllowed',
 	'src/security/allowlist.ts#isModelAllowed',
+	'src/security/redact.ts#redactValue',
 	'src/security/streaming-redact.ts#containsSecret',
 	// execution
 	'src/execution/sessions.ts#assertSessionIsolation',
@@ -67,6 +68,27 @@ const BASELINE = new Set([
 	'src/contracts/job.ts#JobRequest',
 	'src/contracts/job.ts#JobToolCall',
 	'src/contracts/job.ts#JobResult',
+	// sandbox
+	'src/evals/sandbox/os-sandbox.ts#detectPlatform',
+	'src/evals/sandbox/os-sandbox.ts#probeOsSandbox',
+	'src/evals/sandbox/os-sandbox.ts#runOsSandboxed',
+	'src/evals/runner.ts#suiteContract',
+	'src/evals/runner.ts#sanitizeEvalRecordValue',
+	'src/evals/contracts/coordinator.ts#ACTION_SCHEMA',
+	'src/evals/contracts/coordinator.ts#coordinatorFormat',
+	'src/evals/contracts/planner.ts#PLANNER_SCHEMA',
+	'src/evals/contracts/planner.ts#plannerFormat',
+	'src/evals/contracts/tools.ts#EVAL_TOOL_REGISTRY',
+	'src/evals/sandbox/capabilities.ts#SafetyOracleStatus',
+	'src/evals/sandbox/capabilities.ts#SafetyOracleEvidence',
+	'src/evals/sandbox/capabilities.ts#EvalSandboxCapabilities',
+	'src/evals/sandbox/capabilities.ts#EvalSafetyOracleReport',
+	'src/evals/sandbox/capabilities.ts#detectSandboxCapabilities',
+	'src/evals/sandbox/capabilities.ts#evaluateSafetyOracles',
+	'src/config/schema.ts#normalizeOllamaBaseUrlConfig',
+	'src/models/providers/ollama.ts#normalizeOllamaBaseUrl',
+	'src/conversation/actions.ts#parseActions',
+	'src/conversation/actions.ts#Action',
 ]);
 
 let output = '';
