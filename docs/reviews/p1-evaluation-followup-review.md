@@ -269,3 +269,21 @@ This fix addresses the cancellation lifecycle race in the chat REPL. It does not
 
 - **P1-05, L3/L4 were not changed** by this increment except preserved status/limitations. **P1-05: PARTIAL / NOT DONE. L0-05: IN_PROGRESS. L3/L4: BLOCKED.** No OS-enforced sandbox or untrusted patch/command/tool execution implemented; proposal-only/fail-closed boundaries preserved.
 - P1-04, P1-06 (residual), P1-07, P2-01–P2-03 remain **PARTIAL/not fully complete** per ledger acceptance criteria; no over-claim of completion. Unrelated work (`.kilo/tmp/`, untracked/modified `dist/*` artifacts, other worktrees) untouched. PR #5 remains open, draft, unmerged.
+
+## Execution architecture finding (P1-05)
+
+### Execution-flow map
+CLI (bin/air.ts) / MCP (src/mcp/server.ts) -> src/evals/runner.ts::runEvaluation/runGenerationSuite -> catalog load -> for each fixture: createWorkspace (coder only) -> buildEvalMessages -> provider.chat (model call) -> validateToolCallProposal (tool-calling) -> detectSandboxCapabilities + evaluateSafetyOracles (reporting only) -> writeRecord. No patch application, command execution, or tool dispatch occurs in the runner. Safety oracles are reported, never executed.
+
+### Source-level answers
+1. Does an evaluation executor already exist? NO. runner.ts is proposal-only; it records model outputs and deterministic validation metadata. There is no patch applier, command runner, or tool dispatcher in src/evals.
+2. Which operations can execute untrusted content today? NONE in the eval path. The shared trusted runner (src/execution/runner.ts) executes adapter commands but is not part of eval safety oracles and is not sandboxed as an eval boundary.
+3. Which operations are proposal-only? All model outputs (diffs, tool calls, plans) are validated but not executed.
+4. Which operations are deliberately disabled? Safety oracle execution (--execute-safety-oracles) reports unsupported/fail-closed because no enforced boundary exists.
+5. Where should sandbox enforcement occur? At a new isolated executor that applies a proposed diff to a per-case workspace and runs fixture-declared commands under runOsSandboxed, invoked only from runGenerationSuite for coder/debugging/tool-calling oracles.
+6. Can the existing runner invoke a sandboxed child process without redesigning the application? Partially: createWorkspace already provides isolated copies, and runOsSandboxed provides the OS boundary. But patch application, command allowlisting, result capture and oracle verification do not exist and must be implemented.
+7. Smallest implementation meeting P1-05: a narrow EvalSandboxExecutor that (a) applies a unified diff to the workspace with canonical/symlink-safe confinement, (b) runs an allowlisted argv-only command under runOsSandboxed with minimal env, timeout, tree-kill, (c) captures exit code/output, (d) returns structured evidence. Estimated: medium-sized, platform-dependent on Linux/macOS; Windows remains unsupported without a native Job Object/restricted-token implementation.
+8. Genuine new scope required: patch applier + command executor + oracle wiring + cross-platform CI evidence. This is beyond a small wiring change but is contained to src/evals/sandbox + runner and does not require L3/L4.
+
+### Conclusion
+P1-05 remains PARTIAL. The blocker is not merely missing integration; it requires implementing the eval executor (patch apply + sandboxed command execution + oracle verification) which does not yet exist. Windows lacks any OS-enforced mechanism. macOS unverified. Linux enforcement depends on host privileges. PR #5 must remain open/unmerged until this is complete.
