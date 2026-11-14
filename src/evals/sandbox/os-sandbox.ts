@@ -135,7 +135,7 @@ function killTree(pid: number | undefined): void {
 
 export async function runOsSandboxed(spec: SandboxRunSpec): Promise<OsSandboxRunResult> {
   const capability = await probeOsSandbox();
-  if (!capability.available) {
+  if (!capability.available || !capability.enforced.filesystem || !capability.enforced.network || !capability.enforced.process) {
     return {
       ok: false,
       exitCode: null,

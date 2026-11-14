@@ -64,7 +64,7 @@ export async function executeCoderOracle(params: {
   signal?: AbortSignal;
 }): Promise<CoderOracleExecutionResult> {
   const capability = await probeOsSandbox();
-  if (!capability.available) {
+  if (!capability.available || !capability.enforced.filesystem || !capability.enforced.network || !capability.enforced.process) {
     return {
       executed: false,
       passed: false,
