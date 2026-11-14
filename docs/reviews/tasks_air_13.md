@@ -473,3 +473,11 @@ Copy this into the PR description or update the relevant package entry at the en
 - P1-04/P1-06/P1-07/P2-01/P2-02 remain PARTIAL per ledger acceptance criteria.
 - L3/L4 remain BLOCKED.
 - Validation: typecheck, typecheck:test, lint, build, pack --dry-run, python ruff/mypy/pytest all pass; full npm test not rerun after this minimal change beyond targeted redaction suite.
+
+## Incremental progress note (os-sandbox primitive)
+
+- Added src/evals/sandbox/os-sandbox.ts: platform detection, capability probe, and unOsSandboxed() wrapping real OS mechanisms (Linux unshare net/pid/mount namespace; macOS sandbox-exec Seatbelt profile; Windows fail-closed unsupported). Fail-closed on unavailable mechanisms.
+- Added 	ests/evals/os-sandbox.test.ts (4 tests).
+- Updated scripts/check-dead-code.mjs baseline for new exports.
+- P1-05 remains PARTIAL: eval execution boundary not yet wired to use os-sandbox; Windows has no OS enforcement; Linux/macOS enforcement depends on host privileges and remains unverified in CI (no macOS runner).
+- L3/L4 remain BLOCKED.

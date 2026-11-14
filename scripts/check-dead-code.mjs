@@ -68,7 +68,10 @@ const BASELINE = new Set([
 	'src/contracts/job.ts#JobRequest',
 	'src/contracts/job.ts#JobToolCall',
 	'src/contracts/job.ts#JobResult',
-	// evaluation contracts/helpers (P1-03 schema/tool-context integrity, P1-05 sandbox boundary contract, P1-04/P2-03 record redaction)
+	// sandbox
+	'src/evals/sandbox/os-sandbox.ts#detectPlatform',
+	'src/evals/sandbox/os-sandbox.ts#probeOsSandbox',
+	'src/evals/sandbox/os-sandbox.ts#runOsSandboxed',
 	'src/evals/runner.ts#suiteContract',
 	'src/evals/runner.ts#sanitizeEvalRecordValue',
 	'src/evals/contracts/coordinator.ts#ACTION_SCHEMA',
