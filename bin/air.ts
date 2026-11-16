@@ -684,6 +684,10 @@ program
 
     const waiters = new Map<string, Promise<void>>();
     const jobHandles = new Map<string, { orch: any; controller: AbortController }>();
+    // brainAnswer is async, so a /quit during a brain call must not be
+    // short-circuited by process.exit(0) in the close handler. Track the
+    // outstanding call and drain it before exiting.
+    let pendingBrain: Promise<void> | null = null;
 
     async function runJob(task: string, _workId?: string, hints?: { requiresWrite?: boolean; requiresCode?: boolean }): Promise<void> {
       const requiresWrite = hints?.requiresWrite !== false;
@@ -819,7 +823,7 @@ program
           logEvent('job_submitted', a.goal);
           void runJob(a.goal, undefined, a.hints);
         } else if (a.type === 'answer') {
-          (async () => {
+          pendingBrain = (async () => {
             const { brainAnswer, isBrainAvailable } = await import('../src/brain');
             let reply = 'Acknowledged.';
             if (await isBrainAvailable()) {
@@ -839,6 +843,8 @@ program
             console.log(out.gray(`air: ${reply}`));
           })().catch((err) => {
             console.log(out.red(`brain error: ${String(err)}`));
+          }).finally(() => {
+            pendingBrain = null;
           });
         } else if (a.type === 'clarify') {
           await appendMessage(conv!.id, { role: 'assistant', content: a.question });
@@ -856,7 +862,15 @@ program
         }
       }
     });
-    rl.on('close', async () => { try { await Promise.all([...waiters.values()]); } catch {} process.exit(0); });
+    rl.on('close', async () => {
+      // Drain any outstanding brain call before exiting so /quit during a
+      // brain answer still persists the assistant message (brainAnswer is async).
+      if (pendingBrain) {
+        try { await Promise.race([pendingBrain, new Promise((r) => setTimeout(r, 5000))]); } catch {}
+      }
+      try { await Promise.all([...waiters.values()]); } catch {}
+      process.exit(0);
+    });
   });
 
 program

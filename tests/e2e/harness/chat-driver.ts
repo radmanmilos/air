@@ -29,9 +29,11 @@ export interface ChatSession {
 
 export function startChat(env: Record<string, string>, cwd: string, args: string[] = ['chat']): ChatSession {
   const start = Date.now();
+  // The chat driver pipes stdin/stdout, so the REPL is non-TTY by default.
+  // Opt into the interactive REPL explicitly for the test harness.
   const child = spawn(process.execPath, [AIR_BIN, ...args], {
     cwd,
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...env, AIR_E2E_TTY: '1' },
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
   });

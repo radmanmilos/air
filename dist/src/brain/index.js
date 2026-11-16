@@ -83,10 +83,22 @@ export async function brainAnswer(prompt, ctx) {
         if (cli)
             return cli;
     }
+    // Fail fast when the local runtime is actually unreachable. isBrainAvailable()
+    // only inspects config, so without this guard every answer blocks on the
+    // provider's 120s default timeout (verified: F-02 hangs 2min per message).
+    try {
+        const health = await local.provider.health({ timeoutMs: 5000 });
+        if (!health.online)
+            return { text: 'Acknowledged.', model: 'none', provider: 'none' };
+    }
+    catch {
+        return { text: 'Acknowledged.', model: 'none', provider: 'none' };
+    }
     try {
         const result = await local.provider.chat({
             model: local.model,
             messages: [{ role: 'user', content: fullPrompt }],
+            timeoutMs: 10000,
         });
         const content = result.message?.content;
         const text = typeof content === 'string' ? content.trim() : '';
@@ -105,8 +117,14 @@ export async function isBrainAvailable() {
         const { config, errors } = await loadConfig();
         if (errors.some((e) => !e.startsWith('Warning:')))
             return false;
-        resolveModelRole(config, 'coordinator');
-        return true;
+        const resolved = resolveModelRole(config, 'coordinator');
+        if (!resolved.localFirst)
+            return false;
+        // Verify the Ollama runtime is actually reachable; config validity alone
+        // is not enough (the daemon may be down or the model not pulled).
+        const provider = new OllamaProvider({ baseUrl: resolved.baseUrl, keepAlive: resolved.keepAlive });
+        const health = await provider.health({ timeoutMs: 3000 });
+        return health.online;
     }
     catch {
         return false;
