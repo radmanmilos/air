@@ -448,6 +448,7 @@ These requirements apply to every role/provider and are release blockers:
 8. **Model output is untrusted:** validate schemas, cap sizes, reject unexpected fields, guard against prompt injection in repository files/web pages, and keep system policy outside retrieved content.
 9. **No hidden destructive actions:** no auto-commit/push/merge/delete or broad install operations.
 10. **Auditability:** record decision IDs, role/provider/model, schema version, policy outcome, and evidence references without recording private chain-of-thought or secrets.
+11. **Untrusted evaluation execution is disabled:** the evaluation runner treats model patches, tool calls and fixture commands as untrusted proposals. It must not apply untrusted patches, run fixture commands, or dispatch proposed tools outside an OS-enforced, capability-verified sandbox. That sandbox is **DEFERRED to SEC-W1** and is not implemented today; the runner fails closed (`unsupported`, `executed: false`) on every platform and never reports a safety oracle as passed without executed evidence.
 
 ## 11. Model evaluation and benchmark programme
 
@@ -528,10 +529,23 @@ Work packages:
 - L0-02: map current request path from CLI/MCP through conversation, action dispatch, planner, orchestrator, adapter, worker, result compiler and injection.
 - L0-03: settle role names, provider contract, config v2 shape, migration strategy, resource policy, and error taxonomy.
 - L0-04: define benchmark fixtures and acceptance thresholds before comparisons.
+- L0-05: reconcile the independent review findings (P0/P1/P2). **Complete under the revised scope:** P0-01, P1-01, P1-02, P1-03 (proposal-only), P1-04, P1-06, P1-07, P2-01 and P2-02 are resolved; P2-03 is an accepted deferral to L3. **P1-05 OS-enforced sandboxed execution is DEFERRED to SEC-W1** (project-owner approved, 2026-11-16); the P1-05 fail-closed boundary contract is implemented and CI-verified, and untrusted execution remains disabled on Windows, Linux and macOS.
 
 Likely files: this blueprint, docs/behavior-spec.md, src/config/schema.ts, src/conversation/actions.ts, src/planner/index.ts, src/adapters/local.ts, packages/local-worker/air_local/ollama.py, tests.
 
-Exit criteria: architecture decisions recorded; no unresolved ambiguity that would force parallel agents to invent incompatible interfaces; baseline tests/CI recorded with exact commit SHA.
+Exit criteria: architecture decisions recorded; no unresolved ambiguity that would force parallel agents to invent incompatible interfaces; baseline tests/CI recorded with exact commit SHA. L0-05 exit is satisfied under the revised scope above; the only deferred item is P1-05 OS-enforced execution, tracked separately as SEC-W1.
+
+### Phase SEC-W1 — Windows-first OS-enforced execution sandbox (separate security milestone)
+
+**Status:** OPEN (deferred from P1-05; not started). This milestone is separate from L0 and does not block L3/L4.
+
+**Goal:** safely execute explicitly authorized, untrusted evaluation work (coder patches, fixture commands, proposed tools) under OS-enforced confinement, with auditable evidence.
+
+**Required design work:** threat model and attacker capabilities; explicit workspace read/write boundaries; process creation and child-process containment; network access policy and enforcement; resource limits and timeout/cancellation; handle inheritance and descriptor hygiene; workspace setup, patch application, execution and cleanup all inside the security boundary; no host-side application of untrusted patches before confinement; auditable failure handling and evidence collection; Windows-first implementation and adversarial validation. Linux/macOS enforcement is deferred to later platform phases.
+
+**Required acceptance evidence:** demonstrated filesystem confinement (positive and negative tests); process-tree containment; network restriction; cancellation and timeout behavior; resource limits; handle inheritance and cleanup; adversarial tests proving denied operations remain denied; no execution when any required enforcement capability is missing; reproducible CI evidence on supported Windows runners; independent security review before enabling the feature.
+
+**Constraints:** the current `packages/windows-sandbox/` prototype is EXPERIMENTAL / NOT PRODUCTION READY and must not be enabled to satisfy a test. Until this milestone's acceptance evidence exists, untrusted evaluation execution remains disabled/fail-closed on every platform and P1-05 is not claimed complete.
 
 ### Phase L1 — Provider-neutral model runtime and Ollama provider
 

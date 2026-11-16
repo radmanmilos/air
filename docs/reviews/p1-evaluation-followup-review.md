@@ -1,6 +1,8 @@
 # P1 Evaluation Follow-up Review (P1-03 CI, P1-04/P1-05/P1-06 Investigation)
 
-**Scope:** Verification and investigation record (documentation-only reconciliation). Clearly distinguished below: the **P1-05 implementation SHA reviewed** (`02cbaad`), the **latest documentation/branch SHA before this correction** (`4bd48db`, with exact-SHA CI), and historical snapshots with their corresponding CI evidence. P1-05 remains PARTIAL/NOT DONE (fail-closed boundary contract only; no sandboxed untrusted execution implemented).
+**Scope:** Verification and investigation record (documentation-only reconciliation). Clearly distinguished below: the **P1-05 fail-closed boundary SHA reviewed** (`02cbaad`), the **latest documentation/branch SHA** (`e8d4243`, CI run 43637550393), and historical snapshots with their corresponding CI evidence.
+
+**2026-11-16 decision (approved):** P1-05 **OS-enforced sandboxed execution is formally DEFERRED** into a separate Windows-first security milestone (**SEC-W1**). P1-05 remains **DEFERRED, not completed**: the fail-closed boundary contract is implemented and CI-verified, while sandboxed untrusted execution (patch application, fixture commands, proposed-tool dispatch, OS-enforced filesystem/network/process confinement) is **not implemented and disabled on Windows, Linux and macOS**. See `docs/reviews/tasks_air_13.md` ("Decision record — P1-05 deferral" and "SEC-W1").
 
 ## 1. Exact repository / commit reviewed
 
@@ -111,9 +113,9 @@
 
 ## 7. P1-05 findings — Coder/tool/debugging safety oracles and sandboxed execution
 
-**Status: PARTIAL (fail-closed contract/capability boundary implemented). Sandboxed execution & executed safety/acceptance oracles remain NOT COMPLETE.**
+**Status: DEFERRED (approved) — fail-closed boundary contract is DONE; sandboxed execution and executed safety/acceptance oracles are deferred to SEC-W1 and are NOT implemented.**
 
-### 7.1 Implemented (this increment, fail-closed)
+### 7.1 Implemented (fail-closed boundary)
 - **Typed boundary contract:** `src/evals/sandbox/capabilities.ts` defines explicit oracle statuses (`not_run|unsupported|blocked|timed_out|failed|passed`), per-oracle evidence, platform capability detection, and `evaluateSafetyOracles()` reporting. Exported API baselined in `scripts/check-dead-code.mjs`.
 - **Runner integration:** `src/evals/runner.ts` adds opt-in `--execute-safety-oracles` (default off). Run records include `executeSafetyOracles` and `sandboxCapabilities`; coder/tool-calling/debugging case records include structured `safetyOracles { executed, mode, capabilities, oracles[] }`. Proposal/schema validation remains separate from executed safety/acceptance.
 - **Fail-closed behavior:** by default oracles are `not_run`/`executed:false` (`proposal_only`). When opt-in is requested, capability detection reports required controls unavailable (untrusted patch application, fixture-command sandbox, proposed tool dispatch, filesystem confinement, network isolation) on **Windows/Linux/macOS in this implementation**, so oracles are reported `unsupported`/`executed:false` (`sandbox_attempted`) with reasons/details. No untrusted patches are applied, no fixture commands run, and no proposed tools are dispatched.
@@ -150,13 +152,13 @@
 | Environment/credential isolation | **Not implemented** for eval sandbox executions | **None proven** | None | No execution path; future must use minimal sanitized env. |
 | Cross-case isolation/cleanup | Workspace-per-run copy helper exists (staging) | Partial (filesystem separation only) | Existing `workspace.test.ts` (copy/cleanup), not adversarial sandbox proof | Not a security boundary against escapes/malicious processes. |
 
-**Conclusion:** full cross-platform OS-enforced sandboxing for untrusted eval execution cannot be demonstrated with available in-repo mechanisms/dependencies/CI guarantees; therefore execution remains disabled/fail-closed. Any future execution path must be platform-capability-gated, deny-by-default, and separately tested per-OS with real enforcement evidence.
+**Conclusion:** full cross-platform OS-enforced sandboxing for untrusted eval execution cannot be demonstrated with available in-repo mechanisms/dependencies/CI guarantees; therefore execution remains disabled/fail-closed. With project-owner approval this work is **formally DEFERRED to SEC-W1 (Windows-first)**, not completed. Any future execution path must be platform-capability-gated, deny-by-default, and separately tested per-OS with real enforcement evidence.
 
-### 7.4 Remaining gaps / follow-up
-- Implement and prove (per-OS) deterministic patch applier + path/symlink/reparse confinement, fixture-declared command allowlist executor, env sanitization, timeout/output bounds, process-tree cleanup, and network/filesystem denial where enforceable.
+### 7.4 Remaining gaps / follow-up (owned by SEC-W1)
+- Implement and prove (per-OS, Windows first) deterministic patch applier + path/symlink/reparse confinement, fixture-declared command allowlist executor, env sanitization, timeout/output bounds, process-tree cleanup, and network/filesystem denial where enforceable.
 - Execute coder/tool-calling/debugging safety/acceptance oracles only under proven boundaries; record auditable evidence per oracle.
 - Revisit T11/T12-like tool-calling cases to distinguish proposal-validation outcomes from executed tool sandbox outcomes.
-- Preserve P1-03 residuals: worker-registry parity/drift not machine-proven; proposal arg validation not a complete execution boundary. L0-05 remains IN_PROGRESS; L3/L4 remain BLOCKED.
+- P1-03 residuals remain as documented (proposal argument validation is not an execution boundary). L0-05 is complete under the revised scope; L3/L4 remain blocked by L0-03/L0-04d and L1/L2, not by P1-05 execution.
 
 ## 8. P1-06 findings — Planner adversarial fixtures and deterministic validation
 
@@ -186,14 +188,17 @@
 | P1-03 proposal validation as complete execution safety / full JSON Schema support beyond evaluable features | **FAIL** (not claimed) | Proposal-only; unevaluable/unsupported schema constructs intentionally fail closed; P1-05 sandboxed execution remains open. (Verified by source/design.) |
 | P1-04 reviewer fixture/prompt oracle leakage (severity/expected/seed labels) | **PASS** | Neutralized `tests/evals/fixtures/reviewer.json`, sanitizer, real-fixture prompt leak test in `tests/evals/runner.test.ts` (Verified by source/tests). |
 | P1-05 fail-closed capability contract, opt-in flag, truthful oracle statuses, no unsafe execution by default | **PASS** (for implemented increment) | `src/evals/sandbox/capabilities.ts`, `src/evals/runner.ts`, `tests/evals/sandbox-capabilities.test.ts` + focused eval tests (39 passed locally). Opt-in reports `unsupported`/`executed:false` when controls unavailable; no patch apply/command/tool execution implemented. |
-| P1-05 sandboxed coder/tool/debugging execution and safety oracles executed with OS-enforced evidence | **FAIL** (open) | No demonstrable cross-platform OS-enforced sandbox boundary; execution remains disabled/fail-closed. |
+| P1-05 sandboxed coder/tool/debugging execution and safety oracles executed with OS-enforced evidence | **DEFERRED** (approved 2026-11-16 → SEC-W1) | No demonstrable OS-enforced sandbox boundary; execution remains disabled/fail-closed on Windows/Linux/macOS. Not a PASS. |
 | P1-05 safety fixtures/oracles exist as metadata | **PARTIAL** | Coder/tool-calling/debugging fixtures include safety/acceptance oracle intent; runtime records structured not_run/unsupported evidence, but no executed oracle checks. |
 | P1-06 planner generation vs validator cases separated | **PASS** | `tests/evals/fixtures/planner.json` modes P01–P06 generate, P07–P12 validate (Verified). |
 | P1-06 invalid plans validated via `validatePlanDetailed()` without model call | **PASS** | `src/evals/runner.ts` validate-mode path + deterministic validation (Verified by source). |
 | P1-06 duplicate/unknown/self/cycle/limits/criteria/bounds covered | **PASS** | Fixture cases P07–P12, `tests/evals/schema-contracts.test.ts`, `src/planner/index.ts` (Verified by tests/source). |
 | P1-06 explicit runner-level proof that validate cases make zero model calls | **PASS** (for audited runner-path criterion) | `tests/evals/runner.test.ts` ("P1-06 planner validate cases (runner-level)") exercises `runGenerationSuite` with a throwing `provider.chat` spy over planner `mode:"validate"` cases (one valid bounded plan, one invalid self-dependency): asserts zero `provider.chat` calls, deterministic `validatePlanDetailed()` outcomes/metadata recorded (`mode:"validate"`, valid/invalid with expected errors), `safetyOracles { executed:false, reason:"planner-validator-case-no-model-call" }`, and request contract metadata. Focused run: 14/14 in runner suite; relevant eval suite `npx vitest run tests/evals tests/planner-compiler.test.ts tests/models` 59/59. (Verified by tests/source.) |
-| P1-07 Ollama assistant tool-call request/response contract | **FAIL** (open, not changed) | Still open per ledger/review; out of scope (Reported by prior review/ledger). |
-| P2-01/P2-02/P2-03 and L3/L4 | **NOT CHANGED** | Open/blocked per ledger; unchanged in this task (Verified). |
+| P1-07 Ollama assistant tool-call request/response contract | **PASS** | `ModelMessage.toolCalls` added; Ollama serializes assistant `tool_calls` (id/type/function name/arguments) and preserves sequencing; round-trip/serialization/malformed tests in `tests/models/ollama.test.ts`. |
+| P2-01 health timeout/cancellation semantics | **PASS** | `health()` treats `TIMEOUT` as `online:false`; caller cancellation still rejects `CANCELLED` (not misreported offline); tests in `tests/models/ollama.test.ts`. |
+| P2-02 base URL validation | **PASS** | `normalizeOllamaBaseUrlConfig()` rejects non-HTTP(S)/credentials/query/fragment in schema and provider; tests in `tests/config.test.ts`. |
+| P2-03 `maxConcurrentGenerative` enforcement | **DEFERRED to L3** (accepted, non-blocking P2) | Documented as configuration intent; review recommends enforcement in the L3 resource manager. No enforcement claimed. |
+| L3/L4 | **BLOCKED** | Blocked by L0-03 independent architecture review, L0-04d scoring review, and L1/L2 completion — not by L0-05. |
 
 ## 10. Prioritized implementation plan (dependencies, proposed units)
 
@@ -265,25 +270,27 @@ Additionally, `runJob` pushed `activeWorkIds` only after printing "Started job",
 
 This fix addresses the cancellation lifecycle race in the chat REPL. It does not change MCP cancellation (already fixed in P1-01), orchestrator logic, or conversation persistence. The root cause was specific to the chat REPL's stale closure variable.
 
-## 12. Confirmation
+## 12. Confirmation (updated 2026-11-16)
 
-- **P1-05, L3/L4 were not changed** by this increment except preserved status/limitations. **P1-05: PARTIAL / NOT DONE. L0-05: IN_PROGRESS. L3/L4: BLOCKED.** No OS-enforced sandbox or untrusted patch/command/tool execution implemented; proposal-only/fail-closed boundaries preserved.
-- P1-04, P1-06 (residual), P1-07, P2-01–P2-03 remain **PARTIAL/not fully complete** per ledger acceptance criteria; no over-claim of completion. Unrelated work (`.kilo/tmp/`, untracked/modified `dist/*` artifacts, other worktrees) untouched. PR #5 remains open, draft, unmerged.
+- **P1-05:** fail-closed boundary contract **DONE / CI-verified**; OS-enforced sandboxed execution and executed safety/acceptance oracles are **DEFERRED (approved) to SEC-W1**. P1-05 is **not** marked PASS/DONE. Execution remains disabled on Windows, Linux and macOS.
+- **L0-05:** **DONE under the revised scope.** P0-01, P1-01, P1-02, P1-03, P1-04, P1-06, P1-07, P2-01 and P2-02 are PASS with CI evidence; P2-03 is an accepted, documented deferral to L3. No mandatory criterion other than P1-05 OS-enforced execution is deferred.
+- **L3/L4:** remain **BLOCKED** by L0-03 (independent architecture review), L0-04d (scoring review) and L1/L2 completion — not by L0-05.
+- Unrelated work (`.kilo/tmp/`, the experimental `packages/windows-sandbox/` prototype and its build outputs, other worktrees) is preserved. The prototype is not wired into the runtime or CI and is excluded from `npm pack`.
 
-## Execution architecture finding (P1-05)
+## Execution architecture finding (P1-05) — updated 2026-11-16
 
 ### Execution-flow map
-CLI (bin/air.ts) / MCP (src/mcp/server.ts) -> src/evals/runner.ts::runEvaluation/runGenerationSuite -> catalog load -> for each fixture: createWorkspace (coder only) -> buildEvalMessages -> provider.chat (model call) -> validateToolCallProposal (tool-calling) -> detectSandboxCapabilities + evaluateSafetyOracles (reporting only) -> writeRecord. No patch application, command execution, or tool dispatch occurs in the runner. Safety oracles are reported, never executed.
+CLI (bin/air.ts) / MCP (src/mcp/server.ts) -> src/evals/runner.ts::runEvaluation/runGenerationSuite -> catalog load -> for each fixture: createWorkspace (coder only) -> buildEvalMessages -> provider.chat (model call) -> validateToolCallProposal (tool-calling) -> detectSandboxCapabilities + evaluateSafetyOracles (reporting only) -> [opt-in coder only] executeCoderOracle -> writeRecord. `executeCoderOracle` returns `unsupported`/`executed:false` and applies no patch whenever the OS capability is unverified, which is the case on all platforms today. No untrusted patch application, command execution, or tool dispatch occurs.
 
 ### Source-level answers
-1. Does an evaluation executor already exist? NO. runner.ts is proposal-only; it records model outputs and deterministic validation metadata. There is no patch applier, command runner, or tool dispatcher in src/evals.
-2. Which operations can execute untrusted content today? NONE in the eval path. The shared trusted runner (src/execution/runner.ts) executes adapter commands but is not part of eval safety oracles and is not sandboxed as an eval boundary.
+1. Does an evaluation executor exist? A **fail-closed** executor exists (`src/evals/sandbox/eval-executor.ts`, `patch-applier.ts`, `os-sandbox.ts`) but it is capability-gated and returns `unsupported` on Windows/Linux/macOS; it does not execute untrusted work today. Runner records are otherwise proposal-only.
+2. Which operations can execute untrusted content today? **NONE** in the eval path. The shared trusted runner (`src/execution/runner.ts`) executes adapter commands but is not part of eval safety oracles and is not an eval sandbox boundary.
 3. Which operations are proposal-only? All model outputs (diffs, tool calls, plans) are validated but not executed.
-4. Which operations are deliberately disabled? Safety oracle execution (--execute-safety-oracles) reports unsupported/fail-closed because no enforced boundary exists.
-5. Where should sandbox enforcement occur? At a new isolated executor that applies a proposed diff to a per-case workspace and runs fixture-declared commands under runOsSandboxed, invoked only from runGenerationSuite for coder/debugging/tool-calling oracles.
-6. Can the existing runner invoke a sandboxed child process without redesigning the application? Partially: createWorkspace already provides isolated copies, and runOsSandboxed provides the OS boundary. But patch application, command allowlisting, result capture and oracle verification do not exist and must be implemented.
-7. Smallest implementation meeting P1-05: a narrow EvalSandboxExecutor that (a) applies a unified diff to the workspace with canonical/symlink-safe confinement, (b) runs an allowlisted argv-only command under runOsSandboxed with minimal env, timeout, tree-kill, (c) captures exit code/output, (d) returns structured evidence. Estimated: medium-sized, platform-dependent on Linux/macOS; Windows remains unsupported without a native Job Object/restricted-token implementation.
-8. Genuine new scope required: patch applier + command executor + oracle wiring + cross-platform CI evidence. This is beyond a small wiring change but is contained to src/evals/sandbox + runner and does not require L3/L4.
+4. Which operations are deliberately disabled? Safety-oracle execution (`--execute-safety-oracles`) reports `unsupported`/fail-closed because no enforced boundary exists.
+5. Where should sandbox enforcement occur? At the isolated executor that applies a proposed diff to a per-case workspace and runs fixture-declared commands under an OS-enforced boundary, invoked only from `runGenerationSuite` for coder/debugging/tool-calling oracles — i.e., **SEC-W1**.
+6. Can the existing runner invoke a sandboxed child process without redesigning the application? The fail-closed plumbing exists (`createWorkspace`, `runOsSandboxed`, `executeCoderOracle`), but `runOsSandboxed` refuses to run on all current platforms; real per-OS enforcement and adversarial proof are the missing work.
+7. Smallest implementation meeting P1-05: complete `runOsSandboxed` with a Windows-first mechanism (Job Object/restricted token/AppContainer), then prove filesystem/process/network confinement, cancellation, resource limits, handle hygiene, and no-execution-on-missing-capability with adversarial tests.
+8. Genuine new scope required: OS-enforced mechanism + adversarial validation + reproducible Windows CI evidence + independent security review. This is **SEC-W1**, a separate security milestone; it does not block L3/L4.
 
 ### Conclusion
-P1-05 remains PARTIAL. The blocker is not merely missing integration; it requires implementing the eval executor (patch apply + sandboxed command execution + oracle verification) which does not yet exist. Windows lacks any OS-enforced mechanism. macOS unverified. Linux enforcement depends on host privileges. PR #5 must remain open/unmerged until this is complete.
+P1-05 execution is **DEFERRED (approved) to SEC-W1**. The fail-closed boundary is complete and CI-verified; no OS-enforced sandbox or untrusted execution is implemented or claimed on any platform. The experimental Windows prototype is retained but not enabled. L0-05 is complete under the revised scope.

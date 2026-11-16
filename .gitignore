@@ -13,3 +13,7 @@ node_modules/
 test_log.md
 
 results/
+
+# Experimental Windows sandbox prototype: never commit build outputs.
+packages/windows-sandbox/bin/
+packages/windows-sandbox/obj/
