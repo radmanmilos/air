@@ -213,6 +213,26 @@ def run(
             started_at=started_at,
         )
 
+    contract_version = int(request.get("contractVersion", 1))
+
+    # Resolve the model. v2 requires an explicit model; v1 falls back to the
+    # worker's default for backward compatibility (deprecated path).
+    model = request.get("model")
+    if not model and contract_version >= 2:
+        return _finish(
+            result_path,
+            run_id=run_id,
+            state="FAILED",
+            category="INVALID_REQUEST",
+            message="contract v2 requires an explicit model; none was provided",
+            started_at=started_at,
+        )
+    if not model:
+        # v1 backward compat: fall back to worker default (deprecated).
+        from air_local.models import Router
+
+        model = Router().pick("default")
+
     read_only = bool(request.get("readOnly", False))
     allow_shell = bool(request.get("allowShell", False))
     allow_network = bool(request.get("allowNetwork", True))
@@ -234,7 +254,7 @@ def run(
     )
 
     try:
-        answer = agent.run(request["task"], model=request.get("model"))
+        answer = agent.run(request["task"], model=model)
     except _Cancelled:
         return _finish(
             result_path,

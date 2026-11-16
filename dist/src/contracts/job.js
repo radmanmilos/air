@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
-export const CONTRACT_VERSION = 1;
+export const CONTRACT_VERSION = 2;
 /** Exit codes the worker process returns. These are contract, not CLI, codes. */
 export const WORKER_EXIT_CODES = {
     COMPLETED: 0,

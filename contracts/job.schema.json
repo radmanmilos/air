@@ -3,7 +3,7 @@
   "$id": "https://github.com/radmanmilos/air/contracts/job.schema.json",
   "title": "AIR local worker job",
   "description": "Canonical request/result contract between the AIR control plane and packages/local-worker. Both sides read and validate this file; neither keeps a copy.",
-  "x-contractVersion": 1,
+  "x-contractVersion": 2,
   "x-exitCodes": {
     "0": "COMPLETED",
     "2": "INVALID_REQUEST",
@@ -21,13 +21,15 @@
       "additionalProperties": false,
       "required": ["contractVersion", "runId", "task", "cwd"],
       "properties": {
-        "contractVersion": { "type": "integer", "enum": [1] },
+        "contractVersion": { "type": "integer", "enum": [1, 2] },
         "runId": { "type": "string" },
         "task": { "type": "string" },
         "cwd": { "type": "string" },
         "readOnly": { "type": "boolean" },
         "allowShell": { "type": "boolean" },
         "allowNetwork": { "type": "boolean" },
+        "role": { "type": "string" },
+        "provider": { "type": "string" },
         "model": { "type": "string" },
         "maxSteps": { "type": "integer", "minimum": 1, "maximum": 200 },
         "configPath": { "type": "string" }
@@ -38,7 +40,7 @@
       "additionalProperties": false,
       "required": ["contractVersion", "runId", "state"],
       "properties": {
-        "contractVersion": { "type": "integer", "enum": [1] },
+        "contractVersion": { "type": "integer", "enum": [1, 2] },
         "runId": { "type": "string" },
         "state": { "type": "string", "enum": ["COMPLETED", "FAILED", "CANCELLED"] },
         "answer": { "type": "string" },

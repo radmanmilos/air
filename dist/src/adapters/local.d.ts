@@ -33,7 +33,9 @@ export declare class LocalAdapter implements AgentAdapter {
     private readonly cacheDir;
     private readonly explicitModel?;
     private readonly commandOverride?;
+    private resolvedRole?;
     constructor(options?: LocalAdapterOptions);
+    private resolveCoderRole;
     private worker;
     canHandle(_task: TaskInput): boolean;
     buildCommand(task: TaskInput): CommandSpec;

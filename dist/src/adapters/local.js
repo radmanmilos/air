@@ -10,10 +10,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONTRACT_VERSION } from '../contracts/job.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { parse as parseYaml } from 'yaml';
+import { resolveModelRole } from '../models/role-resolver.js';
+import { DEFAULT_CONFIG } from '../config/schema.js';
 import { paths } from '../config/paths.js';
 import { workerCommand } from '../worker/provision.js';
-/** Worker's configured default model (config.yaml `models.brain`). */
-const DEFAULT_MODEL = 'qwen3.5:4b';
 function safeRunId(runId) {
     const cleaned = runId
         .replace(/[^A-Za-z0-9._-]/g, '_')
@@ -39,13 +41,56 @@ export class LocalAdapter {
     cacheDir;
     explicitModel;
     commandOverride;
+    resolvedRole;
     constructor(options = {}) {
         this.explicitModel = options.model ?? process.env.AIR_LOCAL_MODEL;
-        this.model = this.explicitModel ?? DEFAULT_MODEL;
         this.cacheDir = options.cacheDir ?? paths.cacheDir;
         this.commandOverride = options.command;
         const command = this.worker();
         this.executable = command?.executable;
+        // Resolve model from config if not explicitly provided.
+        if (this.explicitModel) {
+            this.model = this.explicitModel;
+        }
+        else {
+            try {
+                const resolved = this.resolveCoderRole();
+                this.model = resolved.model;
+                this.resolvedRole = resolved;
+            }
+            catch (err) {
+                throw new Error(`local adapter: cannot resolve coder role: ${String(err)}`);
+            }
+        }
+    }
+    resolveCoderRole() {
+        // Synchronous config resolution for the coder role. Uses global config
+        // only (models is GLOBAL_ONLY). Falls back to DEFAULT_CONFIG defaults.
+        let config = structuredClone(DEFAULT_CONFIG);
+        try {
+            if (existsSync(paths.globalConfigFile)) {
+                const raw = readFileSync(paths.globalConfigFile, 'utf8');
+                const parsed = parseYaml(raw);
+                if (parsed && typeof parsed === 'object') {
+                    // Merge models section if present.
+                    if (parsed.models && typeof parsed.models === 'object') {
+                        if (parsed.models.roles && parsed.models.roles.coder) {
+                            config.models.roles.coder = parsed.models.roles.coder;
+                        }
+                        if (parsed.models.providers && parsed.models.providers.ollama) {
+                            config.models.providers.ollama = { ...config.models.providers.ollama, ...parsed.models.providers.ollama };
+                        }
+                        if (parsed.models.keepAlive)
+                            config.models.keepAlive = parsed.models.keepAlive;
+                    }
+                }
+            }
+        }
+        catch {
+            // Config read/parse failed; use defaults.
+        }
+        const resolved = resolveModelRole(config, 'coder');
+        return { role: 'coder', provider: resolved.providerId, model: resolved.model };
     }
     worker() {
         if (this.commandOverride !== undefined)
@@ -82,9 +127,32 @@ export class LocalAdapter {
             allowShell: !!task.allowShell,
             allowNetwork: !!task.allowNetwork,
         };
-        // Send a model only when one was explicitly chosen. Otherwise the worker
-        // uses its own configured default, which may differ from AIR's display name.
-        const model = task.preferredModel ?? this.explicitModel;
+        // Resolve the authoritative model selection. The configured coder role
+        // (from AIR's config) takes precedence over explicit model overrides.
+        // No hardcoded fallback: if resolution fails, the error propagates.
+        let role = 'coder';
+        let provider = 'ollama';
+        let model = task.preferredModel ?? this.explicitModel;
+        if (!model) {
+            // Resolve from AIR's canonical config via the role resolver.
+            if (this.resolvedRole) {
+                role = this.resolvedRole.role;
+                provider = this.resolvedRole.provider;
+                model = this.resolvedRole.model;
+            }
+            else {
+                // No resolved role (config failed at construction). Try again.
+                const resolved = this.resolveCoderRole();
+                role = resolved.role;
+                provider = resolved.provider;
+                model = resolved.model;
+                this.resolvedRole = resolved;
+                this.model = model;
+            }
+        }
+        // Include role, provider, and model in the contract (v2).
+        request.role = role;
+        request.provider = provider;
         if (model)
             request.model = model;
         writeFileSync(requestPath, JSON.stringify(request, null, 2), 'utf8');

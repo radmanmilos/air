@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2
 
 # Exit codes are part of the contract: AIR maps them to error categories.
 EXIT_CODES = {
