@@ -14,10 +14,10 @@ test_log.md
 
 results/
 
-# Kilo local state (session tmp records, local plans, local config).
-# Already-tracked files under .kilo/ remain tracked; this prevents new local
-# state from being committed accidentally.
-.kilo/
+# Kilo state is tracked (config, plans, task records). Ignore only local
+# machine/agent artifacts. Transient *.log files are covered by the rule above.
+.kilo/node_modules/
+.kilo/agent-manager.json
 
 # Experimental Windows sandbox prototype: never commit build outputs.
 packages/windows-sandbox/bin/
