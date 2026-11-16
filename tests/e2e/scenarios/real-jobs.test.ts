@@ -33,7 +33,9 @@ function fixture(): string {
 }
 
 function chatEnv(sandbox: any, extra: Record<string, string> = {}): Record<string, string> {
-  return { ...sandbox.env, ...extra };
+  // The chat REPL refuses non-TTY stdin by design (UI-02). The E2E harness
+  // drives chat with piped stdio, so it opts in explicitly here.
+  return { ...sandbox.env, AIR_E2E_TTY: '1', ...extra };
 }
 
 describe('real: P-05 brainstorm question must not spawn a write job', () => {

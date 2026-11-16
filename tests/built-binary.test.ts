@@ -8,7 +8,14 @@ describe('built binary smoke', () => {
     expect(out).toContain('Unified AI tool orchestrator');
   });
   it('chat starts without crashing', () => {
-    const out = execFileSync(process.execPath, [join(process.cwd(), 'dist/bin/air.js'), 'chat'], { input: '/quit\n', encoding: 'utf8', timeout: 10000 });
+    // The chat REPL refuses non-TTY stdin by design (UI-02). This smoke test
+    // drives it with piped input, so it opts in explicitly.
+    const out = execFileSync(process.execPath, [join(process.cwd(), 'dist/bin/air.js'), 'chat'], {
+      input: '/quit\n',
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { ...process.env, AIR_E2E_TTY: '1' },
+    });
     expect(out).toContain('air chat');
   });
 });

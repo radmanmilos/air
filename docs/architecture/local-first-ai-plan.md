@@ -1,8 +1,9 @@
 # AIR Local-First Intelligence — Architecture and Implementation Blueprint
 
-**Status:** PRs #1-#3 merged: provider-neutral Ollama runtime, registries, global model-role config v2, role resolver, concrete evaluation payloads and repeatable evaluation runner are on main. Independent architecture and scoring review remain outstanding.  
+**Status:** PRs #1-#5 merged: provider-neutral Ollama runtime, registries, global model-role config v2, role resolver, concrete evaluation payloads, repeatable evaluation runner, and L0-05 independent-review reconciliation (revised scope) are on main. Independent architecture and scoring review remain outstanding. **PR #5 / L0-05 merged and complete under the owner-approved revised scope** (P1-05 OS-enforced sandboxed execution formally **DEFERRED** to SEC-W1; P2-03 accepted deferral to L3). Terminal UX audit and the first focused terminal improvement are in progress; see [user experience and UI](user-experience-and-ui.md).  
 **Prepared:** 2026-11-12  
-**Repository baseline inspected:** main at 6b71e6180ce5de18e912f7ecd542366c18fb4701  
+**Repository baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5  
+**Current main baseline:** `a42428b30cb47e7d01d014cb4eff7b035635ffa5` (post-L0-05; PR #5 merge commit `c27dcdf4a5c4f6cc2e15809273ad19ecec532877` is an ancestor, not HEAD).  
 **Purpose:** Make AIR's own intelligence local-first and model-driven while preserving deterministic control, safety, portability, and optional external providers.
 
 > This is the implementation contract for the next AIR architecture milestone. It is self-contained so an AI or human engineer can take an individual work package without relying on chat history. If implementation discovers that the live repository differs from a statement here, verify the live code, update this document, and record the discrepancy before changing behavior.
@@ -80,7 +81,7 @@ The following describes code inspected at the baseline commit, not the target de
 - The current local worker has model slots, but the TypeScript control plane still treats the bundled worker as one local adapter. This is not yet a complete AIR-owned role architecture.
 - The current planner is heuristic. Its existence must not be described as LLM planning.
 - The local adapter currently has a hardcoded default model constant. Canonical configuration should ultimately own this decision.
-- AGENTS.md contains an inconsistency: its six rules refer to docs/reviews/tasks_air_6.md, while its source-of-truth section and README identify docs/reviews/tasks_air_12.md. The active implementation ledger created alongside this blueprint should resolve this by becoming the explicit next task ledger; do not silently edit historical task ledgers.
+- **AGENTS.md ledger reference (RESOLVED):** the historical caveat below noted an inconsistency where the six rules referenced `docs/reviews/tasks_air_6.md` while the source-of-truth section identified `docs/reviews/tasks_air_12.md`. The active implementation ledger is now `docs/reviews/tasks_air_13.md`, which AGENTS.md, README.md and this blueprint all reference. Historical task ledgers (`tasks_air_6.md`, `tasks_air_11.md`, `tasks_air_12.md`) are preserved as audit records and are not edited.
 - At inspection time the latest commit's combined status endpoint returned no status entries, and the connector's commit-workflow wrapper returned no runs (it filters to pull-request-triggered runs). Therefore the latest commit's CI result was **not independently verified** in this task. Earlier task-ledger claims of green CI are historical claims, not proof for current HEAD.
 
 

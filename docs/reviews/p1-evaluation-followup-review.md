@@ -8,7 +8,8 @@
 
 - **Repository:** `https://github.com/radmanmilos/air`
 - **Local checkout:** `E:\GitHub\air`
-- **Branch:** `fix/l0-05-p0-conversation-atomic` (tracks `origin/fix/l0-05-p0-conversation-atomic`), PR [#5](https://github.com/radmanmilos/air/pull/5) (OPEN, draft, base `main`, unmerged). *Verified by GitHub/git preflight.*
+- **Branch (HISTORICAL snapshot at time of investigation):** `fix/l0-05-p0-conversation-atomic` (tracked `origin/fix/l0-05-p0-conversation-atomic`), PR [#5](https://github.com/radmanmilos/air/pull/5) (**HISTORICAL: OPEN, draft, base `main`, unmerged at the time this investigation was recorded**). *Verified by GitHub/git preflight at the time.*
+- **PR #5 final disposition (see §13): MERGED** at `c27dcdf4a5c4f6cc2e15809273ad19ecec532877`. Current `main` baseline is `a42428b30cb47e7d01d014cb4eff7b035635ffa5`. Do not read the "OPEN/draft/unmerged" wording above as the current state.
 - **P1-05 implementation SHA reviewed (runtime increment):** `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (`fix(evals): add fail-closed P1-05 safety oracle boundary contract`). CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success, 7/7 jobs**. *Verified by GitHub CI.*
 - **Latest documentation/branch SHA before this correction:** `4bd48db041a3b01c7251ceab7055264ffff5a8bf` (`docs(review): record P1-05 fail-closed CI evidence`) — local == origin == PR #5 head before this reconciliation commit. CI [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962) **completed success, 7/7 jobs** for exact SHA `4bd48db`. *Verified by git/GitHub CI.*
 - **Historical snapshots (preserved):** P1-03 implementation `42ee626809446d4cd17c44633db890401b2d9688`, CI [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) success (7/7) — baseline for sections 3–6/8 as recorded; follow-up docs/housekeeping heads `1d83ed0` CI [43382851018](https://github.com/radmanmilos/air/actions/runs/43382851018), `f16ee78` CI [43383888852](https://github.com/radmanmilos/air/actions/runs/43383888852).
@@ -294,3 +295,30 @@ CLI (bin/air.ts) / MCP (src/mcp/server.ts) -> src/evals/runner.ts::runEvaluation
 
 ### Conclusion
 P1-05 execution is **DEFERRED (approved) to SEC-W1**. The fail-closed boundary is complete and CI-verified; no OS-enforced sandbox or untrusted execution is implemented or claimed on any platform. The experimental Windows prototype is retained but not enabled. L0-05 is complete under the revised scope.
+
+## 13. Final disposition — PR #5 and current main baseline (added 2026-11-16)
+
+This section records the **current** repository state and corrects the historical wording in §1 without destroying the audit trail. Everything above §13 reflects the state of the repository **at the time the investigation was recorded**; the "OPEN/draft/unmerged" description of PR #5 and the `main` HEAD `f5e45a345f430b96d66933838944469886879689` quoted in §1 are **historical snapshots**, not the current state.
+
+### Verified current facts
+
+| Fact | Value | Evidence |
+|---|---|---|
+| PR #5 state | **MERGED** | `gh pr list --state all` returns `MERGED` for PR #5, merged 2026-11-12T19:44:09Z |
+| PR #5 merge commit | `c27dcdf4a5c4f6cc2e15809273ad19ecec532877` | `git cat-file -t` = `commit`; parents are `f5e45a3` (old main) and `6b9442a` (PR head) |
+| Merge commit is ancestor of current main | **yes** | `git merge-base --is-ancestor c27dcdf origin/main` succeeds |
+| Current local branch | `main` | `git branch` |
+| Current HEAD | `a42428b30cb47e7d01d014cb4eff7b035635ffa5` | `git rev-parse HEAD` |
+| Upstream tracking | `origin/main` | `git rev-parse --abbrev-ref "main@{upstream}"` |
+| Working tree | clean | `git status --short --branch` → `## main...origin/main` |
+| Local vs origin/main | even (0/0) | `git rev-list --left-right --count main...origin/main` |
+| Latest `origin/main` CI | run [43837436658](https://github.com/radmanmilos/air/actions/runs/43837436658) — **completed, success** | `gh run list --branch main` |
+| Merge-commit CI | run [43836537780](https://github.com/radmanmilos/air/actions/runs/43836537780) — **completed, success**, headSha `c27dcdf...` | `gh run view 43836537780 --json` |
+
+### Disposition
+
+- PR #5 (`fix/l0-05-p0-conversation-atomic`) is **merged**. The "OPEN, draft, base main, unmerged" wording in §1 is preserved as a historical record of the state at investigation time and is explicitly labelled as historical above.
+- The `main` HEAD quoted in §1 (`f5e45a345f430b96d66933838944469886879689`) is the **pre-merge baseline**, not the current baseline. Current baseline is `a42428b30cb47e7d01d014cb4eff7b035635ffa5`.
+- All exact-SHA CI evidence in §2 and the acceptance table in §9 remains valid for the SHAs it names; none of those SHAs is the current HEAD.
+- L0-05 is complete under the revised scope; P1-05 execution remains **DEFERRED to SEC-W1** and is not claimed PASS/DONE.
+- L3/L4 remain **BLOCKED** by L0-03, L0-04d and L1/L2 — not by L0-05 or PR #5.

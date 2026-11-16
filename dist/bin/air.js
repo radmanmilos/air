@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import chalk from 'chalk';
+import { configureColor, out, startupHeader, printWelcome, log, isInteractive } from '../src/cli/output.js';
 import { loadConfig, migrateConfig } from '../src/config/loader.js';
 import { loadCatalog, catalogTools } from '../src/config/catalog.js';
 import { createHealthTracker } from '../src/health/tracker.js';
@@ -20,7 +20,11 @@ program
     .name('air')
     .description('Unified AI tool orchestrator')
     .version(AIR_VERSION)
-    .option('--dev', 'Developer mode: verbose diagnostics and full logs');
+    .option('--dev', 'Developer mode: verbose diagnostics and full logs')
+    .option('--no-color', 'Disable color output (also respects NO_COLOR)');
+// Color is a presentation choice, never a behavior. Configure before any
+// output so piped/scripted/CI usage is clean text.
+configureColor();
 async function listAdapters(config) {
     // Production registry: real adapters only, discovered from PATH.
     // MockAdapter is test-only and injected explicitly by tests.
@@ -43,18 +47,14 @@ function orchestratorFor(config, cacheDir) {
  * explicit, opt-in action (`air merge <id> --apply`).
  */
 function printApplyNextStep(runId) {
-    console.log(chalk.bold.cyan(`Next: air merge ${runId} --apply`));
-    console.log(chalk.gray(`Preview first with: air merge ${runId}`));
+    console.log(out.bold(out.cyan(`Next: air merge ${runId} --apply`)));
+    console.log(out.gray(`Preview first with: air merge ${runId}`));
 }
 async function runAction(task, options) {
     if (process.argv.includes('--dev'))
         process.env.AIR_DEV = '1';
-    console.log(chalk.cyan('╔═══════════════════════════════════════╗'));
-    console.log(chalk.cyan('║') + chalk.bold('   AIR - Adaptive Intelligence Router  ') + chalk.cyan('║'));
-    console.log(chalk.cyan('║') + chalk.gray('  "AIR is free and so are we"') + chalk.cyan('║'));
-    console.log(chalk.cyan('╚═══════════════════════════════════════╝'));
-    console.log(chalk.cyan('air run'));
-    console.log(chalk.gray('Task:'), task);
+    console.log(startupHeader(AIR_VERSION, 'run'));
+    console.log(out.gray('Task:'), task);
     const cwd = options.cwd ?? process.cwd();
     const { config } = await loadConfig({ cwd });
     const orch = orchestratorFor(config, undefined);
@@ -74,7 +74,7 @@ async function runAction(task, options) {
             }
         }
         catch (err) {
-            console.log(chalk.red(err?.message ?? String(err)));
+            console.log(out.red(err?.message ?? String(err)));
             process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
         }
         const results = await Promise.all(sessions.map(async (s) => {
@@ -114,46 +114,46 @@ async function runAction(task, options) {
         catch { /* noop */ }
         const s = orch.get(session.runId);
         if (!s) {
-            console.log(chalk.red('No session result.'));
+            console.log(out.red('No session result.'));
             process.exit(EXIT_CODES.TASK_FAILURE);
         }
         if (s.state === 'CANCELLED') {
-            console.log(chalk.yellow('Cancelled by user.'));
+            console.log(out.yellow('Cancelled by user.'));
             process.exit(EXIT_CODES.USER_CANCELLED);
         }
         if (s.state === 'AWAITING_APPROVAL') {
-            console.log(chalk.yellow(`Failover proposed for ${session.runId}. Approve to continue.`));
+            console.log(out.yellow(`Failover proposed for ${session.runId}. Approve to continue.`));
             process.exit(EXIT_CODES.FAILOVER_PROPOSED);
         }
         if (s.result === 'NO_CHANGES') {
-            console.log(chalk.yellow('Tool exited 0 but no workspace changes detected (NO_CHANGES).'));
+            console.log(out.yellow('Tool exited 0 but no workspace changes detected (NO_CHANGES).'));
             process.exit(EXIT_CODES.NO_CHANGES);
         }
         if (s.result === 'SUCCEEDED_WITH_CHANGES' || s.result === 'SUCCEEDED_READ_ONLY') {
-            console.log(chalk.green(`Succeeded (${s.result}).`));
+            console.log(out.green(`Succeeded (${s.result}).`));
             if (s.result === 'SUCCEEDED_WITH_CHANGES') {
                 printApplyNextStep(session.runId);
             }
             process.exit(EXIT_CODES.SUCCESS);
         }
         // FAILED or unknown
-        console.log(chalk.red(`Failed.`));
+        console.log(out.red(`Failed.`));
         process.exit(EXIT_CODES.TASK_FAILURE);
     }
     catch (err) {
         const msg = String(err?.message || err);
         // Dirty tree refusal from orchestrator.
         if (msg.includes('Working tree is dirty') || msg.includes('Not a Git repository')) {
-            console.log(chalk.red(msg));
+            console.log(out.red(msg));
             process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
         }
         // No eligible candidate.
         if (msg.includes('No eligible candidate') || msg.includes('Hop cap reached')) {
-            console.log(chalk.red(msg));
-            console.log(chalk.gray('No eligible candidate.'));
+            console.log(out.red(msg));
+            console.log(out.gray('No eligible candidate.'));
             process.exit(EXIT_CODES.ALL_EXHAUSTED);
         }
-        console.log(chalk.red(msg));
+        console.log(out.red(msg));
         process.exit(EXIT_CODES.TASK_FAILURE);
     }
 }
@@ -192,16 +192,16 @@ function showStatus(options) {
             process.stdout.write(JSON.stringify(data) + '\n');
             return;
         }
-        console.log(chalk.cyan('air status'));
-        console.log(chalk.gray('Tools:'), data.tools.map((t) => {
+        console.log(out.cyan('air status'));
+        console.log(out.gray('Tools:'), data.tools.map((t) => {
             const inst = t.installed ? `installed${t.version ? ` v${t.version}` : ''}` : 'not-installed';
             return `${t.id} (${inst})${t.available ? '' : ' (unavailable)'}`;
         }).join(', ') || 'none');
-        console.log(chalk.gray('Local worker:'), localWorker.provisioned ? `provisioned (${localWorker.python})` : 'not provisioned (run `air setup local`)');
-        console.log(chalk.gray('Cooldowns:'), data.cooldowns.length);
-        console.log(chalk.gray('Successes:'), snap.totalSuccesses);
-        console.log(chalk.gray('Failures:'), snap.totalFailures);
-        console.log(chalk.gray('Active cooldown:'), snap.hasActiveCooldown ? 'yes' : 'no');
+        console.log(out.gray('Local worker:'), localWorker.provisioned ? `provisioned (${localWorker.python})` : 'not provisioned (run `air setup local`)');
+        console.log(out.gray('Cooldowns:'), data.cooldowns.length);
+        console.log(out.gray('Successes:'), snap.totalSuccesses);
+        console.log(out.gray('Failures:'), snap.totalFailures);
+        console.log(out.gray('Active cooldown:'), snap.hasActiveCooldown ? 'yes' : 'no');
     });
 }
 program
@@ -236,7 +236,7 @@ program
         process.stdout.write(JSON.stringify(payload) + '\n');
         return;
     }
-    console.log(chalk.cyan('air route-test'));
+    console.log(out.cyan('air route-test'));
     console.log(report);
 });
 const configCmd = program
@@ -248,16 +248,16 @@ const configCmd = program
         const { config, errors } = await loadConfig({ cwd: process.cwd() });
         if (errors.length > 0) {
             for (const e of errors)
-                console.log(chalk.red(redact(e)));
+                console.log(out.red(redact(e)));
             process.exit(4);
         }
-        console.log(chalk.green('Config is valid.'));
-        console.log(chalk.gray('Version:'), config.version);
-        console.log(chalk.gray('Failover mode:'), config.failover.mode);
+        console.log(out.green('Config is valid.'));
+        console.log(out.gray('Version:'), config.version);
+        console.log(out.gray('Failover mode:'), config.failover.mode);
         return;
     }
-    console.log(chalk.cyan('air config'));
-    console.log(chalk.yellow('Not implemented yet'));
+    console.log(out.cyan('air config'));
+    console.log(out.yellow('Not implemented yet'));
 });
 configCmd
     .command('migrate')
@@ -265,10 +265,10 @@ configCmd
     .action(async () => {
     const result = await migrateConfig();
     if (result.ok) {
-        console.log(chalk.green(result.message));
+        console.log(out.green(result.message));
     }
     else {
-        console.log(chalk.red(result.message));
+        console.log(out.red(result.message));
         process.exit(4);
     }
 });
@@ -289,7 +289,7 @@ program
     // CLI-supplied commands are always trusted (G3-11).
     const trust = checkVerifyTrust(cmd, [], options.cwd ?? process.cwd(), 'cli');
     if (!trust.trusted) {
-        console.log(chalk.red(`Verify refused: ${trust.reason}`));
+        console.log(out.red(`Verify refused: ${trust.reason}`));
         process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     const result = await runVerify(cmd, options.cwd ?? process.cwd());
@@ -304,14 +304,14 @@ program
     const cwd = options.cwd ?? process.cwd();
     const { config } = await loadConfig({ cwd });
     if (!config.verify.enabled || !config.verify.command) {
-        console.log(chalk.yellow('No verify command configured for this repo.'));
+        console.log(out.yellow('No verify command configured for this repo.'));
         process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     // Repo-config commands are refused unless the cwd is in the global
     // trusted-repos list (G3-11). CLI-supplied commands are always trusted.
     const trust = checkVerifyTrust([config.verify.command], config.trustedRepos ?? [], cwd, 'repo');
     if (!trust.trusted) {
-        console.log(chalk.red(`Verify refused: ${trust.reason}`));
+        console.log(out.red(`Verify refused: ${trust.reason}`));
         process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     const cmd = config.verify.command.split(/\s+/).filter(Boolean);
@@ -436,7 +436,7 @@ adaptersCmd
         process.stdout.write(JSON.stringify(rows) + '\n');
         return;
     }
-    console.log(chalk.cyan('air adapters list'));
+    console.log(out.cyan('air adapters list'));
     for (const r of rows) {
         const inst = r.installed ? `installed${r.version ? ` v${r.version}` : ''}` : 'not-installed';
         const verified = r.verified ? ' [verified]' : '';
@@ -452,36 +452,36 @@ adaptersCmd
     const catalog = await loadCatalog(config);
     const entry = catalog.tools.find((t) => t.id === id);
     if (!entry) {
-        console.log(chalk.red(`Unknown adapter: ${id}`));
+        console.log(out.red(`Unknown adapter: ${id}`));
         process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     const current = getInstallStatus(id, entry.executable);
     if (current.status === 'installed') {
-        console.log(chalk.yellow(`${id} is already installed (v${current.version})`));
+        console.log(out.yellow(`${id} is already installed (v${current.version})`));
         return;
     }
     if (!options.yes) {
-        console.log(chalk.yellow(`About to install ${id} (${entry.name}). This modifies your system.`));
-        console.log(chalk.cyan('Proceed? [y/N] '));
+        console.log(out.yellow(`About to install ${id} (${entry.name}). This modifies your system.`));
+        console.log(out.cyan('Proceed? [y/N] '));
         const answer = await new Promise((resolve) => {
             process.stdin.once('data', (d) => resolve(d.toString().trim().toLowerCase()));
             process.stdin.resume();
         });
         if (answer !== 'y' && answer !== 'yes') {
-            console.log(chalk.yellow('Cancelled.'));
+            console.log(out.yellow('Cancelled.'));
             return;
         }
     }
     try {
         const result = await installAdapter(entry, config);
-        console.log(chalk.green(`${id}: ${result.status}`));
+        console.log(out.green(`${id}: ${result.status}`));
         if (result.version)
-            console.log(chalk.gray(`  version: ${result.version}`));
+            console.log(out.gray(`  version: ${result.version}`));
         if (result.error)
-            console.log(chalk.red(`  error: ${result.error}`));
+            console.log(out.red(`  error: ${result.error}`));
     }
     catch (err) {
-        console.log(chalk.red(`Install failed: ${err?.message || err}`));
+        console.log(out.red(`Install failed: ${err?.message || err}`));
         process.exit(EXIT_CODES.TASK_FAILURE);
     }
 });
@@ -494,34 +494,34 @@ adaptersCmd
     const catalog = await loadCatalog(config);
     const entry = catalog.tools.find((t) => t.id === id);
     if (!entry) {
-        console.log(chalk.red(`Unknown adapter: ${id}`));
+        console.log(out.red(`Unknown adapter: ${id}`));
         process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     const current = getInstallStatus(id, entry.executable);
     if (current.status === 'installed' && current.version === entry.install.version) {
-        console.log(chalk.yellow(`${id} is already at v${entry.install.version}`));
+        console.log(out.yellow(`${id} is already at v${entry.install.version}`));
         return;
     }
     if (!options.yes) {
-        console.log(chalk.yellow(`About to upgrade ${id} to v${entry.install.version}.`));
-        console.log(chalk.cyan('Proceed? [y/N] '));
+        console.log(out.yellow(`About to upgrade ${id} to v${entry.install.version}.`));
+        console.log(out.cyan('Proceed? [y/N] '));
         const answer = await new Promise((resolve) => {
             process.stdin.once('data', (d) => resolve(d.toString().trim().toLowerCase()));
             process.stdin.resume();
         });
         if (answer !== 'y' && answer !== 'yes') {
-            console.log(chalk.yellow('Cancelled.'));
+            console.log(out.yellow('Cancelled.'));
             return;
         }
     }
     try {
         const result = await upgradeAdapter(entry, config);
-        console.log(chalk.green(`${id}: ${result.status}`));
+        console.log(out.green(`${id}: ${result.status}`));
         if (result.version)
-            console.log(chalk.gray(`  version: ${result.version}`));
+            console.log(out.gray(`  version: ${result.version}`));
     }
     catch (err) {
-        console.log(chalk.red(`Upgrade failed: ${err?.message || err}`));
+        console.log(out.red(`Upgrade failed: ${err?.message || err}`));
         process.exit(EXIT_CODES.TASK_FAILURE);
     }
 });
@@ -534,27 +534,27 @@ adaptersCmd
     const catalog = await loadCatalog(config);
     const entry = catalog.tools.find((t) => t.id === id);
     if (!entry) {
-        console.log(chalk.red(`Unknown adapter: ${id}`));
+        console.log(out.red(`Unknown adapter: ${id}`));
         process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     if (!options.yes) {
-        console.log(chalk.yellow(`About to uninstall ${id}.`));
-        console.log(chalk.cyan('Proceed? [y/N] '));
+        console.log(out.yellow(`About to uninstall ${id}.`));
+        console.log(out.cyan('Proceed? [y/N] '));
         const answer = await new Promise((resolve) => {
             process.stdin.once('data', (d) => resolve(d.toString().trim().toLowerCase()));
             process.stdin.resume();
         });
         if (answer !== 'y' && answer !== 'yes') {
-            console.log(chalk.yellow('Cancelled.'));
+            console.log(out.yellow('Cancelled.'));
             return;
         }
     }
     try {
         await uninstallAdapter(entry);
-        console.log(chalk.green(`${id}: uninstalled`));
+        console.log(out.green(`${id}: uninstalled`));
     }
     catch (err) {
-        console.log(chalk.red(`Uninstall failed: ${err?.message || err}`));
+        console.log(out.red(`Uninstall failed: ${err?.message || err}`));
         process.exit(EXIT_CODES.TASK_FAILURE);
     }
 });
@@ -566,24 +566,24 @@ adaptersCmd
     const catalog = await loadCatalog(config);
     const entry = catalog.tools.find((t) => t.id === id);
     if (!entry) {
-        console.log(chalk.red(`Unknown adapter: ${id}`));
+        console.log(out.red(`Unknown adapter: ${id}`));
         process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
     }
     const status = getInstallStatus(id, entry.executable);
     const refreshed = refreshAdapterAvailability(id);
-    console.log(chalk.cyan(`air adapters status ${id}`));
-    console.log(chalk.gray(`  name:          ${entry.name}`));
-    console.log(chalk.gray(`  adapterId:     ${entry.adapterId}`));
-    console.log(chalk.gray(`  provider:      ${entry.provider}`));
-    console.log(chalk.gray(`  model:         ${entry.model}`));
-    console.log(chalk.gray(`  executable:    ${entry.executable}`));
-    console.log(chalk.gray(`  installed:     ${status.installed}`));
-    console.log(chalk.gray(`  version:       ${status.version ?? 'n/a'}`));
-    console.log(chalk.gray(`  status:        ${status.status}`));
-    console.log(chalk.gray(`  available:     ${refreshed?.available ?? false}`));
-    console.log(chalk.gray(`  installAttempts: ${status.installAttempts}`));
+    console.log(out.cyan(`air adapters status ${id}`));
+    console.log(out.gray(`  name:          ${entry.name}`));
+    console.log(out.gray(`  adapterId:     ${entry.adapterId}`));
+    console.log(out.gray(`  provider:      ${entry.provider}`));
+    console.log(out.gray(`  model:         ${entry.model}`));
+    console.log(out.gray(`  executable:    ${entry.executable}`));
+    console.log(out.gray(`  installed:     ${status.installed}`));
+    console.log(out.gray(`  version:       ${status.version ?? 'n/a'}`));
+    console.log(out.gray(`  status:        ${status.status}`));
+    console.log(out.gray(`  available:     ${refreshed?.available ?? false}`));
+    console.log(out.gray(`  installAttempts: ${status.installAttempts}`));
     if (status.error)
-        console.log(chalk.red(`  error:         ${status.error}`));
+        console.log(out.red(`  error:         ${status.error}`));
 });
 program
     .command('resume')
@@ -597,14 +597,14 @@ program
     const orch = orchestratorFor(config, undefined);
     try {
         const session = await orch.resume(runId, task);
-        console.log(chalk.green(`Resumed ${session.runId} (parent: ${runId})`));
-        console.log(chalk.gray(`Adapter: ${session.adapterId} (${session.provider}/${session.model})`));
-        console.log(chalk.gray(`State: ${session.state}`));
-        console.log(chalk.gray(`Result: ${session.result ?? 'pending'}`));
+        console.log(out.green(`Resumed ${session.runId} (parent: ${runId})`));
+        console.log(out.gray(`Adapter: ${session.adapterId} (${session.provider}/${session.model})`));
+        console.log(out.gray(`State: ${session.state}`));
+        console.log(out.gray(`Result: ${session.result ?? 'pending'}`));
         process.exit(EXIT_CODES.SUCCESS);
     }
     catch (err) {
-        console.log(chalk.red(String(err?.message || err)));
+        console.log(out.red(String(err?.message || err)));
         process.exit(EXIT_CODES.TASK_FAILURE);
     }
 });
@@ -627,6 +627,18 @@ program
     .option('--resume <id>', 'Resume a conversation')
     .option('--free-only', 'Prefer free models (default true)')
     .action(async (options) => {
+    // `air chat` is an interactive REPL. In a non-TTY environment (piped,
+    // scripted, CI) entering readline would hang or corrupt output, so refuse
+    // with a clear message pointing at the non-interactive commands instead.
+    // The E2E harness drives chat with piped stdio; it opts in explicitly via
+    // AIR_E2E_TTY=1 so the guard does not break the test driver.
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+        if (process.env.AIR_E2E_TTY !== '1') {
+            process.stderr.write('air chat requires an interactive terminal.\n');
+            process.stderr.write('For non-interactive use, try: air run "<task>" or air status --json.\n');
+            process.exit(EXIT_CODES.CONFIG_OR_DIRTY);
+        }
+    }
     const { createConversation, loadConversation, saveConversation, appendMessage, injectResult, mutateConversation } = await import('../src/conversation/index.js');
     const { decide } = await import('../src/conversation/decide.js');
     const { planFromRequest } = await import('../src/planner/index.js');
@@ -639,8 +651,8 @@ program
     if (!conv)
         conv = createConversation({ freeOnly: options.freeOnly !== false });
     saveConversation(conv);
-    console.log(chalk.cyan(`air chat (conversation ${conv.id})`));
-    console.log(chalk.gray('Type a message, /run <task>, /status, /jobs, /cancel [id], /last, /help, /quit'));
+    console.log(out.cyan(`air chat (conversation ${conv.id}`));
+    log(`Type a message, /run <task>, /status, /jobs, /cancel [id], /last, /help, /quit`);
     const eventLog = process.env.AIR_EVENT_LOG;
     const logEvent = (type, detail) => {
         if (!eventLog)
@@ -677,7 +689,7 @@ program
         await appendMessage(conv.id, { role: 'assistant', content: `Started job ${session.runId}.` });
         logEvent('job_started', session.runId);
         logEvent('notice_printed', `Started job ${session.runId}`);
-        console.log(chalk.green(`Started job ${session.runId}`));
+        console.log(out.green(`Started job ${session.runId}`));
         // Background waiter.
         const p = (async () => {
             try {
@@ -711,10 +723,10 @@ program
                         c.facts.push(bullet);
                 });
                 logEvent('job_finished', `${session.runId}: ${summary.split('.')[0]}`);
-                console.log(chalk.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
+                console.log(out.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
             }
             catch (err) {
-                console.log(chalk.red(`job ${session.runId} error: ${String(err)}`));
+                console.log(out.red(`job ${session.runId} error: ${String(err)}`));
             }
             finally {
                 jobHandles.delete(session.runId);
@@ -734,32 +746,32 @@ program
             return;
         }
         if (trimmed === '/help') {
-            console.log(chalk.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel [id], /last, /stats, /tasks, /quit'));
+            console.log(out.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel [id], /last, /stats, /tasks, /quit'));
             return;
         }
         if (trimmed === '/status') {
             const c = (await import('../src/conversation/index.js')).loadConversation(conv.id) ?? conv;
-            console.log(chalk.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`));
+            console.log(out.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`));
             return;
         }
         if (trimmed === '/jobs' || trimmed === '/tasks') {
-            console.log(chalk.gray(`active: ${conv.activeWorkIds.join(',') || '(none)'}`));
+            console.log(out.gray(`active: ${conv.activeWorkIds.join(',') || '(none)'}`));
             return;
         }
         if (trimmed === '/stats') {
-            console.log(chalk.gray(`messages=${conv.messages.length} tasks=${conv.activeWorkIds.length} facts=${conv.facts.length}`));
+            console.log(out.gray(`messages=${conv.messages.length} tasks=${conv.activeWorkIds.length} facts=${conv.facts.length}`));
             return;
         }
         if (trimmed === '/last') {
             const last = [...conv.messages].reverse().find((m) => m.role === 'tool');
-            console.log(chalk.gray(last ? last.content : '(no result yet)'));
+            console.log(out.gray(last ? last.content : '(no result yet)'));
             return;
         }
         if (trimmed.startsWith('/cancel ')) {
             const id = trimmed.slice(8).trim();
             const entry = jobHandles.get(id);
             if (!entry) {
-                console.log(chalk.yellow(`No such job: ${id}`));
+                console.log(out.yellow(`No such job: ${id}`));
                 return;
             }
             try {
@@ -769,7 +781,7 @@ program
             entry.controller.abort();
             await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== id); });
             jobHandles.delete(id);
-            console.log(chalk.yellow(`Cancelled ${id}`));
+            console.log(out.yellow(`Cancelled ${id}`));
             return;
         }
         if (trimmed.startsWith('/run ') || trimmed.startsWith('/plan ')) {
@@ -792,7 +804,7 @@ program
                 }
                 await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== last); });
                 jobHandles.delete(last);
-                console.log(chalk.yellow(`Cancelled ${last}`));
+                console.log(out.yellow(`Cancelled ${last}`));
                 return;
             }
         }
@@ -813,26 +825,31 @@ program
                     const { brainAnswer, isBrainAvailable } = await import('../src/brain/index.js');
                     let reply = 'Acknowledged.';
                     if (await isBrainAvailable()) {
-                        process.stdout.write(chalk.gray('air: thinking...\\n'));
                         logEvent('brain_start', trimmed);
+                        // No interstitial in non-TTY mode: a cleared "thinking..." line
+                        // leaks to piped output and breaks scripted consumers.
+                        if (isInteractive()) {
+                            process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
+                        }
                         const freshConv = loadConversation(conv.id) ?? conv;
                         const r = await brainAnswer(trimmed, { history: freshConv.messages, jobs: freshConv.activeWorkIds });
-                        process.stdout.write('\r' + ' '.repeat(20) + '\r');
+                        if (isInteractive())
+                            process.stderr.write('\u001b[2K\r');
                         logEvent('brain_end', r.text.slice(0, 200));
                         reply = r.text;
                     }
                     await appendMessage(conv.id, { role: 'assistant', content: reply });
-                    console.log(chalk.gray(`air: ${reply}`));
+                    console.log(out.gray(`air: ${reply}`));
                 })().catch((err) => {
-                    console.log(chalk.red(`brain error: ${String(err)}`));
+                    console.log(out.red(`brain error: ${String(err)}`));
                 });
             }
             else if (a.type === 'clarify') {
                 await appendMessage(conv.id, { role: 'assistant', content: a.question });
-                console.log(chalk.gray(`air: ${a.question}`));
+                console.log(out.gray(`air: ${a.question}`));
             }
             else if (a.type === 'status') {
-                console.log(chalk.gray(`messages=${conv.messages.length} active=${conv.activeWorkIds.join(',')}`));
+                console.log(out.gray(`messages=${conv.messages.length} active=${conv.activeWorkIds.join(',')}`));
             }
             else if (a.type === 'cancel_job') {
                 const entry = jobHandles.get(a.jobId);
@@ -844,7 +861,7 @@ program
                     entry.controller.abort();
                 }
                 await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== a.jobId); });
-                console.log(chalk.yellow(`Cancelled ${a.jobId}`));
+                console.log(out.yellow(`Cancelled ${a.jobId}`));
             }
         }
     });
@@ -862,7 +879,7 @@ program
     const { readTaskState } = await import('../src/execution/task-state.js');
     const st = await readTaskState(jobId);
     if (!st || !st.worktreePath || !st.sourceCwd) {
-        console.log(chalk.red('No worktree info for job.'));
+        console.log(out.red('No worktree info for job.'));
         process.exit(1);
     }
     const { applyWorktree, previewWorktree } = await import('../src/workspace/index.js');
@@ -875,18 +892,18 @@ program
     };
     if (!options.apply) {
         const preview = previewWorktree(info);
-        console.log(chalk.cyan(`air merge ${jobId} (preview)`));
+        console.log(out.cyan(`air merge ${jobId} (preview)`));
         if (preview.changedFiles.length === 0) {
-            console.log(chalk.yellow('No changes to apply.'));
+            console.log(out.yellow('No changes to apply.'));
         }
         else {
             console.log(preview.diffStat || preview.changedFiles.map((f) => `  ${f}`).join('\n'));
         }
-        console.log(chalk.bold(`Nothing was changed. Re-run with --apply to merge into ${st.sourceCwd}.`));
+        console.log(out.bold(`Nothing was changed. Re-run with --apply to merge into ${st.sourceCwd}.`));
         process.exit(0);
     }
     const res = applyWorktree(info);
-    console.log(res.ok ? chalk.green(res.message) : chalk.red(res.message));
+    console.log(res.ok ? out.green(res.message) : out.red(res.message));
     process.exit(res.ok ? 0 : 1);
 });
 program
@@ -903,13 +920,13 @@ program
     const { provisionLocalWorker, formatProvisionResult } = await import('../src/worker/provision.js');
     const result = await provisionLocalWorker({
         force: !!options.force,
-        log: options.json ? undefined : (line) => console.log(chalk.gray(line)),
+        log: options.json ? undefined : (line) => console.log(out.gray(line)),
     });
     if (options.json) {
         process.stdout.write(JSON.stringify(result) + '\n');
     }
     else {
-        console.log(result.ok ? chalk.green(formatProvisionResult(result)) : chalk.red(formatProvisionResult(result)));
+        console.log(result.ok ? out.green(formatProvisionResult(result)) : out.red(formatProvisionResult(result)));
     }
     process.exit(result.ok ? 0 : EXIT_CODES.TASK_FAILURE);
 });
@@ -925,8 +942,14 @@ program
         process.stdout.write(JSON.stringify(report) + '\n');
     }
     else {
-        console.log(report.ok ? chalk.green(formatDoctorReport(report)) : chalk.red(formatDoctorReport(report)));
+        console.log(report.ok ? out.green(formatDoctorReport(report)) : out.red(formatDoctorReport(report)));
     }
     process.exit(report.ok ? 0 : 1);
 });
+// No-args entrypoint: a short welcome instead of a bare usage block. This
+// never installs or starts anything; it points at the next useful command.
+if (!process.argv.slice(2).length) {
+    printWelcome(AIR_VERSION);
+    process.exit(0);
+}
 program.parse();

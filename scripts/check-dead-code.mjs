@@ -53,6 +53,15 @@ const BASELINE = new Set([
 	'src/security/allowlist.ts#isModelAllowed',
 	'src/security/redact.ts#redactValue',
 	'src/security/streaming-redact.ts#containsSecret',
+	// CLI presentation surface (UI-02): public API consumed by bin/air.ts and
+	// intended for future clients (terminal/desktop/VS Code extension).
+	'src/cli/output.ts#supportsColor',
+	'src/cli/output.ts#isInteractive',
+	'src/cli/output.ts#configureColor',
+	'src/cli/output.ts#startupHeader',
+	'src/cli/output.ts#printWelcome',
+	'src/cli/output.ts#log',
+	'src/cli/output.ts#status',
 	// execution
 	'src/execution/sessions.ts#assertSessionIsolation',
 	// workspace
