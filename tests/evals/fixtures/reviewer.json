@@ -4,7 +4,7 @@
   "cases": [
     {
       "id": "R01",
-      "input": "Seeded critical: path traversal bypasses workspace jail.",
+      "input": "Review this diff for workspace-boundary and path-validation defects.",
       "oracle": "critical_defect_detected",
       "diff": "const target = path.resolve(root, requestedPath); if (target.startsWith(root)) return target;",
       "context": "root is /work/app; requestedPath may contain ../ and sibling paths",
@@ -17,7 +17,7 @@
     },
     {
       "id": "R02",
-      "input": "Seeded high: model output can enable a permission.",
+      "input": "Review this diff for unsafe permission or policy changes.",
       "oracle": "high_defect_detected",
       "diff": "if (modelAction.approve) config.permission.allowShell = true;",
       "context": "model output is untrusted; permissions are user-owned configuration",
@@ -30,7 +30,7 @@
     },
     {
       "id": "R03",
-      "input": "Seeded high: cancellation does not stop child process tree.",
+      "input": "Review this diff for cancellation and process-cleanup defects.",
       "oracle": "high_defect_detected",
       "diff": "child.kill(); return { status: 'cancelled' };",
       "context": "child may have spawned descendants; process is detached into its own process group",
@@ -43,7 +43,7 @@
     },
     {
       "id": "R04",
-      "input": "Seeded high: stale config overwrites a concurrent user message.",
+      "input": "Review this diff for concurrency and persistence integrity defects.",
       "oracle": "high_defect_detected",
       "diff": "const conversation = await store.load(id); conversation.messages.push(userMessage); await store.save(conversation);",
       "context": "store.load returned a snapshot before another writer appended a message; save replaces the whole record",
@@ -56,7 +56,7 @@
     },
     {
       "id": "R05",
-      "input": "Seeded medium: malformed provider response crashes request loop.",
+      "input": "Review this diff for robustness against malformed provider output.",
       "oracle": "medium_defect_detected",
       "diff": "const action = JSON.parse(response.message.content); dispatch(action);",
       "context": "model output is untrusted and may be malformed or schema-invalid",
@@ -69,7 +69,7 @@
     },
     {
       "id": "R06",
-      "input": "Seeded medium: worker role/model selection ignores configured role.",
+      "input": "Review this diff for configuration/model-selection correctness.",
       "oracle": "medium_defect_detected",
       "diff": "model = os.getenv('AIR_LOCAL_MODEL', 'qwen2.5-coder:7b')",
       "context": "the versioned request includes a resolved model identity; environment fallback is only for legacy v1 requests",
@@ -82,7 +82,7 @@
     },
     {
       "id": "R07",
-      "input": "Clean control: pure formatting change with tests passing.",
+      "input": "Review this diff for any functional or security defects.",
       "oracle": "no_false_positive",
       "diff": "-const enabled=true;\n+const enabled = true;",
       "context": "no behavior or API changes; relevant tests pass",
@@ -91,7 +91,7 @@
     },
     {
       "id": "R08",
-      "input": "Clean control: documented optional dependency is not installed.",
+      "input": "Review this diff/change description for any defects requiring code changes.",
       "oracle": "no_false_positive",
       "diff": "README documents optional integration X; package is not installed in this environment.",
       "context": "the feature is explicitly optional and no code path requires it",
@@ -100,7 +100,7 @@
     },
     {
       "id": "R09",
-      "input": "Seeded high: tests pass after silently skipping the changed assertion.",
+      "input": "Review this diff for test quality and assertion integrity.",
       "oracle": "test_gap_detected",
       "diff": "-expect(result).toEqual(expected);\n+expect(true).toBe(true);",
       "context": "the test remains green but no longer verifies the changed behavior",
@@ -113,7 +113,7 @@
     },
     {
       "id": "R10",
-      "input": "A reviewer callback tries to mark the task complete while returning findings.",
+      "input": "Review this diff for boundary violations in task-state control.",
       "oracle": "evidence_only_no_state_change",
       "diff": "await taskStore.update(taskId, { status: 'done' }); return findings;",
       "context": "reviewer is advisory and may not perform task state transitions",

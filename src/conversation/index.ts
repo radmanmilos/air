@@ -9,11 +9,11 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { resolvePaths } from '../config/paths';
 import { redact } from '../security/redact';
+import { lockedReadModifyWrite } from '../utils/lock';
 
 function airPaths() {
   return resolvePaths({ env: process.env });
 }
-import { lockedReadModifyWrite } from '../utils/lock';
 
 export interface ConversationMessage {
   id: string;
@@ -87,6 +87,11 @@ export function loadConversation(id: string): Conversation | null {
   }
 }
 
+/**
+ * Persist a full conversation object (initial creation or controlled replacement).
+ * Not safe for concurrent in-place updates: use `mutateConversation`/`appendMessage`
+ * after creation so mutations re-read latest state under the per-conversation lock.
+ */
 export function saveConversation(conv: Conversation): void {
   assertId(conv.id);
   conv.updatedAt = new Date().toISOString();
@@ -96,33 +101,61 @@ export function saveConversation(conv: Conversation): void {
   renameSync(tmp, f);
 }
 
-export async function appendMessage(id: string, msg: Omit<ConversationMessage, 'id' | 'ts'> & { id?: string; ts?: string }): Promise<Conversation | null> {
-  return lockedReadModifyWrite<Conversation>(
+/**
+ * Atomically read-modify-write a persisted conversation under the
+ * per-conversation lock. The mutator receives the latest stored state and
+ * must return the next state to persist. Use for all in-place updates after
+ * initial creation to avoid stale-object overwrites.
+ */
+export async function mutateConversation(
+  id: string,
+  mutator: (current: Conversation) => Promise<Conversation | void> | Conversation | void,
+): Promise<Conversation> {
+  const next = await lockedReadModifyWrite<Conversation>(
     `conversation-${id}`,
     file(id),
     async (current) => {
       if (!current) throw new Error(`Conversation ${id} not found`);
-      const full: ConversationMessage = {
-        id: msg.id ?? randomUUID(),
-        role: msg.role,
-        content: msg.content,
-        ts: msg.ts ?? new Date().toISOString(),
-        workId: msg.workId,
-        meta: msg.meta,
-      };
-      current.messages.push(full);
-      current.updatedAt = new Date().toISOString();
-      return current;
+      const result = await mutator(current);
+      const out = (result ?? current) as Conversation;
+      out.updatedAt = new Date().toISOString();
+      return out;
     },
   );
+  if (!next) throw new Error(`Conversation ${id} mutation failed (lock timeout)`);
+  return next;
+}
+
+export async function appendMessage(id: string, msg: Omit<ConversationMessage, 'id' | 'ts'> & { id?: string; ts?: string }): Promise<Conversation> {
+  return mutateConversation(id, (current) => {
+    const full: ConversationMessage = {
+      id: msg.id ?? randomUUID(),
+      role: msg.role,
+      content: msg.content,
+      ts: msg.ts ?? new Date().toISOString(),
+      workId: msg.workId,
+      meta: msg.meta,
+    };
+    current.messages.push(full);
+    return current;
+  });
 }
 
 export async function injectResult(convId: string, summary: string, workId?: string): Promise<void> {
-  const conv = loadConversation(convId);
-  if (conv && workId && conv.messages.some((m) => m.role === 'tool' && m.workId === workId)) {
-    return; // idempotent: already injected
-  }
-  await appendMessage(convId, { role: 'tool', content: summary, workId });
+  await mutateConversation(convId, (current) => {
+    if (workId && current.messages.some((m) => m.role === 'tool' && m.workId === workId)) {
+      return current; // idempotent: already injected
+    }
+    const full: ConversationMessage = {
+      id: randomUUID(),
+      role: 'tool',
+      content: summary,
+      ts: new Date().toISOString(),
+      workId,
+    };
+    current.messages.push(full);
+    return current;
+  });
 }
 
 export function compactConversation(conv: Conversation, maxMessages = 50): Conversation {

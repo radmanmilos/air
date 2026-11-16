@@ -1,17 +1,74 @@
 import { z } from 'zod';
 export const WorkItemSchema = z.object({
-    id: z.string(),
-    objective: z.string(),
+    id: z.string().min(1).max(64),
+    objective: z.string().min(1).max(500),
     taskType: z.enum(['code_edit', 'code_review', 'explain', 'research', 'summarize', 'plan', 'test', 'other']),
     readOnly: z.boolean(),
     requiresWrite: z.boolean(),
     requiresCode: z.boolean(),
-    dependsOn: z.array(z.string()),
-    acceptanceCriteria: z.array(z.string()),
+    dependsOn: z.array(z.string().min(1).max(64)).max(16),
+    acceptanceCriteria: z.array(z.string().min(1).max(300)).min(1).max(16),
 });
-export const PlanSchema = z.object({ workItems: z.array(WorkItemSchema) });
+export const PlanSchema = z.object({ workItems: z.array(WorkItemSchema).min(1).max(32) });
+function hasCycle(items) {
+    const deps = new Map(items.map((i) => [i.id, i.dependsOn]));
+    const visiting = new Set();
+    const visited = new Set();
+    const visit = (id) => {
+        if (visited.has(id))
+            return false;
+        if (visiting.has(id))
+            return true;
+        visiting.add(id);
+        for (const dep of deps.get(id) ?? []) {
+            if (visit(dep))
+                return true;
+        }
+        visiting.delete(id);
+        visited.add(id);
+        return false;
+    };
+    for (const id of deps.keys())
+        if (visit(id))
+            return true;
+    return false;
+}
+export function validatePlanDetailed(input) {
+    const parsed = PlanSchema.safeParse(input);
+    if (!parsed.success) {
+        return { valid: false, errors: parsed.error.issues.map((i) => `${i.path.join('.') || 'plan'}: ${i.message}`) };
+    }
+    const plan = parsed.data;
+    const errors = [];
+    const ids = plan.workItems.map((w) => w.id);
+    const idSet = new Set(ids);
+    if (idSet.size !== ids.length)
+        errors.push('duplicate work item ids');
+    const known = idSet;
+    let totalDeps = 0;
+    for (const item of plan.workItems) {
+        if (item.dependsOn.includes(item.id))
+            errors.push(`self-dependency: ${item.id}`);
+        for (const dep of item.dependsOn) {
+            if (!known.has(dep))
+                errors.push(`unknown dependency: ${item.id} -> ${dep}`);
+        }
+        totalDeps += item.dependsOn.length;
+    }
+    if (totalDeps > 64)
+        errors.push('dependency count exceeds limit');
+    if (hasCycle(plan.workItems))
+        errors.push('dependency cycle detected');
+    if (errors.length > 0)
+        return { valid: false, errors };
+    return { valid: true, plan, errors: [] };
+}
 export function validatePlan(plan) {
-    return PlanSchema.parse(plan);
+    const result = validatePlanDetailed(plan);
+    if (!result.valid || !result.plan) {
+        throw new Error(result.errors.join('; ') || 'invalid plan');
+    }
+    return result.plan;
 }
 export function planFromRequest(goal, hints = {}) {
     const lower = goal.toLowerCase();

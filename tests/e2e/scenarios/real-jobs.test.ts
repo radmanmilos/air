@@ -109,7 +109,7 @@ describe('real: P-04 chat stays responsive during a slow brain call', () => {
   it('answers /status within 2 s while a slow brain call is in flight', async () => {
     const sandbox = createSandbox(fixture());
     try {
-      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change', FAKE_DELAY_MS: '6000', FAKE_BRAIN_RECORD: sandbox.stateDir + '/brain.txt' });
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change', FAKE_DELAY_MS: '6000', AIR_BRAIN_MODEL_OLLAMA: 'fake' });
       const chat = startChat(env, sandbox.repoDir);
       try {
         await chat.waitForLine(/air chat \(conversation/, 0, 10000);
@@ -256,7 +256,7 @@ describe('real: P-06 brain receives conversation history', () => {
   it('persists prior turns so they are available to the brain', async () => {
     const sandbox = createSandbox(fixture());
     try {
-      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change' });
+      const env = chatEnv(sandbox, { FAKE_BEHAVIOR: 'no-change', AIR_BRAIN_MODEL_OLLAMA: 'fake' });
       const chat = startChat(env, sandbox.repoDir);
       let convId = '';
       try {

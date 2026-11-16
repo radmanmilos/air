@@ -14,9 +14,11 @@ export interface ModelMessage {
   name?: string;
   toolCallId?: string;
   images?: string[];
+  /** Assistant tool calls for conversation history (provider-neutral). */
+  toolCalls?: ModelToolCall[];
 }
 
-interface ModelToolDefinition {
+export interface ModelToolDefinition {
   type: 'function';
   function: {
     name: string;

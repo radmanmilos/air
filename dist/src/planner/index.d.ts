@@ -39,21 +39,16 @@ export declare const PlanSchema: z.ZodObject<{
         acceptanceCriteria: z.ZodArray<z.ZodString>;
     }, z.core.$strip>>;
 }, z.core.$strip>;
-export declare function validatePlan(plan: Plan): Plan;
 export type TaskType = 'code_edit' | 'code_review' | 'explain' | 'research' | 'summarize' | 'plan' | 'test' | 'other';
-export interface WorkItem {
-    id: string;
-    objective: string;
-    taskType: TaskType;
-    readOnly: boolean;
-    requiresWrite: boolean;
-    requiresCode: boolean;
-    dependsOn: string[];
-    acceptanceCriteria: string[];
+export type WorkItem = z.infer<typeof WorkItemSchema>;
+export type Plan = z.infer<typeof PlanSchema>;
+export interface PlanValidationResult {
+    valid: boolean;
+    plan?: Plan;
+    errors: string[];
 }
-export interface Plan {
-    workItems: WorkItem[];
-}
+export declare function validatePlanDetailed(input: unknown): PlanValidationResult;
+export declare function validatePlan(plan: Plan): Plan;
 export interface PlanHints {
     requiresWrite?: boolean;
     requiresCode?: boolean;

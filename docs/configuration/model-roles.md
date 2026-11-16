@@ -40,6 +40,7 @@ models:
   providers:
     ollama:
       enabled: true
+      # Absolute HTTP(S) URL only (no credentials, query, or fragment); trailing slashes are normalized.
       baseUrl: http://127.0.0.1:11434
   roles:
     coordinator:

@@ -1,4 +1,4 @@
-import { redact, containsSecret, redactEnvContents } from '@/security/redact';
+import { redact, containsSecret, redactEnvContents, redactValue } from '@/security/redact';
 import { describe, it, expect } from 'vitest';
 
 const KEY = 'sk-or-this-is-a-fake-test-key-1234567890abcdef';
@@ -69,5 +69,35 @@ describe('secret redaction (G-01, G2-09, R3-06)', () => {
   it('multiple secrets in one line are all redacted', () => {
     const out = redact(`k1=${KEY} k2=${KEY}`);
     expect(out.match(/\[REDACTED\]/g)?.length).toBe(2);
+  });
+
+  it('redacts secret-like values recursively in objects and arrays (P2-03)', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const value = { a: 'token=' + secret, b: [{ c: secret }, 'plain ' + secret], n: 42, flag: true };
+    const out = redactValue(value) as typeof value;
+    expect(JSON.stringify(out)).not.toContain(secret);
+    expect(out.n).toBe(42);
+    expect(out.flag).toBe(true);
+    expect(out.a).toContain('[REDACTED]');
+  });
+
+  it('redacts Error messages and stacks recursively (P2-03)', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const err = new Error('boom ' + secret);
+    err.stack = 'stack ' + secret;
+    const out = redactValue(err) as Error;
+    expect(out.message).not.toContain(secret);
+    expect(out.stack).not.toContain(secret);
+    expect(out.name).toBe('Error');
+  });
+
+  it('handles null, undefined, primitives and malformed values without throwing (P2-03)', () => {
+    expect(redactValue(null)).toBeNull();
+    expect(redactValue(undefined)).toBeUndefined();
+    expect(redactValue(7)).toBe(7);
+    expect(redactValue('no secret')).toBe('no secret');
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => redactValue(circular)).not.toThrow();
   });
 });

@@ -80,7 +80,7 @@ Components:
 - **Planner / result compiler** — Lightweight task decomposition and coherent reply compilation (`src/planner`, `src/result-compiler`).
 - **Permissions** — Shared permission policy (`src/permissions`) applied before worker invocation.
 - **Workspace** — Real git worktree isolation per write job (`src/workspace`).
-- **Model runtime (new, not yet wired to chat)** — Provider-neutral TypeScript contracts and an Ollama HTTP provider live under `src/models/`. Logical model roles are configured globally and resolved separately from execution adapters. See [model provider runtime](docs/adapters/model-providers.md) and [model roles](docs/configuration/model-roles.md).
+- **Model runtime** — Provider-neutral TypeScript contracts and an Ollama HTTP provider live under `src/models/`. Logical model roles are configured globally and resolved separately from execution adapters. CLI `air chat` answer replies use the configured local Ollama coordinator role (or an explicit local `AIR_BRAIN_MODEL_OLLAMA` override) only; external coding CLIs are not invoked on the default answer path. See [model provider runtime](docs/adapters/model-providers.md) and [model roles](docs/configuration/model-roles.md).
 - **Local worker** — Internal Python package (`packages/local-worker`) providing its existing Ollama transport, a jailed tool set, and project scaffolding. `air` is its only entrypoint; there is no separate CLI or install. `air setup local` provisions a private venv under the AIR cache directory; `air doctor` reports whether a local job can run. Role/model propagation to the worker remains future work.
 
 ## Repository layout

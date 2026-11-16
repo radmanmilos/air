@@ -10,7 +10,9 @@ export declare function loadConfig(options?: LoadOptions): Promise<{
     errors: string[];
 }>;
 export declare function validateConfigFile(file: string): Promise<string[]>;
-export declare function migrateConfig(): Promise<{
+export declare function migrateConfig(options?: {
+    file?: string;
+}): Promise<{
     ok: boolean;
     message: string;
 }>;

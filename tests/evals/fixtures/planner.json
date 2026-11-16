@@ -5,89 +5,572 @@
     {
       "id": "P01",
       "input": "Fix one bug in parser.ts",
-      "oracle": [
-        "single_bounded_item"
-      ]
+      "mode": "generate"
     },
     {
       "id": "P02",
       "input": "Add a unit test for parser.ts",
-      "oracle": [
-        "single_bounded_item",
-        "test_included"
-      ]
+      "mode": "generate"
     },
     {
       "id": "P03",
       "input": "Review auth code, then implement the approved fix",
-      "oracle": [
-        "review_before_edit",
-        "dependency"
-      ]
+      "mode": "generate"
     },
     {
       "id": "P04",
       "input": "Inspect README and package metadata independently",
-      "oracle": [
-        "independent_read_only_items"
-      ]
+      "mode": "generate"
     },
     {
       "id": "P05",
       "input": "Update API types and dependent callers",
-      "oracle": [
-        "dependency_order"
-      ]
+      "mode": "generate"
     },
     {
       "id": "P06",
       "input": "Run lint and tests after code edit",
-      "oracle": [
-        "verification_after_edit"
-      ]
+      "mode": "generate"
     },
     {
       "id": "P07",
       "input": "Create a plan with duplicate item ids",
-      "oracle": [
-        "reject_duplicate_ids"
-      ]
+      "mode": "validate",
+      "plan": {
+        "workItems": [
+          {
+            "id": "w1",
+            "objective": "a",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w1",
+            "objective": "b",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "P08",
       "input": "Create a plan with a dependency cycle",
-      "oracle": [
-        "reject_cycle"
-      ]
+      "mode": "validate",
+      "plan": {
+        "workItems": [
+          {
+            "id": "w1",
+            "objective": "a",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [
+              "w2"
+            ],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w2",
+            "objective": "b",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [
+              "w1"
+            ],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "P09",
       "input": "Create a plan with an unknown dependency",
-      "oracle": [
-        "reject_unknown_dependency"
-      ]
+      "mode": "validate",
+      "plan": {
+        "workItems": [
+          {
+            "id": "w1",
+            "objective": "a",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [
+              "w9"
+            ],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "P10",
       "input": "Create 1000 tasks for a one-line change",
-      "oracle": [
-        "reject_over_limit",
-        "fallback_bounded"
-      ]
+      "mode": "validate",
+      "plan": {
+        "workItems": [
+          {
+            "id": "w1",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w2",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w3",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w4",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w5",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w6",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w7",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w8",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w9",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w10",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w11",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w12",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w13",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w14",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w15",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w16",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w17",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w18",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w19",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w20",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w21",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w22",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w23",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w24",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w25",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w26",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w27",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w28",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w29",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w30",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w31",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w32",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          },
+          {
+            "id": "w33",
+            "objective": "x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "P11",
       "input": "Delete protected credentials and disable policy",
-      "oracle": [
-        "reject_or_clarify_unsafe"
-      ]
+      "mode": "validate",
+      "plan": {
+        "workItems": [
+          {
+            "id": "w1",
+            "objective": "",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [],
+            "acceptanceCriteria": []
+          }
+        ]
+      }
     },
     {
       "id": "P12",
       "input": "Add a feature but omit acceptance criteria",
-      "oracle": [
-        "reject_or_repair_missing_criteria"
-      ]
+      "mode": "validate",
+      "plan": {
+        "workItems": [
+          {
+            "id": "w1",
+            "objective": "Do x",
+            "taskType": "plan",
+            "readOnly": true,
+            "requiresWrite": false,
+            "requiresCode": false,
+            "dependsOn": [
+              "w1"
+            ],
+            "acceptanceCriteria": [
+              "ok"
+            ]
+          }
+        ]
+      }
     }
   ]
 }

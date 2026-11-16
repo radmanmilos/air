@@ -4,10 +4,14 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildEvalMessages,
+  buildEvalChatRequest,
   cosineSimilarity,
   parseEvalArgs,
   rankTopDocuments,
   runEvaluation,
+  runGenerationSuite,
+  sanitizeEvalRecordValue,
+  validateToolCallProposal,
   type EvalRunnerOptions,
 } from '../../src/evals/runner';
 import type { ModelChatRequest, ModelChatResponse, ModelDescriptor, ModelEmbeddingRequest, ModelEmbeddingResponse, ProviderHealth, RunningModelDescriptor } from '../../src/models/types';
@@ -68,7 +72,28 @@ describe('evaluation prompt and scoring helpers', () => {
     expect(prompt).not.toContain('falsePositiveControl');
   });
 
-  it('includes copied workspace files for coder prompts but not expected file lists', () => {
+  it('recursively sanitizes hidden oracle fields and redacts secret-like fixture text in model payloads (P1-04/P2-03)', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const messages = buildEvalMessages('summarizer', {
+      id: 'S04',
+      input: 'Summarize this ' + secret,
+      messages: [{ role: 'user', content: 'token ' + secret }],
+      required: ['must redact'],
+      forbidden: [secret],
+      nested: { oracle: 'hidden', expected: { severity: 'high' }, note: 'has ' + secret },
+    } as any);
+    const prompt = messages.map((m) => m.content).join('\n');
+    expect(prompt).toContain('[REDACTED]');
+    expect(prompt).not.toContain(secret);
+    expect(prompt).not.toContain('"oracle"');
+    expect(prompt).not.toContain('"expected"');
+    expect(prompt).not.toContain('"required"');
+    expect(prompt).not.toContain('"forbidden"');
+    expect(prompt).not.toContain('"severity"');
+  });
+
+  it('includes copied workspace files for coder prompts but not expected file lists and redacts secrets in workspace content', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
     const messages = buildEvalMessages('coder', {
       id: 'K01',
       input: 'Fix the percentage calculation',
@@ -76,13 +101,55 @@ describe('evaluation prompt and scoring helpers', () => {
       workspace: 'coder-discount',
       expectedFiles: ['src/discount.js'],
       acceptance: ['all tests pass'],
-    }, { 'src/discount.js': 'return price - price * percent;' });
+    }, { 'src/discount.js': 'return price - price * percent; // ' + secret });
     const prompt = messages[1]?.content ?? '';
     expect(prompt).toContain('src/discount.js');
     expect(prompt).toContain('return price');
     expect(prompt).toContain('all tests pass');
+    expect(prompt).toContain('[REDACTED]');
+    expect(prompt).not.toContain(secret);
     expect(prompt).not.toContain('focused_diff_and_test');
     expect(prompt).not.toContain('expectedFiles');
+  });
+
+  it('sanitizes model-visible payloads without mutating authoritative fixture objects', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const fixture = {
+      id: 'S99',
+      input: 'task ' + secret,
+      oracle: 'hidden',
+      nested: { expected: ['x'], note: secret, arr: [{ forbidden: 'y' }] },
+    };
+    const original = JSON.parse(JSON.stringify(fixture));
+    const prompt = buildEvalMessages('summarizer', fixture as any).map((m) => m.content).join('\n');
+    expect(fixture).toEqual(original);
+    expect(prompt).not.toContain(secret);
+    expect(prompt).not.toContain('"oracle"');
+    expect(prompt).not.toContain('"expected"');
+    expect(prompt).not.toContain('"forbidden"');
+  });
+
+  it('redacts secret-like values in persisted records recursively (incl. arrays/errors/diagnostics) while preserving evidence fields (P1-04/P2-03)', () => {
+    const secret = 'sk-air-eval-not-a-real-secret-000000000000';
+    const record = {
+      recordType: 'case',
+      caseId: 'K01',
+      output: 'token=' + secret,
+      toolCalls: [{ function: { name: 'read_file', arguments: { path: 'a', auth: secret } } }],
+      deterministicValidation: { valid: false, errors: [{ message: 'bad ' + secret, path: '$.x' }] },
+      safetyOracles: { oracles: [{ reason: secret }] },
+      error: { message: 'boom ' + secret, stack: 'stack ' + secret },
+      nested: [{ note: secret }],
+    };
+    const sanitized = sanitizeEvalRecordValue(record) as typeof record;
+    const text = JSON.stringify(sanitized);
+    expect(text).not.toContain(secret);
+    expect(text).toContain('[REDACTED]');
+    expect(sanitized.recordType).toBe('case');
+    expect(sanitized.caseId).toBe('K01');
+    expect(sanitized.deterministicValidation.valid).toBe(false);
+    expect(sanitized.deterministicValidation.errors[0]?.path).toBe('$.x');
+    expect(sanitized.toolCalls[0]?.function.name).toBe('read_file');
   });
 
   it('calculates cosine similarity and ranks labelled documents', () => {
@@ -194,6 +261,178 @@ describe('evaluation runner execution boundary', () => {
       });
       expect(provider.embed).toHaveBeenCalledTimes(2);
       expect(provider.chat).not.toHaveBeenCalled();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+
+describe('P1-03 evaluation request integrity', () => {
+  it('supplies ActionSchema format for coordinator requests', () => {
+    const msgs = buildEvalMessages('coordinator', { id: 'C01', input: 'Explain promises', expectedAction: 'answer' });
+    const req = buildEvalChatRequest('coordinator', 'm', msgs, 8192, 1000);
+    expect(req.format).toBeDefined();
+    expect(JSON.stringify(req.format)).toContain('"answer"');
+    expect(JSON.stringify(msgs)).not.toContain('"expectedAction"');
+  });
+
+  it('supplies PlanSchema format for planner requests', () => {
+    const msgs = buildEvalMessages('planner', { id: 'P01', input: 'Plan x', oracle: ['x'] });
+    const req = buildEvalChatRequest('planner', 'm', msgs, 8192, 1000);
+    expect(req.format).toBeDefined();
+    expect(JSON.stringify(req.format)).toContain('workItems');
+    expect(JSON.stringify(msgs)).not.toContain('"oracle"');
+  });
+
+  it('supplies actual tool definitions for tool-calling requests and hides expected tool', () => {
+    const msgs = buildEvalMessages('tool-calling', { id: 'T01', input: 'Read src/index.ts', expectedTool: 'read_file', policyOracle: 'allow' });
+    const req = buildEvalChatRequest('tool-calling', 'm', msgs, 8192, 1000);
+    expect(Array.isArray(req.tools)).toBe(true);
+    expect(req.tools?.some((t) => t.function.name === 'read_file')).toBe(true);
+    const prompt = msgs.map((m) => m.content).join('\n');
+    expect(prompt).toContain('read_file');
+    expect(prompt).not.toContain('expectedTool');
+    expect(prompt).not.toContain('policyOracle');
+  });
+
+  it('does not leak reviewer oracle labels in real fixture prompts', async () => {
+    const raw = await readFile(join(process.cwd(), 'tests', 'evals', 'fixtures', 'reviewer.json'), 'utf8');
+    const catalog = JSON.parse(raw) as { cases: Array<{ id: string; input: string; expectedFinding?: unknown }> };
+    for (const fixture of catalog.cases) {
+      const msgs = buildEvalMessages('reviewer', fixture as any);
+      const prompt = msgs.map((m) => m.content).join('\n');
+      expect(prompt).not.toMatch(/Seeded critical|Seeded high|Seeded medium|Clean control/i);
+      expect(prompt).not.toContain('expectedFinding');
+      expect(prompt).not.toContain('falsePositiveControl');
+      expect(prompt).not.toContain('"oracle"');
+    }
+  });
+});
+
+describe('P1-06 planner validate cases (runner-level)', () => {
+  function plannerRunOptions(output: string): EvalRunnerOptions {
+    return {
+      suite: 'planner',
+      model: 'test-model:latest',
+      baseUrl: 'http://127.0.0.1:11434',
+      output,
+      repetitions: 1,
+      warmups: 0,
+      context: 2048,
+      promptVersion: 'test-prompt-v1',
+      timeoutMs: 5000,
+    };
+  }
+
+  it('runs validate cases via deterministic validation without provider.chat and records expected metadata', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'air-eval-planner-validate-'));
+    const output = join(directory, 'results.jsonl');
+    const chat = vi.fn(() => {
+      throw new Error('provider.chat must not be called for planner mode:validate cases');
+    });
+    const provider = {
+      ...createMockProvider(true),
+      chat,
+      embed: vi.fn(() => {
+        throw new Error('provider.embed must not be called for planner cases');
+      }),
+    } as unknown as ModelProvider;
+    const catalog = {
+      cases: [
+        {
+          id: 'PV01',
+          input: 'Validate a correct bounded plan',
+          mode: 'validate' as const,
+          plan: {
+            workItems: [
+              {
+                id: 'w1',
+                objective: 'Inspect parser module',
+                taskType: 'research',
+                readOnly: true,
+                requiresWrite: false,
+                requiresCode: false,
+                dependsOn: [],
+                acceptanceCriteria: ['Relevant parser behavior is identified'],
+              },
+            ],
+          },
+        },
+        {
+          id: 'PV02',
+          input: 'Validate an invalid plan with self-dependency',
+          mode: 'validate' as const,
+          plan: {
+            workItems: [
+              {
+                id: 'w1',
+                objective: 'Broken plan item',
+                taskType: 'plan',
+                readOnly: true,
+                requiresWrite: false,
+                requiresCode: false,
+                dependsOn: ['w1'],
+                acceptanceCriteria: ['ok'],
+              },
+            ],
+          },
+        },
+      ],
+    };
+    try {
+      const measured = await runGenerationSuite(plannerRunOptions(output), catalog, provider, output, {});
+      expect(measured).toBe(2);
+      expect(chat).not.toHaveBeenCalled();
+
+      const records = (await readFile(output, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(records).toHaveLength(2);
+
+      const valid = records.find((r) => r.caseId === 'PV01');
+      expect(valid).toMatchObject({
+        recordType: 'case',
+        suite: 'planner',
+        caseId: 'PV01',
+        phase: 'measured',
+        repetition: 1,
+        promptVersion: 'test-prompt-v1',
+        contextTokens: 2048,
+        provider: 'ollama',
+        model: 'test-model:latest',
+        durationMs: 0,
+        output: null,
+        toolCalls: [],
+        finishReason: null,
+        usage: null,
+        tokensPerSecond: null,
+        timing: null,
+        deterministicValidation: { mode: 'validate', valid: true, errors: [] },
+        safetyOracles: { executed: false, reason: 'planner-validator-case-no-model-call' },
+        requestContract: {
+          schemaName: 'PlanSchema',
+          formatProvided: true,
+          toolsProvided: false,
+        },
+      });
+      expect((valid?.requestContract as { schemaHash?: unknown } | undefined)?.schemaHash).toEqual(expect.any(String));
+      expect(typeof valid?.rssBeforeBytes).toBe('number');
+      expect(typeof valid?.rssAfterBytes).toBe('number');
+
+      const invalid = records.find((r) => r.caseId === 'PV02');
+      expect(invalid).toMatchObject({
+        recordType: 'case',
+        suite: 'planner',
+        caseId: 'PV02',
+        deterministicValidation: { mode: 'validate', valid: false },
+        safetyOracles: { executed: false, reason: 'planner-validator-case-no-model-call' },
+      });
+      const errors = (invalid?.deterministicValidation as { errors?: unknown[] } | undefined)?.errors ?? [];
+      expect(Array.isArray(errors)).toBe(true);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(JSON.stringify(errors)).toContain('self-dependency');
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

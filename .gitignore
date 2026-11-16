@@ -13,3 +13,12 @@ node_modules/
 test_log.md
 
 results/
+
+# Kilo state is tracked (config, plans, task records). Ignore only local
+# machine/agent artifacts. Transient *.log files are covered by the rule above.
+.kilo/node_modules/
+.kilo/agent-manager.json
+
+# Experimental Windows sandbox prototype: never commit build outputs.
+packages/windows-sandbox/bin/
+packages/windows-sandbox/obj/

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ModelCapability,
   ModelChatRequest,
   ModelChatResponse,
@@ -12,6 +12,7 @@ import type {
   RunningModelDescriptor,
 } from '../types';
 import { ModelProviderError } from '../types';
+import { redact } from '../../security/redact';
 import type { ModelProvider } from './provider';
 
 interface OllamaModelRecord {
@@ -131,7 +132,7 @@ function mapToolCalls(value: unknown, provider: string, model: string): ModelToo
         );
       }
     }
-    if (!isRecord(args) || typeof fn.name !== 'string') {
+    if (!isRecord(args) || typeof fn.name !== 'string' || fn.name.length === 0) {
       throw new ModelProviderError(
         'INVALID_RESPONSE',
         'Ollama returned invalid tool-call arguments or name',
@@ -147,6 +148,31 @@ function mapToolCalls(value: unknown, provider: string, model: string): ModelToo
   });
 }
 
+function isValidToolResultCorrelationId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function serializeAssistantToolCalls(toolCalls: ModelToolCall[], provider: string, model: string): Array<Record<string, unknown>> {
+  if (!Array.isArray(toolCalls)) {
+    throw new ModelProviderError('PROVIDER_ERROR', 'Assistant toolCalls must be an array', provider, model);
+  }
+  return toolCalls.map((call) => {
+    if (!isRecord(call as unknown) || call.type !== 'function' || !isRecord(call.function)) {
+      throw new ModelProviderError('PROVIDER_ERROR', 'Assistant tool call has invalid shape', provider, model);
+    }
+    const name = call.function.name;
+    const args = call.function.arguments;
+    if (typeof name !== 'string' || name.length === 0 || !isRecord(args)) {
+      throw new ModelProviderError('PROVIDER_ERROR', 'Assistant tool call must have function name and object arguments', provider, model);
+    }
+    return {
+      ...(call.id ? { id: call.id } : {}),
+      type: 'function',
+      function: { name, arguments: args },
+    };
+  });
+}
+
 export type OllamaFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface OllamaProviderOptions {
@@ -154,6 +180,37 @@ export interface OllamaProviderOptions {
   defaultTimeoutMs?: number;
   keepAlive?: string | number;
   fetch?: OllamaFetch;
+}
+
+export function normalizeOllamaBaseUrl(rawUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (cause) {
+    throw new ModelProviderError(
+      'PROVIDER_ERROR',
+      'Ollama base URL must be an absolute HTTP(S) URL',
+      'ollama',
+      undefined,
+      undefined,
+      { cause },
+    );
+  }
+  if (
+    (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+    parsed.username.length > 0 ||
+    parsed.password.length > 0 ||
+    parsed.search.length > 0 ||
+    parsed.hash.length > 0
+  ) {
+    throw new ModelProviderError(
+      'PROVIDER_ERROR',
+      'Ollama base URL must use HTTP(S) and must not contain credentials, query, or fragment',
+      'ollama',
+    );
+  }
+  // Normalize trailing slash for consistent endpoint construction and config equivalence.
+  return parsed.toString().replace(/\/+$/, '');
 }
 
 export class OllamaProvider implements ModelProvider {
@@ -164,34 +221,7 @@ export class OllamaProvider implements ModelProvider {
   private readonly fetchImpl: OllamaFetch;
 
   constructor(options: OllamaProviderOptions = {}) {
-    const rawUrl = options.baseUrl ?? 'http://127.0.0.1:11434';
-    let parsed: URL;
-    try {
-      parsed = new URL(rawUrl);
-    } catch (cause) {
-      throw new ModelProviderError(
-        'PROVIDER_ERROR',
-        'Ollama base URL must be an absolute HTTP(S) URL',
-        this.id,
-        undefined,
-        undefined,
-        { cause },
-      );
-    }
-    if (
-      (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
-      parsed.username.length > 0 ||
-      parsed.password.length > 0 ||
-      parsed.search.length > 0 ||
-      parsed.hash.length > 0
-    ) {
-      throw new ModelProviderError(
-        'PROVIDER_ERROR',
-        'Ollama base URL must use HTTP(S) and must not contain credentials, query, or fragment',
-        this.id,
-      );
-    }
-    this.baseUrl = parsed.toString().replace(/\/+$/, '');
+    this.baseUrl = normalizeOllamaBaseUrl(options.baseUrl ?? 'http://127.0.0.1:11434');
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 120_000;
     this.keepAlive = options.keepAlive ?? '5m';
     this.fetchImpl = options.fetch ?? fetch;
@@ -200,7 +230,7 @@ export class OllamaProvider implements ModelProvider {
   async chat(request: ModelChatRequest): Promise<ModelChatResponse> {
     const payload: Record<string, unknown> = {
       model: request.model,
-      messages: request.messages.map((message) => this.mapMessage(message)),
+      messages: request.messages.map((message) => this.mapMessage(message, request.model)),
       stream: false,
       keep_alive: request.keepAlive ?? this.keepAlive,
     };
@@ -223,13 +253,22 @@ export class OllamaProvider implements ModelProvider {
       );
     }
     const message = raw.message;
+    const content = message.content;
     const toolCalls = mapToolCalls(message.tool_calls, this.id, request.model);
+    if (content !== undefined && content !== null && typeof content !== 'string') {
+      throw new ModelProviderError(
+        'INVALID_RESPONSE',
+        'Ollama returned an invalid assistant message content type',
+        this.id,
+        request.model,
+      );
+    }
     return {
       provider: this.id,
       model: stringValue(raw.model) ?? request.model,
       message: {
         role: 'assistant',
-        content: typeof message.content === 'string' ? message.content : '',
+        content: typeof content === 'string' ? content : '',
         thinking: stringValue(message.thinking),
         toolCalls,
       },
@@ -270,17 +309,21 @@ export class OllamaProvider implements ModelProvider {
   }
 
   async health(options: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<ProviderHealth> {
+    const timeoutMs = options.timeoutMs ?? 5000;
     try {
       const raw = await this.request<Record<string, unknown>>(
         '/api/version',
         { method: 'GET' },
-        options.timeoutMs,
+        timeoutMs,
         options.signal,
       );
       return { provider: this.id, online: true, version: stringValue(raw.version) };
     } catch (error) {
-      if (error instanceof ModelProviderError && error.code === 'PROVIDER_UNAVAILABLE') {
+      if (error instanceof ModelProviderError && (error.code === 'PROVIDER_UNAVAILABLE' || error.code === 'TIMEOUT')) {
         return { provider: this.id, online: false };
+      }
+      if (error instanceof ModelProviderError && error.code === 'CANCELLED') {
+        throw error;
       }
       throw error;
     }
@@ -358,14 +401,23 @@ export class OllamaProvider implements ModelProvider {
     });
   }
 
-  private mapMessage(message: ModelMessage): Record<string, unknown> {
+  private mapMessage(message: ModelMessage, model: string): Record<string, unknown> {
     const result: Record<string, unknown> = {
       role: message.role,
       content: message.content,
     };
     if (message.name) result.name = message.name;
     if (message.images) result.images = message.images;
-    if (message.toolCallId) result.tool_call_id = message.toolCallId;
+    if (message.role === 'tool') {
+      if (isValidToolResultCorrelationId(message.toolCallId)) {
+        result.tool_call_id = message.toolCallId;
+      }
+    } else if (isValidToolResultCorrelationId(message.toolCallId)) {
+      result.tool_call_id = message.toolCallId;
+    }
+    if (message.role === 'assistant' && Array.isArray(message.toolCalls) && message.toolCalls.length > 0) {
+      result.tool_calls = serializeAssistantToolCalls(message.toolCalls, this.id, model);
+    }
     return result;
   }
 
@@ -411,7 +463,7 @@ export class OllamaProvider implements ModelProvider {
       }
       if (!response.ok) {
         const message = isRecord(body) && typeof body.error === 'string'
-          ? body.error
+          ? redact(body.error)
           : 'Ollama request failed with HTTP ' + response.status;
         let code: 'PROVIDER_UNAVAILABLE' | 'MODEL_NOT_FOUND' | 'RATE_LIMITED' | 'PROVIDER_ERROR';
         if (response.status === 404 && model && /not found|pull/i.test(message)) code = 'MODEL_NOT_FOUND';

@@ -4,7 +4,86 @@
 // Repo `.airrc.yaml` is validated against this same schema and rejects
 // unknown top-level keys by default.
 import { z } from 'zod';
-export const CONFIG_VERSION = 1;
+export const CONFIG_VERSION = 2;
+export const MODEL_ROLES = [
+    'coordinator',
+    'planner',
+    'coder',
+    'reviewer',
+    'reasoner',
+    'summarizer',
+    'embeddings',
+];
+const RoleAssignmentSchema = z.object({
+    provider: z.enum(['ollama']),
+    model: z.string().min(1),
+});
+export function normalizeOllamaBaseUrlConfig(value) {
+    const trimmed = value.trim();
+    let parsed;
+    try {
+        parsed = new URL(trimmed);
+    }
+    catch {
+        throw new Error('Ollama base URL must be an absolute HTTP(S) URL');
+    }
+    if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+        parsed.username.length > 0 ||
+        parsed.password.length > 0 ||
+        parsed.search.length > 0 ||
+        parsed.hash.length > 0) {
+        throw new Error('Ollama base URL must be an absolute HTTP(S) URL without credentials, query, or fragment');
+    }
+    return parsed.toString().replace(/\/+$/, '');
+}
+const ProviderSettingsSchema = z.object({
+    enabled: z.boolean().default(true),
+    baseUrl: z.string().transform((value, ctx) => {
+        try {
+            return normalizeOllamaBaseUrlConfig(value);
+        }
+        catch (err) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: err instanceof Error ? err.message : 'Invalid Ollama base URL' });
+            return z.NEVER;
+        }
+    }).default('http://127.0.0.1:11434'),
+});
+const DEFAULT_MODEL_ROLES = {
+    coordinator: { provider: 'ollama', model: 'qwen3.5:4b' },
+    planner: { provider: 'ollama', model: 'qwen3.5:4b' },
+    coder: { provider: 'ollama', model: 'qwen2.5-coder:7b' },
+    reviewer: { provider: 'ollama', model: 'qwen3.5:4b' },
+    reasoner: { provider: 'ollama', model: 'deepseek-r1:1.5b' },
+    summarizer: { provider: 'ollama', model: 'qwen3.5:4b' },
+    embeddings: { provider: 'ollama', model: 'nomic-embed-text:latest' },
+};
+const DEFAULT_MODEL_PROVIDERS = {
+    ollama: { enabled: true, baseUrl: 'http://127.0.0.1:11434' },
+};
+const ModelsSchema = z.object({
+    localFirst: z.boolean().default(true),
+    maxConcurrentGenerative: z.number().int().min(1).max(8).default(1),
+    keepAlive: z.string().min(1).default('5m'),
+    providers: z.object({
+        ollama: ProviderSettingsSchema.default(DEFAULT_MODEL_PROVIDERS.ollama),
+    }).default(DEFAULT_MODEL_PROVIDERS),
+    roles: z.object({
+        coordinator: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.coordinator),
+        planner: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.planner),
+        coder: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.coder),
+        reviewer: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.reviewer),
+        reasoner: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.reasoner),
+        summarizer: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.summarizer),
+        embeddings: RoleAssignmentSchema.default(DEFAULT_MODEL_ROLES.embeddings),
+    }).default(DEFAULT_MODEL_ROLES),
+});
+const DEFAULT_MODELS = {
+    localFirst: true,
+    maxConcurrentGenerative: 1,
+    keepAlive: '5m',
+    providers: DEFAULT_MODEL_PROVIDERS,
+    roles: DEFAULT_MODEL_ROLES,
+};
 const ToolConfigSchema = z.object({
     id: z.string(),
     enabled: z.boolean().default(true),
@@ -62,7 +141,7 @@ const DEFAULT_LOGGING = {
     rotation: { maxBytes: 10 * 1024 * 1024, maxBackups: 5 },
 };
 export const ConfigSchema = z.object({
-    version: z.number().int().min(1).default(CONFIG_VERSION),
+    version: z.number().int().min(1).max(CONFIG_VERSION).default(CONFIG_VERSION),
     tools: z.array(ToolConfigSchema).default([]),
     failover: FailoverSchema.default(DEFAULT_FAILOVER),
     permission: PermissionSchema.default(DEFAULT_PERMISSION),
@@ -83,6 +162,7 @@ export const ConfigSchema = z.object({
         maxBytes: z.number().int().min(1024).default(1_000_000),
     })
         .default(DEFAULT_BUFFERS),
+    models: ModelsSchema.default(DEFAULT_MODELS),
     logging: z
         .object({
         level: z.enum(['debug', 'info', 'warn', 'error']).default('info'),

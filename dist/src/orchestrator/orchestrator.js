@@ -347,9 +347,14 @@ export class Orchestrator {
                         result = 'FAILED';
                     }
                     const endedAt = new Date().toISOString();
+                    const terminalState = result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES'
+                        ? 'COMPLETED'
+                        : result === 'CANCELLED'
+                            ? 'CANCELLED'
+                            : 'FAILED';
                     await writeTaskState({
                         ...state,
-                        state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
+                        state: terminalState,
                         result,
                         endedAt,
                         delta: {
@@ -361,9 +366,9 @@ export class Orchestrator {
                         outputTail: redact(outcome.stdoutTail ?? outcome.stdout),
                         stdoutTruncated: outcome.stdoutTruncated,
                         stderrTruncated: outcome.stderrTruncated,
-                        error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
-                            ? { category, message: outcome.stderr.slice(0, 500) }
-                            : undefined,
+                        error: terminalState === 'COMPLETED'
+                            ? undefined
+                            : { category, message: outcome.stderr.slice(0, 500) },
                     });
                     trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed, delta: formatDeltaReport(delta) });
                     // Register session for tracking.
@@ -375,7 +380,7 @@ export class Orchestrator {
                         provider: chosen.provider,
                         model: chosen.model,
                         readOnly,
-                        state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : result === 'CANCELLED' ? 'CANCELLED' : 'FAILED',
+                        state: terminalState,
                         startedAt: state.startedAt,
                         endedAt,
                         result,
@@ -492,7 +497,8 @@ export class Orchestrator {
                 process.removeListener('SIGTERM', onSig);
             }
         })();
-        this.handles.set(runId, { cancel: () => controller.abort(), promise: runPromise });
+        const handledPromise = runPromise.catch(() => this.sessions.get(runId));
+        this.handles.set(runId, { cancel: () => controller.abort(), promise: handledPromise });
         return initialSession;
     }
     /**
@@ -625,9 +631,14 @@ export class Orchestrator {
             result = 'FAILED';
         }
         const endedAt = new Date().toISOString();
+        const terminalState = result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES'
+            ? 'COMPLETED'
+            : result === 'CANCELLED'
+                ? 'CANCELLED'
+                : 'FAILED';
         await writeTaskState({
             ...state,
-            state: result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : 'FAILED',
+            state: terminalState,
             result,
             endedAt,
             delta: {
@@ -639,12 +650,12 @@ export class Orchestrator {
             outputTail: redact(outcome.stdoutTail ?? outcome.stdout),
             stdoutTruncated: outcome.stdoutTruncated,
             stderrTruncated: outcome.stderrTruncated,
-            error: result !== 'SUCCEEDED_WITH_CHANGES' && result !== 'SUCCEEDED_READ_ONLY' && result !== 'NO_CHANGES'
-                ? { category, message: outcome.stderr.slice(0, 500) }
-                : undefined,
+            error: terminalState === 'COMPLETED'
+                ? undefined
+                : { category, message: outcome.stderr.slice(0, 500) },
         });
         trace({ runId, event: 'run_complete', result, category, durationMs: outcome.durationMs, hops, changed, delta: formatDeltaReport(delta) });
-        session.state = result === 'SUCCEEDED_WITH_CHANGES' || result === 'SUCCEEDED_READ_ONLY' || result === 'NO_CHANGES' ? 'COMPLETED' : result === 'CANCELLED' ? 'CANCELLED' : 'FAILED';
+        session.state = terminalState;
         session.result = result;
         session.endedAt = endedAt;
         this.sessions.set(runId, session);

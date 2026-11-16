@@ -1,10 +1,10 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
-**Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)  
-**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN / L1-L2 integration remains IN PROGRESS  
-**Created:** 2026-11-12  
-**Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5  
-**Current main baseline:** 6b71e6180ce5de18e912f7ecd542366c18fb4701 (PR #3 merged)  
+**Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)
+**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN; **L0-05 DONE (revised scope; P1-05 sandboxed execution formally DEFERRED to SEC-W1)** on `fix/l0-05-p0-conversation-atomic` (P0-01, P1-01, P1-02, P1-03, P1-04, P1-06, P1-07, P2-01, P2-02 CI-verified; P1-05 fail-closed boundary CI-verified; P2-03 accepted deferral to L3) / L1-L2 integration remains IN_PROGRESS
+**Created:** 2026-11-12
+**Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5
+**Current main baseline:** f5e45a345f430b96d66933838944469886879689 (independent review merged; CI run 43278214645 passed)
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -19,11 +19,21 @@
 - A package that changes a shared schema/config/contract must include migration and compatibility tests.
 - The integration owner maintains the blueprint when design decisions change.
 
+## Decision record — P1-05 deferral (approved)
+
+- **Date:** 2026-11-16
+- **Decision:** P1-05 OS-enforced sandboxed execution of untrusted evaluation work is **DEFERRED** into a separate Windows-first security milestone (**SEC-W1**). P1-05 is **not** completed, passed, or claimed as a sandbox.
+- **Approved by:** project owner (explicit authorization recorded for this task).
+- **What remains in L0-05 (revised scope):** the P1-05 **fail-closed boundary contract** (typed oracle statuses, opt-in flag, capability detection, truthful `not_run`/`unsupported` reporting, no untrusted execution) is implemented and CI-verified. Sandboxed execution, untrusted patch application, fixture-command execution and proposed-tool dispatch remain **disabled on Windows, Linux and macOS**.
+- **Explicitly not authorized by this decision:** enabling untrusted execution; claiming or verifying an OS sandbox; removing fail-closed protections; marking P1-05 PASS/DONE; deleting the experimental Windows sandbox prototype source.
+- **Separate milestone:** SEC-W1 (see below) remains OPEN and visible in the roadmap. Linux/macOS enforcement is out of scope for SEC-W1 and deferred to later platform phases.
+
 ## Milestone overview
 
 | Phase | Goal | Status | Depends on |
 |---|---|---|---|
 | L0 | Baseline and executable design gate | IN_PROGRESS | None |
+| SEC-W1 | Windows-first OS-enforced sandbox for untrusted eval execution (deferred from P1-05) | OPEN | L0 |
 | L1 | Provider-neutral runtime + Ollama | IN_PROGRESS | L0 (owner boundary review accepted; independent review open) |
 | L2 | Model registry, capabilities, role config | IN_PROGRESS | L0, L1 |
 | L3 | Resource-aware model manager | TODO | L1, L2 |
@@ -37,7 +47,7 @@
 
 ## L0 — Baseline and executable design gate
 
-**Phase status:** IN_PROGRESS  
+**Phase status:** IN_PROGRESS
 **Exit gate:** architecture contracts and baseline evidence are recorded; no implementation begins beyond isolated spikes until L0 is accepted. See [L0 baseline investigation](../architecture/local-first-l0-baseline.md) and [evaluation plan](../architecture/local-first-evaluation.md).
 
 ### L0-01 — Refresh repository and CI baseline
@@ -94,7 +104,126 @@
 - L0-04a, L0-04b and L0-04c are DONE as implementation packages. L0-04d independent scoring/threshold review remains TODO. No live model results exist.
 - PR #3 merged to main at 6b71e6180ce5de18e912f7ecd542366c18fb4701. Exact-head CI run 301 passed on b8b0afa0d449d9add7b1f9c0ccb45b051ee3ae31; main push CI run 303 was in progress at this ledger update.
 - No local tests were run because no clone/worktree is available. All reported CI results are tied to the exact PR or merge commit.
-- Next gate: obtain an independent review of the merged provider/config/role/runtime/evaluation implementation and scoring thresholds. Reconcile all P0/P1 findings before starting L3 resource lifecycle or L4 coordinator work.
+- Next gate: obtain an independent review of the merged provider/config/role/runtime/evaluation implementation and scoring thresholds. Reconcile all required P0/P1 findings (P1-03–P1-07 still open) and disposition required P2 items before starting L3 resource lifecycle or L4 coordinator work.
+- L0-05 reconciliation started 2026-11-12 on `fix/l0-05-p0-conversation-atomic` (base `f5e45a345f430b96d66933838944469886879689`, CI run 43278214645 success). P0-01 (`fc3d231`, `fda9506`) fixed stale conversation writes; CI [43293203530](https://github.com/radmanmilos/air/actions/runs/43293203530) success for `fda9506`. P1-01 MCP cancellation reconciliation (`c1e474205a6e986cc2f19ff2d01aa03b2977cb05`): linearized on persisted/actual terminal outcomes, preserved COMPLETED/FAILED over cancel, confirmed CANCELLED only when persisted, enforced chat cross-conversation isolation, hardened handle/poller cleanup and `AIR_MOCK_ADAPTER==="1"` seam, fixed orchestrator cancelled terminal persistence, and avoided unhandled spawn-failure rejections in no-adapter environments. CI [43313608385](https://github.com/radmanmilos/air/actions/runs/43313608385) success for `c1e4742` (all jobs green). P1-02 local-only chat answers/no external CLI egress (`cb0880c361e38333687796adbbfc4e9aeeda52bc`, `fix(brain): enforce local-only chat answers without external CLI egress (P1-02)`); CI [43329891518](https://github.com/radmanmilos/air/actions/runs/43329891518) **success** for `cb0880c` (7/7 jobs green). P1-03–P1-07 and applicable P2 remain open; L3/L4 remain BLOCKED. **(Superseded 2026-11-16: P1-03/P1-04/P1-06/P1-07/P2-01/P2-02 are now PASS and P1-05 execution is DEFERRED to SEC-W1 — see the Decision record and revised L0-05 completion scope above.)**
+
+### L0-05 — Reconcile independent review findings (P0/P1/P2)
+
+- Status: DONE (revised scope — P1-05 sandboxed execution DEFERRED to SEC-W1)
+- Owner: integration agent
+- **Approval basis:** project-owner decision recorded under "Decision record — P1-05 deferral" above. This approval covers P1-05 OS-enforced execution only; it does not silently defer any other criterion.
+
+#### Revised L0-05 completion scope (authoritative)
+
+L0-05 is complete only because every non-deferred mandatory criterion below is satisfied and the single approved deferral is recorded with rationale:
+
+| Criterion | Revised status | Evidence / rationale |
+|---|---|---|
+| P0-01 stale whole-object conversation writes | **PASS** | `mutateConversation` atomic path; `tests/conversation.test.ts`; CI run 43293203530 (`fda9506`). |
+| P1-01 MCP cancellation semantics | **PASS** | persisted-terminal linearization; `tests/mcp-async.test.ts`; CI run 43313608385 (`c1e4742`). |
+| P1-02 local-only chat answer path | **PASS** | no external CLI egress on answer paths; `tests/brain.test.ts`; CI run 43329891518 (`cb0880c`). |
+| P1-03 evaluation schema/tool context | **PASS (proposal-only)** | `suiteContract()` sends `format`/`tools`, records `schemaName`/`schemaHash`/`toolSetHash`/`formatProvided`/`toolsProvided`; strict deterministic `validateToolCallProposal()`; registry parity tests; CI run 43419317640 (`e870573`). Proposal validation is explicitly **not** an execution/sandbox boundary. |
+| P1-04 reviewer oracle leakage | **PASS (audited paths)** | neutral reviewer fixtures, recursive sanitizer, real-fixture prompt leak test; residual sample-size/false-positive-calibration risk documented, not a demonstrated leak. |
+| P1-05 fail-closed safety-oracle boundary | **PASS (boundary only)** | `src/evals/sandbox/capabilities.ts`, opt-in flag, `not_run`/`unsupported` evidence, no untrusted execution; CI run 43391210944 (`02cbaad`). |
+| P1-05 OS-enforced sandboxed execution + executed oracles | **DEFERRED → SEC-W1** | No OS-enforced filesystem/network/process confinement is implemented or verified on any platform; execution returns `unsupported` and launches no untrusted process. Deferred with owner approval; not a PASS. |
+| P1-06 planner adversarial fixtures | **PASS** | generate/validate split, `validatePlanDetailed()`, runner-level no-model-call test; CI run 43404486859 (`2d0746a`). |
+| P1-07 assistant tool-call contract | **PASS** | `ModelMessage.toolCalls` + Ollama `tool_calls` serialization/round-trip tests (`tests/models/ollama.test.ts`). |
+| P2-01 health timeout semantics | **PASS** | `TIMEOUT`→`online:false`; caller cancellation still rejects (`CANCELLED`), not misreported as offline. |
+| P2-02 base URL validation | **PASS** | `normalizeOllamaBaseUrlConfig()` rejects non-HTTP(S)/credentials/query/fragment; schema + provider agree. |
+| P2-03 `maxConcurrentGenerative` enforcement | **DEFERRED to L3 (accepted)** | Non-blocking P2; review recommendation is to enforce in the L3 resource manager. Documented as configuration intent in `docs/configuration/model-roles.md`; no false enforcement claim. |
+
+**Completion rule applied:** no mandatory criterion other than P1-05 OS-enforced execution is deferred. P2-03 is a P2 explicitly recommended for L3 by the independent review and is recorded here as an accepted, documented deferral. L3/L4 remain governed by their own dependencies and are not implied complete.
+
+- **P1-05 implementation commit:** `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (`fix(evals): add fail-closed P1-05 safety oracle boundary contract`) — CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success, 7/7 jobs**.
+- **Latest documentation/branch/PR head before this correction:** `4bd48db041a3b01c7251ceab7055264ffff5a8bf` (`docs(review): record P1-05 fail-closed CI evidence`) on `fix/l0-05-p0-conversation-atomic` (local == origin == PR [#5](https://github.com/radmanmilos/air/pull/5) head at that point). CI [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962) **completed success, 7/7 jobs** for exact SHA `4bd48db`.
+- **Current branch/PR head after this correction:** recorded by the correction commit/CI for this task (see handoff). Historical heads preserved below with exact-SHA evidence.
+- P1-03 implementation commit: `42ee626809446d4cd17c44633db890401b2d9688`. Documentation follow-up commit: `1d83ed0d23aa9e2533b5abb208a49dbbf7808916`. Ledger/PR housekeeping: `f16ee789df11775daa86ce1df87e42077c63f705` (CI [43383888852](https://github.com/radmanmilos/air/actions/runs/43383888852) success, 7/7). P1-05 fail-closed sandbox-boundary implementation commit: `02cbaadf9b03aeec0009315f71d0b69ef44fabcb` (CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success, 7/7 jobs**). P1-05 evidence-recording documentation commit: `4bd48db041a3b01c7251ceab7055264ffff5a8bf` (CI [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962) **completed success, 7/7 jobs** for exact SHA). Head-metadata/strict-proposal increments: `392c8fd` CI [43400519835](https://github.com/radmanmilos/air/actions/runs/43400519835), `2d0746a` CI [43404486859](https://github.com/radmanmilos/air/actions/runs/43404486859), `fa5f349` CI [43408577415](https://github.com/radmanmilos/air/actions/runs/43408577415), `e870573` CI [43419317640](https://github.com/radmanmilos/air/actions/runs/43419317640) (all 7/7).
+- **2026-11-13 incremental hardening (uncommitted at audit, to be recorded on commit):** P1-07 partial — `src/models/types.ts` adds `ModelMessage.toolCalls`; `src/models/providers/ollama.ts` serializes assistant `tool_calls` history (id/type/function name/arguments) and preserves request sequencing; deterministic tests in `tests/models/ollama.test.ts` cover serialization, multiple tool calls, sequencing, and malformed/incomplete/invalid response rejection. P2-01 partial — Ollama `health()` defaults `timeoutMs=5000` and treats `TIMEOUT` as offline (`online:false`) in addition to unavailable; tests added. P2-02 partial — `ProviderSettingsSchema.baseUrl` rejects non-HTTP(S), malformed, credentialed, query, or fragment URLs while accepting valid HTTP(S) endpoints; `tests/config.test.ts` extended. P1-04/P2-03 partial — eval prompt construction recursively sanitizes hidden oracle/answer fields (incl. nested `oracle/expected/rubric/scoring/gold/label(s)/severity/seeded`, `workspace`) and redacts secret-like strings in model-visible payload/task via `src/security/redact`; `tests/evals/runner.test.ts` adds regression coverage. **Not a completion claim:** P1-04, P1-06 residuals, P1-07, P2-01–P2-03 remain PARTIAL/open against full ledger acceptance criteria (broader reviewer-confidence/isolation/coverage, runner-boundary closure, full provider/config/credential/diagnostic surfaces, compatibility). P1-05 remains PARTIAL/NOT DONE. Full-suite status at time of diagnosis: not cleanly green in working tree due E2E `groups.test.ts` hung-job cancellation timeout (`/Cancelled/`, 20s); baseline comparison showed same test **passed** on clean detached `e870573` worktree (exit 0, 1 passed/23 skipped) while working tree failed (exit 1) with pre-existing modified `dist/*` present (e2e chat driver executes `dist/bin/air.js`); staged src/test changes do not touch cancellation/MCP/orchestrator/conversation paths — evidence indicates pre-existing local working-tree `dist` drift/environmental factor rather than this increment's staged source changes, but a clean full suite/CI on committed code is required for authoritative proof. L0-05 remains IN_PROGRESS; L3/L4 BLOCKED. **(Superseded 2026-11-16: this increment is now committed and CI-verified; L0-05 is complete under the revised scope with P1-05 execution DEFERRED to SEC-W1.)**
+- Baseline CI: main `f5e45a345f430b96d66933838944469886879689` run [43278214645](https://github.com/radmanmilos/air/actions/runs/43278214645) success (all jobs).
+- Branch CI (exact SHAs): `fda9506` run [43293203530](https://github.com/radmanmilos/air/actions/runs/43293203530) success (P0-01). `c1e4742` run [43313608385](https://github.com/radmanmilos/air/actions/runs/43313608385) success (P1-01). `cb0880c` run [43329891518](https://github.com/radmanmilos/air/actions/runs/43329891518) **completed success** (P1-02, 7/7 jobs). `42ee626` run [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872) **completed success** (P1-03 implementation, 7/7 jobs). `1d83ed0` run [43382851018](https://github.com/radmanmilos/air/actions/runs/43382851018) **completed success** (P1-03 follow-up documentation, 7/7 jobs). `f16ee78` run [43383888852](https://github.com/radmanmilos/air/actions/runs/43383888852) **completed success** (ledger/PR housekeeping, 7/7 jobs). `02cbaad` run [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) **completed success** (P1-05 fail-closed boundary implementation, 7/7 jobs). `4bd48db` run [43398692962](https://github.com/radmanmilos/air/actions/runs/43398692962) **completed success** (documentation-only evidence record for exact SHA `4bd48db041a3b01c7251ceab7055264ffff5a8bf`, 7/7 jobs). Any subsequent correction commit requires its own exact-SHA CI verification before being claimed CI-verified.
+- Scope: reconcile `docs/reviews/independent-review_local-first-l0.md` required changes before L3/L4.
+
+#### P0-01 — Conversation data-loss from stale whole-object writes
+- Status: DONE (for `fc3d231`/`fda9506` lineage) — fix committed/pushed, full local tests passed, PR #5 CI run 43293203530 success for head `fda9506`.
+- Files: `src/conversation/index.ts`, `bin/air.ts`, `src/mcp/server.ts`, `tests/conversation.test.ts`
+- Root cause: `appendMessage` persisted under `lockedReadModifyWrite`, but `saveConversation` wrote the supplied object wholesale without lock/re-read. CLI/MCP held long-lived `conv` snapshots, mutated them (activeWorkIds/facts/status paths), and called `saveConversation(conv)` after appends/injection/background completion, overwriting newer locked appends. `injectResult` performed its idempotency check outside the lock.
+- Change: added atomic `mutateConversation(id, mutator)` on `lockedReadModifyWrite` (re-reads latest, mutates, stamps `updatedAt`, persists). Refactored `appendMessage`/`injectResult` to use it; moved `injectResult` idempotency check+insert inside the same locked mutation. CLI/MCP now use `mutateConversation` for `activeWorkIds`/facts updates and reload fresh state for MCP status reply; `saveConversation` retained for initial whole-object creation only (documented in code). MCP spawn path no longer saves a pre-append stale snapshot after creation.
+- Tests (local, 2026-11-12): `npx vitest run tests/conversation.test.ts` — 10 passed. `npx vitest run tests/mcp-async.test.ts tests/mcp.test.ts tests/mcp-job-lifecycle.test.ts` — 8 passed. `npm test` (full suite) — **exit 0**, `Test Files 65 passed | 2 skipped (67)`, `Tests 395 passed | 16 skipped (411)`, duration 42.54s (log `.kilo/tmp/npm-test-l0-05.log`). CI for head `fda9506`: PR #5 run [43293203530](https://github.com/radmanmilos/air/actions/runs/43293203530) success.
+- Risks: `saveConversation` remains callable for full replacement; any future stale-object caller outside audited paths could regress. Deterministic lock-contention tests added; no timing-based sleeps.
+
+#### P1/P2 — Remaining required findings
+- P1-01 MCP cancellation semantics (`chat_send cancel_job` path appears to ack without cancelling underlying work): **DONE for fix SHA `c1e474205a6e986cc2f19ff2d01aa03b2977cb05`** — IMPLEMENTED / LOCALLY TESTED / INDEPENDENTLY REVIEWED / COMMITTED / PUSHED / CI-VERIFIED.
+  - Files: `src/mcp/server.ts`, `src/orchestrator/orchestrator.ts`, `tests/mcp-async.test.ts`, `tests/fixtures/mock-tool.js`.
+  - Behavior: `chat_send` tracks MCP chat orchestrators/owners (`chatJobOrchs`, `chatJobConversations`) and enforces cross-conversation isolation. `cancel_job` reads persisted state first, preserves COMPLETED/FAILED/CANCELLED, cancels tracked active jobs via `orch.cancel`+`waitFor` and reports `Cancelled` only when confirmed `CANCELLED`, reports `not running`, `Unknown job`, `does not belong`, `no active handle`, `Cancellation failed`, or `Cancellation unconfirmed` without fabricating state, and cleans `activeWorkIds` via atomic `mutateConversation`. Spawn path registers handle before activeWorkId mutation and rolls back handle/job on mutation failure; spawn/start failures are reported as `Failed to start job...` without leaking active work/handles. Poller/handle cleanup runs in `finally`. Global `jobs` map is not treated as chat-owned for cancellation. `run_task`/`cancel_task` checks terminal state before abort/await and reports actual/unconfirmed outcomes without forced overwrite. `AIR_MOCK_ADAPTER` activation narrowed to explicit `=== '1'` (chat spawn, run_task, resume). `src/orchestrator/orchestrator.ts` persists/reports `state: 'CANCELLED'` (not `FAILED`) for cancelled outcomes in start/resume-after-approval terminal handling; orchestrator run promise is handled for waiters while MCP confirms only persisted outcomes.
+  - Tests added/strengthened (`tests/mcp-async.test.ts`): deterministic cancel-vs-barrier cancellation-wins, completion-wins-before-cancel, already-terminal/cancelled handling, failed-terminal preservation, unknown IDs, cross-conversation isolation (job remains RUNNING/active in owner), concurrent cancel requests (no fabricated success), run_task cancel outcomes/unconfirmed branch (tracked job with no persisted terminal state), non-mock chat/mock-adapter isolation and freeOnly/no-adapter-safe assertions without unintended env leakage. `tests/fixtures/mock-tool.js` converted to ESM and extended with `barrier_succeed`/`barrier_crash` + ready/barrier files.
+  - Adversarial findings: (P1 fixed) cross-conversation chat cancellation — owner tracking/refusal added. (P1 fixed) mock-adapter seam accepted any truthy `AIR_MOCK_ADAPTER` in resume/run — narrowed to `=== '1'`. (P1 fixed, CI) no-adapter spawn rejection leaked as unhandled background rejection in CI — caught and reported, no activeWorkId leak. (P2 accepted/scope) `Orchestrator.cancel()` sets session state optimistically but MCP reports confirmed persisted outcomes only. (P2 out-of-scope) task-state writes remain whole-file atomic writes without CAS/lock; no new stale-write pattern introduced, MCP linearizes on persisted terminal reads/checks.
+  - Validation (2026-11-12, exact fix tree for `c1e4742`): `npx vitest run tests/mcp-async.test.ts` — **12 passed**. `npx vitest run tests/mcp-async.test.ts tests/mcp.test.ts tests/mcp-job-lifecycle.test.ts` — **17 passed**. `npm run typecheck` — pass. `npm run typecheck:test` — pass. `npm run lint` — pass. `npm test` — **exit 0**, `Test Files 65 passed | 2 skipped (67)`, `Tests 404 passed | 16 skipped (420)`, 43.27s (`.kilo/tmp/npm-test-p1-01-rerun.log`). `npm run build` — pass. `npm pack --dry-run` — pass.
+  - CI (exact SHA `c1e474205a6e986cc2f19ff2d01aa03b2977cb05`): PR [#5](https://github.com/radmanmilos/air/pull/5) head `c1e4742`, branch `fix/l0-05-p0-conversation-atomic`, remote matches local. Run [43313608385](https://github.com/radmanmilos/air/actions/runs/43313608385) **completed success** — Python worker ubuntu/windows 3.12/3.14, test ubuntu/windows Node 22, Real-binary smoke tests all green. (Earlier amended SHAs `9c5431d`, `fee75a3` had failed runs; superseded by green `c1e4742`.) Prior run 43293203530 covers `fda9506` (P0) only.
+- P1-02 External coding CLI consent on default/fallback answer paths: **DONE for fix SHA `cb0880c361e38333687796adbbfc4e9aeeda52bc`** — IMPLEMENTED / LOCALLY TESTED / ADVERSARIALLY REVIEWED / COMMITTED / PUSHED / CI-VERIFIED.
+  - Files: `src/brain/index.ts`, `tests/brain.test.ts`, `tests/e2e/scenarios/real-jobs.test.ts`, `tests/e2e/live/smoke.live.test.ts`, `README.md`, `docs/reviews/tasks_air_13.md`.
+  - Root cause: CLI `brainAnswer`/`isBrainAvailable` (`src/brain/index.ts`) preferred external `kilo` then `opencode` CLIs before local Ollama and probed external CLI availability, bypassing `config.models.localFirst`/configured coordinator role and any external-egress consent; `bin/air.ts` answer path invoked it. MCP `chat_send` answer path was already fixed-acknowledgement (no external egress).
+  - Enforcement/behavior: default/fallback chat answer path is local-only. `brainAnswer` resolves local target via explicit local override `AIR_BRAIN_MODEL_OLLAMA` (ollama CLI/provider only) or configured global coordinator role (`loadConfig` + `resolveModelRole`, `localFirst` required, config errors fail closed) and answers via `OllamaProvider`/local ollama CLI; no `kilo`/`opencode`/`kilocode` spawn, no external fallback on local failure/unavailable/config error (returns `Acknowledged.`). `isBrainAvailable` reports local config/override availability only (no external CLI probes). CLI and MCP remain consistent (MCP answer = fixed acknowledgement). No external-consent model invented/expanded; unauthorized external egress removed from answer paths.
+  - Tests: added `tests/brain.test.ts` (no external CLI spawn, configured local provider used, local failure/config-error fail closed, env override local-only). Updated deterministic e2e coverage to exercise local-only brain via fake `ollama` PATH (`tests/e2e/scenarios/real-jobs.test.ts` P-04/P-06) and live smoke wording (`tests/e2e/live/smoke.live.test.ts`).
+  - Validation (local, 2026-11-12): `npx vitest run tests/brain.test.ts tests/chat-provider.test.ts tests/e2e/live/smoke.live.test.ts` — 7 passed, 4 skipped. Targeted regression `tests/brain.test.ts tests/conversation.test.ts tests/mcp-async.test.ts tests/mcp.test.ts tests/mcp-job-lifecycle.test.ts` — 32 passed. `npm run typecheck` pass; `npm run typecheck:test` pass; `npm run lint` pass; `npm run build` pass; `npm test` **exit 0** (66 files passed/2 skipped, 409 tests passed/16 skipped; `.kilo/tmp/npm-test-p1-02-rerun.log`; one transient groups cancellation run failed then passed on rerun/full suite). `npm pack --dry-run` pass. Python worker unchanged (not rerun).
+  - Adversarial review: confirmed no src/bin/mcp callers spawn `kilo`/`opencode` for answers; local failure/retry paths cannot reach external CLIs; env override constrained to local ollama; config warnings-only tolerated, hard config errors fail closed; MCP answer path unchanged/no egress; P0/P1-01 suites included in full pass. Residual risk (accepted, out-of-scope): `isBrainAvailable` may be true from config while Ollama runtime unavailable (safe fail-closed `Acknowledged.`); full coordinator/model-runtime wiring remains L4.
+  - CI (exact SHA `cb0880c361e38333687796adbbfc4e9aeeda52bc`): PR [#5](https://github.com/radmanmilos/air/pull/5) head `cb0880c`, branch `fix/l0-05-p0-conversation-atomic`, remote matches local. Run [43329891518](https://github.com/radmanmilos/air/actions/runs/43329891518) **completed success** — 7/7 jobs green: `test (ubuntu-24.04, 22)`, `test (windows-latest, 22)`, `Python worker (ubuntu-24.04, 3.12)`, `Python worker (ubuntu-24.04, 3.14)`, `Python worker (windows-latest, 3.12)`, `Python worker (windows-latest, 3.14)`, `Real-binary smoke tests`.
+- P1-03 Evaluation schema/tool-context integrity (proposal-argument hardening, this increment): **IMPLEMENTED / LOCALLY TESTED / COMMITTED (pending push+CI)** — prior CI-verified increments preserved: implementation `42ee626809446d4cd17c44633db890401b2d9688` (CI [43339234872](https://github.com/radmanmilos/air/actions/runs/43339234872), 7/7), docs `1d83ed0d23aa9e2533b5abb208a49dbbf7808916` (CI [43382851018](https://github.com/radmanmilos/air/actions/runs/43382851018), 7/7), registry-parity `fa5f3493ac31aa2f25303a4f168b907de87ed74b` (CI [43408577415](https://github.com/radmanmilos/air/actions/runs/43408577415), 7/7).
+  - Files (this increment): `src/evals/runner.ts`, `src/evals/sandbox/capabilities.ts`, `tests/evals/tool-contracts.test.ts`, `docs/reviews/p1-evaluation-followup-review.md`, `docs/reviews/tasks_air_13.md`.
+  - Behavior: `validateToolCallProposal()` rewritten to strict deterministic fail-closed validation against authoritative eval tool schemas (Python-exported/TS-mirror parity): rejects malformed/missing tool-call structure, unknown tools, wrong call type, non-object arguments; validates required properties (incl. nested), property values, nested objects/arrays and `items`, `enum`, `additionalProperties` (reject undeclared when `false`, accept/validate when permitted/schema-valued), and JSON types `string|boolean|integer|number|object|array|null` incl. finite integer-vs-fractional, boolean-not-number, and nullable unions; optional properties/defaults handled without coercion/injection/mutation. Unsupported/unevaluable schema constructs/keywords (e.g. `pattern`, bounds, `format`, `anyOf`/`oneOf`/`allOf`, `$ref`, tuple `items`, invalid shapes) fail closed. Returns stable reason codes + structured diagnostics (`code/tool/path/expected/actual/message`, no argument-value leakage). Runner remains **proposal-only** (no tool dispatch/patch/command/network execution, no CLI/MCP changes, P1-05 boundaries and `safetyOracles.executed:false` semantics preserved).
+  - Tests: `tests/evals/tool-contracts.test.ts` expanded (valid/absent, unknown/malformed, required/missing, wrong string/boolean/integer/fractional/number, boolean-not-number, enum, nested required/objects/arrays, extra-key rejection when strict, permitted additional properties/schema additionalProperties, omitted optional, nullability, no coercion/mutation, unsupported-schema fail-closed, deterministic results, real authoritative registry schemas, no dispatch). Relevant suites compatible.
+  - Validation (local, this pass): `npx vitest run tests/evals` **45 passed**; `npx vitest run tests/planner-compiler.test.ts tests/models` **19 passed**; `npx vitest run tests/check-dead-code.test.ts` **2 passed**; `npm run typecheck`, `npm run typecheck:test`, `npm run lint` pass; `git diff --check` exit 0 (LF warnings only); `cd packages/local-worker && python -m ruff check .`, `python -m mypy air_local`, `python -m pytest -q` **103 passed** (worker unchanged functionally); `npm run build`, `npm pack --dry-run` pass; `npm test` **exit 0**, **70 files passed/2 skipped, 436 tests passed/16 skipped (452)**.
+  - Limitations/boundary: proposal-only (not sandboxing/runtime authorization); any unevaluable schema feature fails closed; P1-05 sandboxed execution is DEFERRED to SEC-W1; P1-04/P1-07/P2 residuals are now closed or accepted as recorded above. **L0-05 is complete under the revised scope; L3/L4 remain blocked by L0-03/L0-04d and L1/L2.**
+
+- P1-05 Sandboxed evaluation execution and executed safety/acceptance oracles (coder/tool-calling/debugging): **DEFERRED (approved) — sandboxed execution is NOT implemented; fail-closed boundary is DONE.**
+  - **Boundary (DONE, commit `02cbaadf9b03aeec0009315f71d0b69ef44fabcb`, CI [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944) success, 7/7 jobs):** `src/evals/sandbox/capabilities.ts` (typed statuses `not_run|unsupported|blocked|timed_out|failed|passed`, oracle evidence, platform capability detection, fail-closed evaluation), `src/evals/runner.ts` (`--execute-safety-oracles` opt-in, default proposal-only; run records `executeSafetyOracles`/`sandboxCapabilities`; coder/tool-calling/debugging case `safetyOracles` include `mode`/`capabilities`/per-oracle status+`executed` evidence; proposal validation remains separate), `scripts/check-dead-code.mjs` baseline, `tests/evals/sandbox-capabilities.test.ts`, `tests/evals/os-sandbox.test.ts`, `tests/evals/eval-executor.test.ts`.
+  - **Behavior (verified):** default = `not_run`/`executed:false` (`proposal_only`), no untrusted patch apply/command execution/tool dispatch. Opt-in = capability-detected **fail-closed on Windows, Linux and macOS** => `unsupported`/`executed:false` (`sandbox_attempted`) with reasons; never marked `passed` without executed evidence. No eval execution is wired into normal CLI/MCP workflows. `src/evals/sandbox/eval-executor.ts` returns `unsupported` and applies no patch when the OS capability is unverified.
+  - **Deferred (SEC-W1):** OS-enforced sandboxed execution, untrusted diff/patch application, fixture command execution, proposed-tool dispatch, enforced filesystem/network/process isolation, and executed coder/tool-calling/debugging safety oracles. P1-05 is **not** claimed PASS/DONE. The experimental Windows prototype in `packages/windows-sandbox/` is retained as **EXPERIMENTAL / NOT PRODUCTION READY** and is not wired into the runtime or CI.
+  - **Threat model/architecture/enforceability:** documented in `docs/reviews/p1-evaluation-followup-review.md` §7 and in SEC-W1 below (untrusted patches/proposals, path/symlink/reparse/traversal/TOCTOU, shell/PATH/env/credential/egress, timeout/process-tree/cleanup, cross-case contamination, oracle-truth risks; application-level validation/workspace copy explicitly not an OS sandbox).
+- P1-04/P1-05/P1-06 Evaluation correctness/safety oracles: **P1-04 PASS (audited paths); P1-06 PASS; P1-05 DEFERRED (execution) / PASS (fail-closed boundary).** See the revised completion-scope table above. Remaining P1-04 risk is evaluation-quality confidence (sample size / false-positive calibration), not a demonstrated leakage path.
+- P1-07 Ollama assistant tool-call request/response contract: **PASS** — provider-neutral `ModelMessage.toolCalls`, Ollama assistant `tool_calls` serialization and deterministic request/response sequencing/malformed-handling tests (`tests/models/ollama.test.ts`, "serializes assistant tool-call history… (P1-07)").
+- P2-01/P2-02 Provider/config hardening: **PASS** — health 5s default timeout with `TIMEOUT`→`online:false` (caller cancellation still rejects `CANCELLED`, not misreported as offline); strict HTTP(S) base URL validation rejecting credentials/query/fragment in both schema and provider.
+- P2-03 `maxConcurrentGenerative` enforcement: **DEFERRED to L3 (accepted, non-blocking P2).** Documented as configuration intent in `docs/configuration/model-roles.md`; the independent review's recommendation is to enforce it in the L3 resource manager. No enforcement is claimed.
+
+- **E2E cancellation fix (committed `384b1d0`):** Fixed `tests/e2e/scenarios/groups.test.ts` G-hang failure. Root cause: stale closure variable `conv` in `bin/air.ts` chat REPL never reflected `activeWorkIds` pushed by `runJob`, causing bare `/cancel` to be misclassified as `answer` → "thinking..."/"Acknowledged." instead of cancellation. Fix: handle bare `/cancel` via `jobHandles` map (populated before "Started job" print), reorder `runJob` to push `activeWorkIds` before printing, reload `conv` from disk, and clean up `jobHandles` in waiter `finally`. Test now passes.
+
+- Gate: **L0-05 is complete under the revised scope (P1-05 execution DEFERRED with owner approval).** L3/L4 remain BLOCKED by L0-03 (independent architecture review), L0-04d (independent scoring/threshold review) and L1/L2 completion — **not** by L0-05. P0-01 CI verified for `fda9506` (run [43293203530](https://github.com/radmanmilos/air/actions/runs/43293203530)). P1-01 CI verified for `c1e4742` (run [43313608385](https://github.com/radmanmilos/air/actions/runs/43313608385)). P1-02 CI verified for `cb0880c` (run [43329891518](https://github.com/radmanmilos/air/actions/runs/43329891518), 7/7 jobs). P1-03 CI verified for `e870573` (run [43419317640](https://github.com/radmanmilos/air/actions/runs/43419317640), 7/7 jobs). P1-06 CI verified for `2d0746a` (run [43404486859](https://github.com/radmanmilos/air/actions/runs/43404486859), 7/7 jobs). P1-05 fail-closed boundary CI verified for `02cbaad` (run [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944), 7/7 jobs). Latest branch head CI: run [43637550393](https://github.com/radmanmilos/air/actions/runs/43637550393) success for `e8d4243` (7/7 jobs). Any subsequent correction commit requires its own exact-SHA CI verification before being claimed CI-verified.
+
+## SEC-W1 — Windows-first OS-enforced sandbox for untrusted evaluation execution (separate security milestone)
+
+**Status:** OPEN (deferred from P1-05; not started)
+**Owner:** unassigned
+**Depends on:** L0 (P1-05 fail-closed boundary accepted)
+**Parent decision:** project-owner-approved P1-05 deferral (see Decision record above).
+
+**Goal:** safely execute explicitly authorized, untrusted evaluation work (coder patches, fixture commands, proposed tools) under OS-enforced confinement, with auditable evidence.
+
+**Threat model / attacker capabilities:** malicious or accidental model artifacts (patches, tool proposals, shell commands); prompt/tool output is untrusted data, never authorization. Attacker may attempt filesystem escape (absolute/`..`, symlink/junction/reparse, TOCTOU), process abuse (shell metacharacters, PATH/executable substitution, child-process survival), host leakage (inherited secrets/env/handles), network egress/exfiltration, resource exhaustion/hangs, and oracle forgery (reporting `passed` without execution).
+
+**Required design work:**
+- Explicit workspace read/write boundaries; canonical-path and symlink/reparse-safe confinement; no host-side application of untrusted patches before confinement.
+- Process creation and child-process containment (Windows Job Objects / restricted tokens / AppContainer as applicable).
+- Network access policy and enforcement (deny by default).
+- Resource limits, timeout and cancellation; process-tree termination and cleanup.
+- Handle inheritance and descriptor hygiene; minimal sanitized environment.
+- Workspace setup, patch application, execution and cleanup all inside the security boundary.
+- Auditable failure handling and evidence collection; no execution when any required enforcement capability is missing.
+- Windows-first implementation and adversarial validation; Linux/macOS deferred to later platform phases.
+
+**Required acceptance evidence:**
+- Demonstrated filesystem confinement with positive and negative tests.
+- Demonstrated process-tree containment.
+- Demonstrated network restriction.
+- Verified cancellation and timeout behavior.
+- Verified resource limits.
+- Verified handle inheritance and cleanup.
+- Adversarial tests proving denied operations remain denied.
+- No execution when any required enforcement capability is missing.
+- Reproducible CI evidence on supported Windows runners.
+- Independent security review before enabling the feature.
+
+**Prototype:** `packages/windows-sandbox/` (C#, `Program.cs`) is retained as **EXPERIMENTAL / NOT PRODUCTION READY**. It is not referenced by `src/`, is not built or run by CI, is excluded from `npm pack` (not in `package.json` `files`), and its build outputs are git-ignored. It must not be enabled to satisfy a test or to claim P1-05 complete.
+
+**Exit criteria:** SEC-W1 acceptance evidence above is CI-reproducible and independently reviewed; only then may untrusted eval execution be enabled, and P1-05 execution oracles be marked PASS.
 
 ## L1 — Provider-neutral model runtime and Ollama provider
 
@@ -150,7 +279,7 @@
 - Owner: integration agent
 - Evidence: src/models/role-resolver.ts resolves logical role to the configured Ollama model/endpoint/resource intent and fails closed when the provider is disabled. It does not probe model availability or silently fall back; registry/capability checks remain future work.
 - Depends on: L2-01, L2-02
-- Scope: role → provider/model selection with capability, availability, resource and user-policy filters; explainable decisions.
+- Scope: role â†’ provider/model selection with capability, availability, resource and user-policy filters; explainable decisions.
 - Acceptance: no silent paid fallback; role assignment is independent of execution adapter.
 
 ### L2-04 — Local adapter and worker contract alignment
@@ -401,3 +530,22 @@ Copy this into the PR description or update the relevant package entry at the en
 | L8 | — | — | — | — |
 | L9 | — | — | — | — |
 | L10 | — | — | — | — |
+
+
+## Incremental progress note (this session)
+
+- Added recursive secret-redaction helper edactValue to src/security/redact.ts (exported from src/security/index.ts) covering strings, arrays, objects, Error messages/stacks, and malformed/circular values with depth guard.
+- Applied edact() to Ollama provider error messages sourced from response bodies (P2-03).
+- Added regression tests in 	ests/redaction.test.ts (P2-03 recursive/nested/malformed).
+- P1-05 remains PARTIAL/NOT DONE: no OS-enforced sandbox implemented; fail-closed boundary contract retained.
+- P1-04/P1-06/P1-07/P2-01/P2-02 remain PARTIAL per ledger acceptance criteria.
+- L3/L4 remain BLOCKED.
+- Validation: typecheck, typecheck:test, lint, build, pack --dry-run, python ruff/mypy/pytest all pass; full npm test not rerun after this minimal change beyond targeted redaction suite.
+
+## Incremental progress note (os-sandbox primitive)
+
+- Added src/evals/sandbox/os-sandbox.ts: platform detection, capability probe, and unOsSandboxed() wrapping real OS mechanisms (Linux unshare net/pid/mount namespace; macOS sandbox-exec Seatbelt profile; Windows fail-closed unsupported). Fail-closed on unavailable mechanisms.
+- Added 	ests/evals/os-sandbox.test.ts (4 tests).
+- Updated scripts/check-dead-code.mjs baseline for new exports.
+- P1-05 remains PARTIAL: eval execution boundary not yet wired to use os-sandbox; Windows has no OS enforcement; Linux/macOS enforcement depends on host privileges and remains unverified in CI (no macOS runner).
+- L3/L4 remain BLOCKED.

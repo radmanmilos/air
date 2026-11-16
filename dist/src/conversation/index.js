@@ -8,10 +8,10 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { resolvePaths } from '../config/paths.js';
 import { redact } from '../security/redact.js';
+import { lockedReadModifyWrite } from '../utils/lock.js';
 function airPaths() {
     return resolvePaths({ env: process.env });
 }
-import { lockedReadModifyWrite } from '../utils/lock.js';
 const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function assertId(id) {
     if (typeof id !== 'string' || !ID_RE.test(id)) {
@@ -53,6 +53,11 @@ export function loadConversation(id) {
         return null;
     }
 }
+/**
+ * Persist a full conversation object (initial creation or controlled replacement).
+ * Not safe for concurrent in-place updates: use `mutateConversation`/`appendMessage`
+ * after creation so mutations re-read latest state under the per-conversation lock.
+ */
 export function saveConversation(conv) {
     assertId(conv.id);
     conv.updatedAt = new Date().toISOString();
@@ -61,10 +66,27 @@ export function saveConversation(conv) {
     writeFileSync(tmp, JSON.stringify(conv, null, 2));
     renameSync(tmp, f);
 }
-export async function appendMessage(id, msg) {
-    return lockedReadModifyWrite(`conversation-${id}`, file(id), async (current) => {
+/**
+ * Atomically read-modify-write a persisted conversation under the
+ * per-conversation lock. The mutator receives the latest stored state and
+ * must return the next state to persist. Use for all in-place updates after
+ * initial creation to avoid stale-object overwrites.
+ */
+export async function mutateConversation(id, mutator) {
+    const next = await lockedReadModifyWrite(`conversation-${id}`, file(id), async (current) => {
         if (!current)
             throw new Error(`Conversation ${id} not found`);
+        const result = await mutator(current);
+        const out = (result ?? current);
+        out.updatedAt = new Date().toISOString();
+        return out;
+    });
+    if (!next)
+        throw new Error(`Conversation ${id} mutation failed (lock timeout)`);
+    return next;
+}
+export async function appendMessage(id, msg) {
+    return mutateConversation(id, (current) => {
         const full = {
             id: msg.id ?? randomUUID(),
             role: msg.role,
@@ -74,16 +96,24 @@ export async function appendMessage(id, msg) {
             meta: msg.meta,
         };
         current.messages.push(full);
-        current.updatedAt = new Date().toISOString();
         return current;
     });
 }
 export async function injectResult(convId, summary, workId) {
-    const conv = loadConversation(convId);
-    if (conv && workId && conv.messages.some((m) => m.role === 'tool' && m.workId === workId)) {
-        return; // idempotent: already injected
-    }
-    await appendMessage(convId, { role: 'tool', content: summary, workId });
+    await mutateConversation(convId, (current) => {
+        if (workId && current.messages.some((m) => m.role === 'tool' && m.workId === workId)) {
+            return current; // idempotent: already injected
+        }
+        const full = {
+            id: randomUUID(),
+            role: 'tool',
+            content: summary,
+            ts: new Date().toISOString(),
+            workId,
+        };
+        current.messages.push(full);
+        return current;
+    });
 }
 export function compactConversation(conv, maxMessages = 50) {
     if (conv.messages.length <= maxMessages)

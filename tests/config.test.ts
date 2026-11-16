@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parse } from 'yaml';
 import { loadConfig, validateConfigFile, migrateConfig } from '../src/config/loader';
-import { CONFIG_VERSION } from '../src/config/schema';
+import { CONFIG_VERSION, safeParseConfig, formatConfigError } from '../src/config/schema';
 import { describe, it, expect } from 'vitest';
 
 describe('config loader (G2-03)', () => {
@@ -134,6 +134,31 @@ describe('config loader (G2-03)', () => {
     );
     const errors = await validateConfigFile(file);
     expect(errors.some((error) => error.includes('provider'))).toBe(true);
+  });
+
+  it('rejects unsafe Ollama base URLs (P2-02: credentials/query/fragment/non-http)', async () => {
+    const bad = [
+      'http://user:pass@127.0.0.1:11434',
+      'https://token@example.com',
+      'http://127.0.0.1:11434/path?x=1',
+      'http://127.0.0.1:11434#frag',
+      'ftp://127.0.0.1:11434',
+    ];
+    for (const baseUrl of bad) {
+      const parsed = safeParseConfig({
+        version: 2,
+        models: { providers: { ollama: { enabled: true, baseUrl } } },
+      }, { strict: true });
+      expect(parsed.success, baseUrl).toBe(false);
+      if (!parsed.success) {
+        expect(formatConfigError(parsed.error, 'cfg')).toContain('baseUrl');
+      }
+    }
+    const ok = safeParseConfig({
+      version: 2,
+      models: { providers: { ollama: { enabled: true, baseUrl: 'https://ollama.internal:11434' } } },
+    }, { strict: true });
+    expect(ok.success).toBe(true);
   });
 
   it('redacts a token value present in repo config errors', async () => {

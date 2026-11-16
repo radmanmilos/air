@@ -57,9 +57,9 @@ describe('live: A-02 onboarding against a real repo', () => {
 describe('live: B-04 brain tool reachable', () => {
   liveScenario(
     'live: B-04',
-    'B-04 a live brain tool (kilo/opencode/ollama) answers --version',
+    'B-04 a local chat brain is configured',
     canBrain,
-    'no live brain tool is installed',
+    'no local chat brain is configured',
     async () => {
       expect(await isBrainAvailable()).toBe(true);
     },
