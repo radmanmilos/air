@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const CONTRACT_VERSION = 1 as const;
+export const CONTRACT_VERSION = 2 as const;
 
 /** Exit codes the worker process returns. These are contract, not CLI, codes. */
 export const WORKER_EXIT_CODES = {
@@ -47,6 +47,10 @@ export interface JobRequest {
   readOnly?: boolean;
   allowShell?: boolean;
   allowNetwork?: boolean;
+  /** Logical AIR role resolved by the control plane (e.g., 'coder'). */
+  role?: string;
+  /** Provider identifier (e.g., 'ollama'). */
+  provider?: string;
   model?: string;
   maxSteps?: number;
   configPath?: string;

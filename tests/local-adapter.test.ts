@@ -77,13 +77,15 @@ describe('local adapter', () => {
     const request = JSON.parse(readFileSync(requestPath, 'utf8'));
 
     expect(request).toEqual({
-      contractVersion: 1,
+      contractVersion: 2,
       runId: 'run-test',
       task: 'say hello',
       cwd: process.cwd(),
       readOnly: false,
       allowShell: true,
       allowNetwork: false,
+      role: 'coder',
+      provider: 'ollama',
       model: 'qwen2.5-coder:7b',
     });
     expect(requestPath.endsWith('.json')).toBe(true);
@@ -92,15 +94,18 @@ describe('local adapter', () => {
     expect(spec.env?.AIR_LOCAL_RESULT).toBe(resultPath);
   });
 
-  it('omits the model unless one was explicitly chosen', () => {
+  it('resolves model from config when not explicitly chosen', () => {
     const cacheDir = tempDir();
     const adapter = new LocalAdapter({ command: WORKER, cacheDir });
 
     const spec = adapter.buildCommand(task());
     const request = JSON.parse(readFileSync(argAfter(spec.args, '--request'), 'utf8'));
 
-    expect(request.model).toBeUndefined();
-    expect(adapter.model).toBe('qwen3.5:4b');
+    expect(request.contractVersion).toBe(2);
+    expect(request.role).toBe('coder');
+    expect(request.provider).toBe('ollama');
+    expect(request.model).toBe('qwen2.5-coder:7b');
+    expect(adapter.model).toBe('qwen2.5-coder:7b');
   });
 
   it('prefers a task model over the adapter model', () => {
@@ -177,7 +182,7 @@ const args = process.argv.slice(2);
 const get = (name) => args[args.indexOf(name) + 1];
 const request = JSON.parse(readFileSync(get('--request'), 'utf8'));
 const result = {
-  contractVersion: 1,
+  contractVersion: 2,
   runId: request.runId,
   state: 'COMPLETED',
   answer: 'shim answer',

@@ -115,7 +115,7 @@ def test_rejects_unknown_fields():
 
 
 def test_rejects_wrong_contract_version():
-    errors = contract.validate_request(_request(contractVersion=2))
+    errors = contract.validate_request(_request(contractVersion=0))
     assert any("contractVersion" in e for e in errors)
 
 

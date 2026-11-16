@@ -40,7 +40,7 @@
       "name": "request wrong contract version",
       "kind": "request",
       "valid": false,
-      "value": { "contractVersion": 2, "runId": "run-1", "task": "say hi", "cwd": "." }
+      "value": { "contractVersion": 0, "runId": "run-1", "task": "say hi", "cwd": "." }
     },
     {
       "name": "request maxSteps below minimum",
