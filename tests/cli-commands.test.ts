@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { SLASH_COMMANDS, formatHelpText, findCommand, isKnownCommand, UNIQUE_SLASH_COMMANDS } from '../src/cli/commands';
+
+const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 
 describe('slash command registry', () => {
   it('includes all supported commands', () => {
@@ -48,5 +53,13 @@ describe('slash command registry', () => {
     expect(text).toContain('Conversation:');
     expect(text).toContain('Jobs:');
     expect(text).toContain('Inspection:');
+  });
+});
+
+describe('terminal escape sequences (regression)', () => {
+  it('dist contains actual escape sequences, not literal backslash text', () => {
+    const dist = readFileSync(join(ROOT, 'dist', 'bin', 'air.js'), 'utf8');
+    expect(dist).toContain("'\\u001b[2K\\r'");
+    expect(dist).not.toContain("'\\\\u001b[2K\\\\r'");
   });
 });

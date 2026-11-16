@@ -754,6 +754,7 @@ program
           rl.prompt();
         } catch (err) {
           console.log(out.red(`job ${session.runId} error: ${String(err)}`));
+          rl.prompt();
         } finally {
           jobHandles.delete(session.runId);
         }
@@ -851,7 +852,8 @@ if (trimmed.startsWith('/')) {
         if (a.type === 'spawn_job') {
           logEvent('job_submitted', a.goal);
           void runJob(a.goal, undefined, a.hints);
-} else if (a.type === 'answer') {
+          rl.prompt();
+        } else if (a.type === 'answer') {
           if (shuttingDown) {
             // Do not start new brain answers during shutdown; acknowledge
             // immediately so the user gets a response.
@@ -867,11 +869,11 @@ if (trimmed.startsWith('/')) {
               // No interstitial in non-TTY mode: a cleared "thinking..." line
               // leaks to piped output and breaks scripted consumers.
               if (isInteractive()) {
-                process.stderr.write(out.gray('air: thinking... ') + '\\u001b[2K\\r');
+                process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
               }
               const freshConv = loadConversation(conv!.id) ?? conv!;
               const r = await brainAnswer(trimmed, { history: freshConv.messages, jobs: freshConv.activeWorkIds });
-              if (isInteractive()) process.stderr.write('\\u001b[2K\\r');
+              if (isInteractive()) process.stderr.write('\u001b[2K\r');
               logEvent('brain_end', r.text.slice(0, 200));
               reply = r.text;
             }
@@ -880,6 +882,7 @@ if (trimmed.startsWith('/')) {
             rl.prompt();
           })().catch((err) => {
             console.log(out.red(`brain error: ${String(err)}`));
+            rl.prompt();
           });
           pendingBrains.add(brainPromise);
           brainPromise.finally(() => { pendingBrains.delete(brainPromise); });
@@ -889,6 +892,7 @@ if (trimmed.startsWith('/')) {
           rl.prompt();
         } else if (a.type === 'status') {
           console.log(out.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`));
+          rl.prompt();
         } else if (a.type === 'cancel_job') {
           const entry = jobHandles.get(a.jobId);
           if (entry) {
@@ -897,6 +901,7 @@ if (trimmed.startsWith('/')) {
           }
           await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== a.jobId); });
           console.log(out.yellow(`Cancelled ${a.jobId}`));
+          rl.prompt();
         }
       }
     });

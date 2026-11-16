@@ -22,7 +22,10 @@ export interface BrainContext {
 
 /** Diagnostic result of checking whether the local brain can answer. */
 export interface BrainReadiness {
+  /** True only when the configured provider and model are verified available. */
   available: boolean;
+  /** 'ready' means: config valid, localFirst true, Ollama server responding,
+   *  and configured model installed (or env override server reachable). */
   reason: 'ready' | 'not_configured' | 'config_error' | 'server_unavailable' | 'model_not_found';
   detail?: string;
 }
@@ -34,7 +37,7 @@ async function tryOllamaCli(prompt: string, model: string): Promise<BrainResult 
     const r: { stdout: string; status: number | null; error: any } = await new Promise((resolve) => {
       const child = crossSpawn('ollama', ['run', model, prompt], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 120000,
+        timeout: 10000,
       });
       let stdout = '';
       child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
@@ -42,7 +45,7 @@ async function tryOllamaCli(prompt: string, model: string): Promise<BrainResult 
       const timer = setTimeout(() => {
         try { child.kill(); } catch { /* noop */ }
         resolve({ stdout, status: null, error: new Error('timeout') });
-      }, 120000);
+      }, 10000);
       child.on('close', (code: number | null) => {
         clearTimeout(timer);
         resolve({ stdout, status: code, error: child.error || null });
@@ -86,7 +89,17 @@ async function resolveLocalBrain(): Promise<{ provider: OllamaProvider; model: s
 export async function checkBrainReadiness(): Promise<BrainReadiness> {
   const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
   if (envModel) {
-    // Explicit local override: assume the ollama CLI/provider can handle it.
+    // Explicit local override: verify the Ollama runtime is reachable for the
+    // configured base URL. We cannot verify the specific model is installed
+    // (it may be a CLI-only model), but the server must respond.
+    const baseUrl = process.env.AIR_BRAIN_OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+    const provider = new OllamaProvider({ baseUrl });
+    try {
+      const health = await provider.health({ timeoutMs: 3000 });
+      if (!health.online) return { available: false, reason: 'server_unavailable', detail: 'Ollama not responding' };
+    } catch (err) {
+      return { available: false, reason: 'server_unavailable', detail: String(err) };
+    }
     return { available: true, reason: 'ready' };
   }
   let config: any;

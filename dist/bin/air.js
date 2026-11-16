@@ -175,6 +175,7 @@ function showStatus(options) {
             version: AIR_VERSION,
             tools: adapterStatus(),
             localWorker,
+            brain: { available: false, reason: 'unknown' },
             cooldowns: snap.cooldowns.map((c) => ({
                 provider: c.provider,
                 model: c.model,
@@ -188,6 +189,12 @@ function showStatus(options) {
                 hasActiveCooldown: snap.hasActiveCooldown,
             },
         };
+        try {
+            const { isBrainAvailable } = await import('../src/brain/index.js');
+            const available = await isBrainAvailable();
+            data.brain = { available, reason: available ? 'ready' : 'unavailable' };
+        }
+        catch { /* noop */ }
         if (options.json) {
             process.stdout.write(JSON.stringify(data) + '\n');
             return;
@@ -198,7 +205,7 @@ function showStatus(options) {
             return `${t.id} (${inst})${t.available ? '' : ' (unavailable)'}`;
         }).join(', ') || 'none');
         console.log(out.gray('Local worker:'), localWorker.provisioned ? `provisioned (${localWorker.python})` : 'not provisioned (run `air setup local`)');
-        console.log(out.gray('Cooldowns:'), data.cooldowns.length);
+        console.log(out.gray('Brain:'), data.brain.available ? `available` : `unavailable`);
         console.log(out.gray('Successes:'), snap.totalSuccesses);
         console.log(out.gray('Failures:'), snap.totalFailures);
         console.log(out.gray('Active cooldown:'), snap.hasActiveCooldown ? 'yes' : 'no');
@@ -377,19 +384,14 @@ program
 program
     .command('commands')
     .description('List available commands (side-panel help)')
-    .action(() => {
-    console.log('AIR commands:');
-    console.log('  /run <task>        Run a task');
-    console.log('  /status            Show health and cooldowns');
-    console.log('  /dashboard         Show sessions and events');
-    console.log('  /export            Export session log');
-    console.log('  /models            List models');
-    console.log('  /verify <cmd...>   Run verification');
-    console.log('  /merge <jobId>     Preview a completed job worktree (add --apply to merge)');
-    console.log('  /setup local       Provision the internal local worker');
-    console.log('  /doctor            Check whether a local job can run');
-    console.log('  /mcp               Start MCP server');
-    console.log('Type "/" then a command, or run "air <command>".');
+    .action(async () => {
+    const { formatHelpText } = await import('../src/cli/commands.js');
+    console.log(formatHelpText());
+    console.log('');
+    console.log('Top-level commands: air run, air status, air doctor, air setup local,');
+    console.log('  air models, air verify, air merge, air export, air mcp, air commands');
+    console.log('');
+    console.log('Type "/" then a command in chat, or run "air <command>".');
 });
 program
     .command('models')
@@ -696,6 +698,7 @@ program
         logEvent('job_started', session.runId);
         logEvent('notice_printed', `Started job ${session.runId}`);
         console.log(out.green(`Started job ${session.runId}`));
+        console.log(out.gray(`  Job ID: ${session.runId}  (use /cancel ${session.runId} to stop)`));
         // Background waiter.
         const p = (async () => {
             try {
@@ -730,9 +733,14 @@ program
                 });
                 logEvent('job_finished', `${session.runId}: ${summary.split('.')[0]}`);
                 console.log(out.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
+                if (facts.changedFiles && facts.changedFiles.length > 0) {
+                    console.log(out.gray(`  ${facts.changedFiles.length} file(s) changed. Use "air merge ${session.runId}" to preview.`));
+                }
+                rl.prompt();
             }
             catch (err) {
                 console.log(out.red(`job ${session.runId} error: ${String(err)}`));
+                rl.prompt();
             }
             finally {
                 jobHandles.delete(session.runId);
@@ -740,38 +748,47 @@ program
         })();
         waiters.set(session.runId, p);
     }
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'air> ' });
+    rl.prompt();
     rl.on('line', async (line) => {
         const trimmed = line.trim();
-        if (!trimmed)
+        if (!trimmed) {
+            rl.prompt();
             return;
+        }
         logEvent('command_handled', trimmed);
         logEvent('message_received', trimmed);
-        if (trimmed === '/quit' || trimmed === '/exit') {
+        if (trimmed === '/quit' || trimmed === '/exit' || trimmed === '/q') {
             shuttingDown = true;
             rl.close();
             return;
         }
-        if (trimmed === '/help') {
-            console.log(out.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel [id], /last, /stats, /tasks, /quit'));
+        if (trimmed === '/help' || trimmed === '/h' || trimmed === '/?') {
+            const { formatHelpText } = await import('../src/cli/commands.js');
+            console.log(out.gray(formatHelpText()));
+            rl.prompt();
             return;
         }
         if (trimmed === '/status') {
             const c = (await import('../src/conversation/index.js')).loadConversation(conv.id) ?? conv;
             console.log(out.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`));
+            rl.prompt();
             return;
         }
         if (trimmed === '/jobs' || trimmed === '/tasks') {
             console.log(out.gray(`active: ${conv.activeWorkIds.join(',') || '(none)'}`));
+            rl.prompt();
             return;
         }
         if (trimmed === '/stats') {
             console.log(out.gray(`messages=${conv.messages.length} tasks=${conv.activeWorkIds.length} facts=${conv.facts.length}`));
+            rl.prompt();
             return;
         }
         if (trimmed === '/last') {
             const last = [...conv.messages].reverse().find((m) => m.role === 'tool');
             console.log(out.gray(last ? last.content : '(no result yet)'));
+            rl.prompt();
             return;
         }
         if (trimmed.startsWith('/cancel ')) {
@@ -789,12 +806,14 @@ program
             await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== id); });
             jobHandles.delete(id);
             console.log(out.yellow(`Cancelled ${id}`));
+            rl.prompt();
             return;
         }
         if (trimmed.startsWith('/run ') || trimmed.startsWith('/plan ')) {
             const task = trimmed.replace(/^\/(run|plan) /, '').trim();
             await appendMessage(conv.id, { role: 'user', content: task });
             void runJob(task);
+            rl.prompt();
             return;
         }
         // Handle bare /cancel directly using jobHandles (avoids stale conv.activeWorkIds).
@@ -812,10 +831,18 @@ program
                 await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== last); });
                 jobHandles.delete(last);
                 console.log(out.yellow(`Cancelled ${last}`));
+                rl.prompt();
                 return;
             }
         }
-        // Decision loop.
+        if (trimmed.startsWith('/')) {
+            const { isKnownCommand } = await import('../src/cli/commands.js');
+            if (!isKnownCommand(trimmed)) {
+                console.log(out.yellow(`Unknown command: ${trimmed.split(/\s+/)[0]}. Type /help for available commands.`));
+                rl.prompt();
+                return;
+            }
+        }
         // Reload conv from disk to avoid stale state.
         const freshConv = loadConversation(conv.id);
         if (freshConv)
@@ -826,6 +853,7 @@ program
             if (a.type === 'spawn_job') {
                 logEvent('job_submitted', a.goal);
                 void runJob(a.goal, undefined, a.hints);
+                rl.prompt();
             }
             else if (a.type === 'answer') {
                 if (shuttingDown) {
@@ -843,19 +871,21 @@ program
                         // No interstitial in non-TTY mode: a cleared "thinking..." line
                         // leaks to piped output and breaks scripted consumers.
                         if (isInteractive()) {
-                            process.stderr.write(out.gray('air: thinking... ') + '\\u001b[2K\\r');
+                            process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
                         }
                         const freshConv = loadConversation(conv.id) ?? conv;
                         const r = await brainAnswer(trimmed, { history: freshConv.messages, jobs: freshConv.activeWorkIds });
                         if (isInteractive())
-                            process.stderr.write('\\u001b[2K\\r');
+                            process.stderr.write('\u001b[2K\r');
                         logEvent('brain_end', r.text.slice(0, 200));
                         reply = r.text;
                     }
                     await appendMessage(conv.id, { role: 'assistant', content: reply });
                     console.log(out.gray(`air: ${reply}`));
+                    rl.prompt();
                 })().catch((err) => {
                     console.log(out.red(`brain error: ${String(err)}`));
+                    rl.prompt();
                 });
                 pendingBrains.add(brainPromise);
                 brainPromise.finally(() => { pendingBrains.delete(brainPromise); });
@@ -863,9 +893,11 @@ program
             else if (a.type === 'clarify') {
                 await appendMessage(conv.id, { role: 'assistant', content: a.question });
                 console.log(out.gray(`air: ${a.question}`));
+                rl.prompt();
             }
             else if (a.type === 'status') {
                 console.log(out.gray(`messages=${conv.messages.length} active=${conv.activeWorkIds.join(',')}`));
+                rl.prompt();
             }
             else if (a.type === 'cancel_job') {
                 const entry = jobHandles.get(a.jobId);
@@ -878,6 +910,7 @@ program
                 }
                 await mutateConversation(conv.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== a.jobId); });
                 console.log(out.yellow(`Cancelled ${a.jobId}`));
+                rl.prompt();
             }
         }
     });

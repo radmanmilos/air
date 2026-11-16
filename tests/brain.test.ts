@@ -115,7 +115,8 @@ describe('brain answer path (P1-02 local-first, no external CLI egress)', () => 
 
   it('explicit local env override uses only local ollama CLI/provider, not external coding CLIs', async () => {
     process.env.AIR_BRAIN_MODEL_OLLAMA = 'fake';
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('no http'); }));
+    // fetch returns health response for the env override base URL
+    vi.stubGlobal('fetch', makeFetchMock());
     const r = await brainAnswer('hello');
     expect(r).toMatchObject({ provider: 'ollama', text: 'local-answer' });
     expect(spawnCalls.every((c) => c.cmd === 'ollama')).toBe(true);
@@ -175,13 +176,21 @@ describe('brain answer path (P1-02 local-first, no external CLI egress)', () => 
     expect(r.reason).toBe('not_configured');
   });
 
-  it('checkBrainReadiness returns ready for env override without probing', async () => {
+  it('checkBrainReadiness returns ready for env override when server is reachable', async () => {
     process.env.AIR_BRAIN_MODEL_OLLAMA = 'fake-model';
-    // fetch throws, but env override should still return ready
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('no http'); }));
+    // fetch returns health response
+    vi.stubGlobal('fetch', makeFetchMock());
     const r = await checkBrainReadiness();
     expect(r.available).toBe(true);
     expect(r.reason).toBe('ready');
+  });
+
+  it('checkBrainReadiness returns server_unavailable for env override when server is down', async () => {
+    process.env.AIR_BRAIN_MODEL_OLLAMA = 'fake-model';
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('no http'); }));
+    const r = await checkBrainReadiness();
+    expect(r.available).toBe(false);
+    expect(r.reason).toBe('server_unavailable');
   });
 
   it('isBrainAvailable returns false when model is not installed', async () => {

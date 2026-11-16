@@ -12,7 +12,10 @@ export interface BrainContext {
 }
 /** Diagnostic result of checking whether the local brain can answer. */
 export interface BrainReadiness {
+    /** True only when the configured provider and model are verified available. */
     available: boolean;
+    /** 'ready' means: config valid, localFirst true, Ollama server responding,
+     *  and configured model installed (or env override server reachable). */
     reason: 'ready' | 'not_configured' | 'config_error' | 'server_unavailable' | 'model_not_found';
     detail?: string;
 }

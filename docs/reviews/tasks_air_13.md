@@ -4,7 +4,7 @@
 **Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN; **L0-05 DONE and MERGED (revised scope; P1-05 sandboxed execution formally DEFERRED to SEC-W1)** — PR [#5](https://github.com/radmanmilos/air/pull/5) merged at `c27dcdf4a5c4f6cc2e15809273ad19ecec532877`; P0-01, P1-01, P1-02, P1-03, P1-04, P1-06, P1-07, P2-01, P2-02 CI-verified; P1-05 fail-closed boundary CI-verified; P2-03 accepted deferral to L3 / L1-L2 integration remains IN_PROGRESS; **UI-01 DONE and UI-02 DONE (d8b4a9d); UI-03..UI-05 remain TODO**
 **Created:** 2026-11-12
 **Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5
-**Current main baseline:** `a42428b30cb47e7d01d014cb4eff7b035635ffa5` (`docs(review): record L0-05 merge and main CI evidence`; CI run [43837436658](https://github.com/radmanmilos/air/actions/runs/43837436658) passed, 7/7 jobs). **Historical reference — PR #5 merge commit:** `c27dcdf4a5c4f6cc2e15809273ad19ecec532877` (main CI run [43836537780](https://github.com/radmanmilos/air/actions/runs/43836537780) passed, 7/7 jobs). The merge commit is an ancestor of current main; it is not the current HEAD.
+**Current main baseline:** `fe2fc7208036ca408a5f6446725ebf55f9fff65e` (F-02 reliability hardening; CI run [43862406296](https://github.com/radmanmilos/air/actions/runs/43862406296) passed, 7/7 jobs). **Integration PR #8:** `integrate/pr6-pr7` branch, commit `eb3411f8041075ae0e58e235fac50ab7fe91f4c1`, CI run [43909012267](https://github.com/radmanmilos/air/actions/runs/43909012267) passed, 7/7 jobs. PR #8 merges PR #6 (F-02) and PR #7 (terminal UX) into one coherent delivery.
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -248,14 +248,16 @@ L0-05 is complete only because every non-deferred mandatory criterion below is s
 ### UI-02 — First polished terminal interaction improvement
 - Status: DONE
 - Owner: integration agent
-- Evidence: new `src/cli/output.ts` (color/TTY gate, one-line header, welcome, log/status helpers); `bin/air.ts` no-args welcome, banner removal, non-TTY chat refusal, non-TTY brain interstitial removal; `tests/cli-interactive.test.ts` (8 tests, all passing); `tests/built-binary.test.ts` and `tests/e2e/scenarios/real-jobs.test.ts` updated with `AIR_E2E_TTY=1` opt-in.
-- Validation: `npm run typecheck`, `npm run typecheck:test`, `npm run lint`, `npm test`, `npm run build`, `npm pack --dry-run`, `npm run check:dead-code` all green locally on Windows.
+- Evidence: new `src/cli/output.ts` (color/TTY gate, one-line header, welcome, log/status helpers); `bin/air.ts` no-args welcome, banner removal, non-TTY chat refusal, non-TTY brain interstitial removal; `src/cli/commands.ts` command registry (single source of truth, aliases, grouped help); `air>` prompt; `tests/cli-interactive.test.ts` (8 tests); `tests/cli-commands.test.ts` (6 tests); `tests/built-binary.test.ts` and `tests/e2e/scenarios/real-jobs.test.ts` updated with `AIR_E2E_TTY=1` opt-in.
+- Validation: `npm run typecheck`, `npm run typecheck:test`, `npm run lint`, `npm test` (482 passed, 16 skipped), `npm run build`, `npm pack --dry-run` all green. CI run [43909012267](https://github.com/radmanmilos/air/actions/runs/43909012267) passed, 7/7 jobs.
 - Acceptance: targeted tests added; full validation checklist green; help text and docs updated; interactive and non-interactive behavior both preserved.
+- Integration: PR #8 (commit `eb3411f`) merges PR #6 (F-02 reliability) and PR #7 (terminal UX) into one coherent delivery.
 
 ### UI-03 — Shared client/runtime boundary
-- Status: TODO
+- Status: TODO (architecture decision recorded)
 - Depends on: UI-02, L1/L2.
 - Scope: stable local interaction contract; authenticated local IPC or constrained mechanism if a desktop client is justified.
+- Note: Architecture decision documented in `docs/architecture/user-experience-and-ui.md` §8a — defer versioned local interaction API until L1/L2 contracts stabilize. This is a decision, not implementation.
 
 ### UI-04 — Optional VS Code integration or desktop companion
 - Status: TODO
