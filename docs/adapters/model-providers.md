@@ -28,7 +28,21 @@ The provider currently exposes:
 | `showModel` | `POST /api/show` | Model metadata and runtime-declared capabilities |
 | `listRunningModels` | `GET /api/ps` | Best-effort running model and reported VRAM size; no inference about free VRAM |
 
-## Error contract
+## Brain readiness (src/brain)
+
+The chat answer path (`brainAnswer` / `isBrainAvailable`) uses `checkBrainReadiness()` to
+determine whether the local brain can answer. This check verifies **both** server reachability
+(via `health()`, 3s timeout) **and** configured-model availability (via `listModels()`, 5s
+timeout). It distinguishes five states:
+
+- `ready` — server reachable and configured coordinator model installed.
+- `server_unavailable` — Ollama daemon not responding or network error.
+- `model_not_found` — server reachable but the configured model is not installed.
+- `config_error` — configuration invalid or `localFirst` is false.
+- `not_configured` — `localFirst` is false in config.
+
+`/api/version` alone does **not** prove model readiness; `listModels()` is required to confirm
+the configured model is installed. See `src/brain/index.ts`.
 
 `ModelProviderError.code` is one of:
 

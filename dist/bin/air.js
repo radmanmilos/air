@@ -665,10 +665,12 @@ program
     };
     const waiters = new Map();
     const jobHandles = new Map();
-    // brainAnswer is async, so a /quit during a brain call must not be
-    // short-circuited by process.exit(0) in the close handler. Track the
-    // outstanding call and drain it before exiting.
-    let pendingBrain = null;
+    // Track ALL in-flight brain answers (not just one) so /quit can drain
+    // every pending answer before exiting. A single reference is unsafe when
+    // multiple messages arrive before a previous answer completes.
+    const pendingBrains = new Set();
+    // Once /quit (or /exit) is received, no new brain answers should start.
+    let shuttingDown = false;
     async function runJob(task, _workId, hints) {
         const requiresWrite = hints?.requiresWrite !== false;
         const controller = new AbortController();
@@ -746,6 +748,7 @@ program
         logEvent('command_handled', trimmed);
         logEvent('message_received', trimmed);
         if (trimmed === '/quit' || trimmed === '/exit') {
+            shuttingDown = true;
             rl.close();
             return;
         }
@@ -825,7 +828,14 @@ program
                 void runJob(a.goal, undefined, a.hints);
             }
             else if (a.type === 'answer') {
-                pendingBrain = (async () => {
+                if (shuttingDown) {
+                    // Do not start new brain answers during shutdown; acknowledge
+                    // immediately so the user gets a response.
+                    await appendMessage(conv.id, { role: 'assistant', content: 'Acknowledged.' });
+                    console.log(out.gray('air: Acknowledged.'));
+                    return;
+                }
+                const brainPromise = (async () => {
                     const { brainAnswer, isBrainAvailable } = await import('../src/brain/index.js');
                     let reply = 'Acknowledged.';
                     if (await isBrainAvailable()) {
@@ -833,12 +843,12 @@ program
                         // No interstitial in non-TTY mode: a cleared "thinking..." line
                         // leaks to piped output and breaks scripted consumers.
                         if (isInteractive()) {
-                            process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
+                            process.stderr.write(out.gray('air: thinking... ') + '\\u001b[2K\\r');
                         }
                         const freshConv = loadConversation(conv.id) ?? conv;
                         const r = await brainAnswer(trimmed, { history: freshConv.messages, jobs: freshConv.activeWorkIds });
                         if (isInteractive())
-                            process.stderr.write('\u001b[2K\r');
+                            process.stderr.write('\\u001b[2K\\r');
                         logEvent('brain_end', r.text.slice(0, 200));
                         reply = r.text;
                     }
@@ -846,9 +856,9 @@ program
                     console.log(out.gray(`air: ${reply}`));
                 })().catch((err) => {
                     console.log(out.red(`brain error: ${String(err)}`));
-                }).finally(() => {
-                    pendingBrain = null;
                 });
+                pendingBrains.add(brainPromise);
+                brainPromise.finally(() => { pendingBrains.delete(brainPromise); });
             }
             else if (a.type === 'clarify') {
                 await appendMessage(conv.id, { role: 'assistant', content: a.question });
@@ -872,18 +882,25 @@ program
         }
     });
     rl.on('close', async () => {
-        // Drain any outstanding brain call before exiting so /quit during a
-        // brain answer still persists the assistant message (brainAnswer is async).
-        if (pendingBrain) {
+        // Drain ALL outstanding brain calls before exiting so /quit during a
+        // brain answer still persists the assistant message. The safety timeout
+        // (25s) is larger than the worst-case brain answer (health 3s + health
+        // 5s + chat 10s = 18s) to avoid premature termination.
+        shuttingDown = true;
+        const brains = [...pendingBrains];
+        if (brains.length > 0) {
             try {
-                await Promise.race([pendingBrain, new Promise((r) => setTimeout(r, 5000))]);
+                await Promise.race([
+                    Promise.all(brains.map((p) => p.catch(() => { }))),
+                    new Promise((r) => setTimeout(r, 25000)),
+                ]);
             }
-            catch { }
+            catch { /* noop */ }
         }
         try {
             await Promise.all([...waiters.values()]);
         }
-        catch { }
+        catch { /* noop */ }
         process.exit(0);
     });
 });
