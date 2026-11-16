@@ -1,10 +1,10 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
 **Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)
-**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN; **L0-05 DONE (revised scope; P1-05 sandboxed execution formally DEFERRED to SEC-W1)** on `fix/l0-05-p0-conversation-atomic` (P0-01, P1-01, P1-02, P1-03, P1-04, P1-06, P1-07, P2-01, P2-02 CI-verified; P1-05 fail-closed boundary CI-verified; P2-03 accepted deferral to L3) / L1-L2 integration remains IN_PROGRESS
+**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN; **L0-05 DONE and MERGED (revised scope; P1-05 sandboxed execution formally DEFERRED to SEC-W1)** — PR [#5](https://github.com/radmanmilos/air/pull/5) merged at `c27dcdf4a5c4f6cc2e15809273ad19ecec532877`; P0-01, P1-01, P1-02, P1-03, P1-04, P1-06, P1-07, P2-01, P2-02 CI-verified; P1-05 fail-closed boundary CI-verified; P2-03 accepted deferral to L3 / L1-L2 integration remains IN_PROGRESS
 **Created:** 2026-11-12
 **Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5
-**Current main baseline:** f5e45a345f430b96d66933838944469886879689 (independent review merged; CI run 43278214645 passed)
+**Current main baseline:** `c27dcdf4a5c4f6cc2e15809273ad19ecec532877` (PR #5 merge commit; main CI run [43836537780](https://github.com/radmanmilos/air/actions/runs/43836537780) passed, 7/7 jobs)
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -109,7 +109,7 @@
 
 ### L0-05 — Reconcile independent review findings (P0/P1/P2)
 
-- Status: DONE (revised scope — P1-05 sandboxed execution DEFERRED to SEC-W1)
+- Status: DONE (revised scope — P1-05 sandboxed execution DEFERRED to SEC-W1). Merged via PR [#5](https://github.com/radmanmilos/air/pull/5) at `c27dcdf4a5c4f6cc2e15809273ad19ecec532877`; main CI run [43836537780](https://github.com/radmanmilos/air/actions/runs/43836537780) passed, 7/7 jobs.
 - Owner: integration agent
 - **Approval basis:** project-owner decision recorded under "Decision record — P1-05 deferral" above. This approval covers P1-05 OS-enforced execution only; it does not silently defer any other criterion.
 
@@ -186,7 +186,7 @@ L0-05 is complete only because every non-deferred mandatory criterion below is s
 
 - **E2E cancellation fix (committed `384b1d0`):** Fixed `tests/e2e/scenarios/groups.test.ts` G-hang failure. Root cause: stale closure variable `conv` in `bin/air.ts` chat REPL never reflected `activeWorkIds` pushed by `runJob`, causing bare `/cancel` to be misclassified as `answer` → "thinking..."/"Acknowledged." instead of cancellation. Fix: handle bare `/cancel` via `jobHandles` map (populated before "Started job" print), reorder `runJob` to push `activeWorkIds` before printing, reload `conv` from disk, and clean up `jobHandles` in waiter `finally`. Test now passes.
 
-- Gate: **L0-05 is complete under the revised scope (P1-05 execution DEFERRED with owner approval).** L3/L4 remain BLOCKED by L0-03 (independent architecture review), L0-04d (independent scoring/threshold review) and L1/L2 completion — **not** by L0-05. P0-01 CI verified for `fda9506` (run [43293203530](https://github.com/radmanmilos/air/actions/runs/43293203530)). P1-01 CI verified for `c1e4742` (run [43313608385](https://github.com/radmanmilos/air/actions/runs/43313608385)). P1-02 CI verified for `cb0880c` (run [43329891518](https://github.com/radmanmilos/air/actions/runs/43329891518), 7/7 jobs). P1-03 CI verified for `e870573` (run [43419317640](https://github.com/radmanmilos/air/actions/runs/43419317640), 7/7 jobs). P1-06 CI verified for `2d0746a` (run [43404486859](https://github.com/radmanmilos/air/actions/runs/43404486859), 7/7 jobs). P1-05 fail-closed boundary CI verified for `02cbaad` (run [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944), 7/7 jobs). Latest branch head CI: run [43637550393](https://github.com/radmanmilos/air/actions/runs/43637550393) success for `e8d4243` (7/7 jobs). Any subsequent correction commit requires its own exact-SHA CI verification before being claimed CI-verified.
+- Gate: **L0-05 is complete under the revised scope (P1-05 execution DEFERRED with owner approval) and MERGED.** L3/L4 remain BLOCKED by L0-03 (independent architecture review), L0-04d (independent scoring/threshold review) and L1/L2 completion — **not** by L0-05. P0-01 CI verified for `fda9506` (run [43293203530](https://github.com/radmanmilos/air/actions/runs/43293203530)). P1-01 CI verified for `c1e4742` (run [43313608385](https://github.com/radmanmilos/air/actions/runs/43313608385)). P1-02 CI verified for `cb0880c` (run [43329891518](https://github.com/radmanmilos/air/actions/runs/43329891518), 7/7 jobs). P1-03 CI verified for `e870573` (run [43419317640](https://github.com/radmanmilos/air/actions/runs/43419317640), 7/7 jobs). P1-06 CI verified for `2d0746a` (run [43404486859](https://github.com/radmanmilos/air/actions/runs/43404486859), 7/7 jobs). P1-05 fail-closed boundary CI verified for `02cbaad` (run [43391210944](https://github.com/radmanmilos/air/actions/runs/43391210944), 7/7 jobs). Final PR head `6b9442a` CI run [43835624792](https://github.com/radmanmilos/air/actions/runs/43835624792) success (7/7 jobs). Merge commit `c27dcdf4a5c4f6cc2e15809273ad19ecec532877` main CI run [43836537780](https://github.com/radmanmilos/air/actions/runs/43836537780) success (7/7 jobs).
 
 ## SEC-W1 — Windows-first OS-enforced sandbox for untrusted evaluation execution (separate security milestone)
 
