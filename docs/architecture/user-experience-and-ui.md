@@ -157,7 +157,18 @@ Rationale:
 - Workspace paths, terminal input, model output and external tool results are all treated as untrusted.
 - The P1-05 fail-closed boundary is preserved; the experimental Windows sandbox prototype is not wired into the runtime.
 
-## 9. Phased implementation roadmap
+## 8a. UI-03 architecture decision — shared client/runtime boundary (2026-11-16)
+
+**Decision: defer the versioned local interaction API until L1/L2 contracts stabilize.**
+
+### Current state
+- **Implemented and tested:** CLI slash commands (`/run`, `/plan`, `/status`, `/jobs`, `/cancel`, `/last`, `/stats`, `/help`, `/quit`), conversation persistence (`mutateConversation`/`appendMessage`), job lifecycle (`runJob`, `injectResult`), orchestrator events. These are internal APIs, not stable public contracts.
+- **Not yet stable:** model provider API (L1), role resolver (L2-03), resource manager (L3). A client-facing API built on unstable internals would require breaking changes.
+- **Future interface (proposed, not implemented):** A versioned local IPC or stdio-based JSON protocol that exposes conversation CRUD, job submission/cancellation, status queries and approval requests. No network listener. Authentication via per-session token or OS-level access control.
+- **Deferred:** multi-client support, desktop companion, VS Code extension. All depend on UI-03.
+
+### Rationale
+One shared AIR runtime. Terminal, desktop and VS Code are clients of shared capabilities, not independent orchestrators. Building a client API before L1/L2 stabilize would create a moving target and duplicate orchestration logic.
 
 | Phase | Scope | Status | Depends on |
 |---|---|---|---|
@@ -181,7 +192,26 @@ SEC-W1 (Windows-first OS-enforced sandbox for untrusted eval execution) remains 
 - Full validation checklist green: typecheck, typecheck:test, lint, test, build, pack --dry-run, dead-code check.
 - No existing CLI/MCP behavior, exit codes or conversation persistence changed.
 
-## 11. Explicit decisions and open questions
+## 12. UI-05 usability and accessibility validation checklist
+
+| Case | Status | Notes |
+|---|---|---|
+| TTY vs non-TTY detection | Automated | `tests/cli-interactive.test.ts` |
+| NO_COLOR / FORCE_COLOR / --no-color | Automated | `tests/cli-interactive.test.ts` |
+| ANSI suppression in pipes | Automated | `tests/cli-interactive.test.ts` |
+| JSON output color-free | Automated | `tests/cli-interactive.test.ts` |
+| Non-TTY chat refusal | Automated | `tests/cli-interactive.test.ts` |
+| Welcome prints, no install/start | Automated | `tests/cli-interactive.test.ts` |
+| One-line header, no banner box | Automated | `tests/cli-interactive.test.ts` |
+| No thinking interstitial in non-TTY | Automated | `tests/cli-interactive.test.ts` |
+| Built binary smoke | Automated | `tests/built-binary.test.ts` |
+| Command registry drift detection | Automated | `tests/cli-commands.test.ts` |
+| Windows PowerShell/CMD | CI (Windows runner) | Manual verification recommended |
+| VS Code integrated terminal | Manual | Not automated |
+| Narrow terminal width | Manual | Not automated |
+| Ctrl+C clean exit | Manual | Not automated |
+| Screen reader compatibility | Manual | Not automated |
+| Color-only state communication | Design review | Color never sole indicator |
 
 **Decisions made:**
 1. AIR remains terminal-first. No full-screen TUI framework.

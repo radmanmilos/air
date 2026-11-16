@@ -20,6 +20,16 @@ export interface BrainContext {
   jobs?: string[];
 }
 
+/** Diagnostic result of checking whether the local brain can answer. */
+export interface BrainReadiness {
+  /** True only when the configured provider and model are verified available. */
+  available: boolean;
+  /** 'ready' means: config valid, localFirst true, Ollama server responding,
+   *  and configured model installed (or env override server reachable). */
+  reason: 'ready' | 'not_configured' | 'config_error' | 'server_unavailable' | 'model_not_found';
+  detail?: string;
+}
+
 async function tryOllamaCli(prompt: string, model: string): Promise<BrainResult | null> {
   try {
     const crossSpawnMod: any = await import('cross-spawn');
@@ -27,7 +37,7 @@ async function tryOllamaCli(prompt: string, model: string): Promise<BrainResult 
     const r: { stdout: string; status: number | null; error: any } = await new Promise((resolve) => {
       const child = crossSpawn('ollama', ['run', model, prompt], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 120000,
+        timeout: 10000,
       });
       let stdout = '';
       child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
@@ -35,7 +45,7 @@ async function tryOllamaCli(prompt: string, model: string): Promise<BrainResult 
       const timer = setTimeout(() => {
         try { child.kill(); } catch { /* noop */ }
         resolve({ stdout, status: null, error: new Error('timeout') });
-      }, 120000);
+      }, 10000);
       child.on('close', (code: number | null) => {
         clearTimeout(timer);
         resolve({ stdout, status: code, error: child.error || null });
@@ -72,6 +82,75 @@ async function resolveLocalBrain(): Promise<{ provider: OllamaProvider; model: s
   }
 }
 
+/**
+ * Check whether the local brain can answer. Distinguishes server reachability
+ * from model availability so callers can report a clear, non-sensitive reason.
+ */
+export async function checkBrainReadiness(): Promise<BrainReadiness> {
+  const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
+  if (envModel) {
+    // Explicit local override: verify the Ollama runtime is reachable for the
+    // configured base URL. We cannot verify the specific model is installed
+    // (it may be a CLI-only model), but the server must respond.
+    const baseUrl = process.env.AIR_BRAIN_OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+    const provider = new OllamaProvider({ baseUrl });
+    try {
+      const health = await provider.health({ timeoutMs: 3000 });
+      if (!health.online) return { available: false, reason: 'server_unavailable', detail: 'Ollama not responding' };
+    } catch (err) {
+      return { available: false, reason: 'server_unavailable', detail: String(err) };
+    }
+    return { available: true, reason: 'ready' };
+  }
+  let config: any;
+  let errors: string[];
+  try {
+    const result = await loadConfig();
+    config = result.config;
+    errors = result.errors;
+  } catch (err) {
+    return { available: false, reason: 'config_error', detail: String(err) };
+  }
+  if (errors.some((e) => !e.startsWith('Warning:'))) {
+    return { available: false, reason: 'config_error', detail: errors.join('; ') };
+  }
+  let resolved: ReturnType<typeof resolveModelRole>;
+  try {
+    resolved = resolveModelRole(config, 'coordinator');
+  } catch (err) {
+    return { available: false, reason: 'config_error', detail: String(err) };
+  }
+  if (!resolved.localFirst) {
+    return { available: false, reason: 'not_configured', detail: 'localFirst is false' };
+  }
+  const provider = new OllamaProvider({ baseUrl: resolved.baseUrl, keepAlive: resolved.keepAlive });
+
+  // 1. Server reachability.
+  let health;
+  try {
+    health = await provider.health({ timeoutMs: 3000 });
+  } catch (err) {
+    return { available: false, reason: 'server_unavailable', detail: String(err) };
+  }
+  if (!health.online) {
+    return { available: false, reason: 'server_unavailable', detail: 'Ollama not responding' };
+  }
+
+  // 2. Model availability.
+  let models;
+  try {
+    models = await provider.listModels({ timeoutMs: 5000 });
+  } catch (err) {
+    return { available: false, reason: 'server_unavailable', detail: String(err) };
+  }
+  const modelAvailable = models.some((m) => m.name === resolved.model);
+  if (!modelAvailable) {
+    return { available: false, reason: 'model_not_found', detail: `Model ${resolved.model} not installed (${models.length} models found)` };
+  }
+
+  return { available: true, reason: 'ready' };
+}
+
 export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<BrainResult> {
   const parts: string[] = [];
   if (ctx?.history && ctx.history.length > 0) {
@@ -82,21 +161,18 @@ export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<B
   }
   const fullPrompt = parts.length > 0 ? parts.join('\n\n') + '\n\nUser: ' + prompt : prompt;
 
+  // Check readiness first (server + model).
+  const readiness = await checkBrainReadiness();
+  if (!readiness.available) {
+    return { text: 'Acknowledged.', model: 'none', provider: 'none' };
+  }
+
   const local = await resolveLocalBrain();
   if (!local) return { text: 'Acknowledged.', model: 'none', provider: 'none' };
   const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
   if (envModel) {
     const cli = await tryOllamaCli(fullPrompt, envModel);
     if (cli) return cli;
-  }
-  // Fail fast when the local runtime is actually unreachable. isBrainAvailable()
-  // only inspects config, so without this guard every answer blocks on the
-  // provider's 120s default timeout (verified: F-02 hangs 2min per message).
-  try {
-    const health = await local.provider.health({ timeoutMs: 5000 });
-    if (!health.online) return { text: 'Acknowledged.', model: 'none', provider: 'none' };
-  } catch {
-    return { text: 'Acknowledged.', model: 'none', provider: 'none' };
   }
   try {
     const result = await local.provider.chat({
@@ -114,18 +190,6 @@ export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<B
 }
 
 export async function isBrainAvailable(): Promise<boolean> {
-  if (process.env.AIR_BRAIN_MODEL_OLLAMA) return true;
-  try {
-    const { config, errors } = await loadConfig();
-    if (errors.some((e) => !e.startsWith('Warning:'))) return false;
-    const resolved = resolveModelRole(config, 'coordinator');
-    if (!resolved.localFirst) return false;
-    // Verify the Ollama runtime is actually reachable; config validity alone
-    // is not enough (the daemon may be down or the model not pulled).
-    const provider = new OllamaProvider({ baseUrl: resolved.baseUrl, keepAlive: resolved.keepAlive });
-    const health = await provider.health({ timeoutMs: 3000 });
-    return health.online;
-  } catch {
-    return false;
-  }
+  const readiness = await checkBrainReadiness();
+  return readiness.available;
 }

@@ -1,10 +1,10 @@
 # AIR — Local-First Intelligence Implementation Ledger
 
 **Blueprint:** [docs/architecture/local-first-ai-plan.md](../architecture/local-first-ai-plan.md)
-**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN; **L0-05 DONE and MERGED (revised scope; P1-05 sandboxed execution formally DEFERRED to SEC-W1)** — PR [#5](https://github.com/radmanmilos/air/pull/5) merged at `c27dcdf4a5c4f6cc2e15809273ad19ecec532877`; P0-01, P1-01, P1-02, P1-03, P1-04, P1-06, P1-07, P2-01, P2-02 CI-verified; P1-05 fail-closed boundary CI-verified; P2-03 accepted deferral to L3 / L1-L2 integration remains IN_PROGRESS; **UI-01/UX audit and UI-02 first terminal improvement IN_PROGRESS**
+**Status:** L0-04a/b/c implementation DONE; L0-03 independent architecture review and L0-04d scoring review OPEN; **L0-05 DONE and MERGED (revised scope; P1-05 sandboxed execution formally DEFERRED to SEC-W1)** — PR [#5](https://github.com/radmanmilos/air/pull/5) merged at `c27dcdf4a5c4f6cc2e15809273ad19ecec532877`; P0-01, P1-01, P1-02, P1-03, P1-04, P1-06, P1-07, P2-01, P2-02 CI-verified; P1-05 fail-closed boundary CI-verified; P2-03 accepted deferral to L3 / L1-L2 integration remains IN_PROGRESS; **UI-01 DONE and UI-02 DONE (d8b4a9d); UI-03..UI-05 remain TODO**
 **Created:** 2026-11-12
 **Historical baseline inspected:** main at 35c7300569df2568dbd2cec97a4f6cc232533cc5
-**Current main baseline:** `a42428b30cb47e7d01d014cb4eff7b035635ffa5` (`docs(review): record L0-05 merge and main CI evidence`; CI run [43837436658](https://github.com/radmanmilos/air/actions/runs/43837436658) passed, 7/7 jobs). **Historical reference — PR #5 merge commit:** `c27dcdf4a5c4f6cc2e15809273ad19ecec532877` (main CI run [43836537780](https://github.com/radmanmilos/air/actions/runs/43836537780) passed, 7/7 jobs). The merge commit is an ancestor of current main; it is not the current HEAD.
+**Current main baseline:** `fe2fc7208036ca408a5f6446725ebf55f9fff65e` (F-02 reliability hardening; CI run [43862406296](https://github.com/radmanmilos/air/actions/runs/43862406296) passed, 7/7 jobs). **Integration PR #8:** `integrate/pr6-pr7` branch, commit `eb3411f8041075ae0e58e235fac50ab7fe91f4c1`, CI run [43909012267](https://github.com/radmanmilos/air/actions/runs/43909012267) passed, 7/7 jobs. PR #8 merges PR #6 (F-02) and PR #7 (terminal UX) into one coherent delivery.
 **Rule:** This is the active task ledger for the local-first intelligence milestone. Update it in every implementation PR. The blueprint defines architecture and acceptance; this file tracks execution state and ownership.
 
 ## Operating rules for this ledger
@@ -44,8 +44,8 @@
 | L8 | Context, summarization, optional embeddings | TODO | L1, L2, L4 |
 | L9 | Model setup and first-run UX | TODO | L2, L3 |
 | L10 | Optional providers and specialized utilities | DEFERRED | L1-L9 as applicable |
-| UI-01 | Terminal UX audit and product interaction design | IN_PROGRESS (this task) | None |
-| UI-02 | First polished terminal interaction improvements | TODO | UI-01 |
+| UI-01 | Terminal UX audit and product interaction design | DONE (d8b4a9d) | None |
+| UI-02 | First polished terminal interaction improvements | DONE (d8b4a9d) | UI-01 |
 | UI-03 | Shared client/runtime boundary and stable local interaction contract | TODO | UI-02, L1-L2 |
 | UI-04 | Optional VS Code integration or desktop companion | TODO | UI-03 |
 | UI-05 | Packaging, usability validation, accessibility and release readiness | TODO | UI-02–UI-04 |
@@ -248,14 +248,16 @@ L0-05 is complete only because every non-deferred mandatory criterion below is s
 ### UI-02 — First polished terminal interaction improvement
 - Status: DONE
 - Owner: integration agent
-- Evidence: new `src/cli/output.ts` (color/TTY gate, one-line header, welcome, log/status helpers); `bin/air.ts` no-args welcome, banner removal, non-TTY chat refusal, non-TTY brain interstitial removal; `tests/cli-interactive.test.ts` (8 tests, all passing); `tests/built-binary.test.ts` and `tests/e2e/scenarios/real-jobs.test.ts` updated with `AIR_E2E_TTY=1` opt-in.
-- Validation: `npm run typecheck`, `npm run typecheck:test`, `npm run lint`, `npm test`, `npm run build`, `npm pack --dry-run`, `npm run check:dead-code` all green locally on Windows.
+- Evidence: new `src/cli/output.ts` (color/TTY gate, one-line header, welcome, log/status helpers); `bin/air.ts` no-args welcome, banner removal, non-TTY chat refusal, non-TTY brain interstitial removal; `src/cli/commands.ts` command registry (single source of truth, aliases, grouped help); `air>` prompt; `tests/cli-interactive.test.ts` (8 tests); `tests/cli-commands.test.ts` (6 tests); `tests/built-binary.test.ts` and `tests/e2e/scenarios/real-jobs.test.ts` updated with `AIR_E2E_TTY=1` opt-in.
+- Validation: `npm run typecheck`, `npm run typecheck:test`, `npm run lint`, `npm test` (482 passed, 16 skipped), `npm run build`, `npm pack --dry-run` all green. CI run [43909012267](https://github.com/radmanmilos/air/actions/runs/43909012267) passed, 7/7 jobs.
 - Acceptance: targeted tests added; full validation checklist green; help text and docs updated; interactive and non-interactive behavior both preserved.
+- Integration: PR #8 (commit `eb3411f`) merges PR #6 (F-02 reliability) and PR #7 (terminal UX) into one coherent delivery.
 
 ### UI-03 — Shared client/runtime boundary
-- Status: TODO
+- Status: TODO (architecture decision recorded)
 - Depends on: UI-02, L1/L2.
 - Scope: stable local interaction contract; authenticated local IPC or constrained mechanism if a desktop client is justified.
+- Note: Architecture decision documented in `docs/architecture/user-experience-and-ui.md` §8a — defer versioned local interaction API until L1/L2 contracts stabilize. This is a decision, not implementation.
 
 ### UI-04 — Optional VS Code integration or desktop companion
 - Status: TODO
@@ -582,7 +584,25 @@ Copy this into the PR description or update the relevant package entry at the en
 - L3/L4 remain BLOCKED.
 - Validation: typecheck, typecheck:test, lint, build, pack --dry-run, python ruff/mypy/pytest all pass; full npm test not rerun after this minimal change beyond targeted redaction suite.
 
-## Incremental progress note (os-sandbox primitive)
+## Incremental progress note (F-02 reliability hardening, 2026-11-16)
+
+- **Priority A — Chat shutdown and pending-answer reliability:**
+  - Root cause: `pendingBrain` was a single `Promise<void> | null` reference. Multiple messages could overwrite it, and `.finally()` nulling made earlier answers untracked. The shutdown wait (5s) was shorter than the chat timeout (10s), so `/quit` during a slow answer could terminate before persistence. `process.exit(0)` after the race was still premature.
+  - Fix: replaced single reference with `Set<Promise<void>>` tracking ALL in-flight brain answers. Added `shuttingDown` flag to prevent new answers during shutdown. `/quit` sets the flag. Close handler waits for all pending brain answers with a 25s safety timeout (larger than worst-case 18s). Errors are caught per-promise. No arbitrary sleep delays.
+  - Files: `bin/air.ts` (pendingBrains set, shuttingDown flag, close handler rewrite, answer handler tracking).
+
+- **Priority B — Ollama model readiness:**
+  - Root cause: `isBrainAvailable` only probed `/api/version` (server reachability), not model availability. A reachable server with a missing model would attempt a chat call that fails.
+  - Fix: added `checkBrainReadiness()` returning `BrainReadiness` with five states (`ready`, `server_unavailable`, `model_not_found`, `config_error`, `not_configured`). Uses `health()` (3s) for server reachability and `listModels()` (5s) for model availability. `isBrainAvailable` and `brainAnswer` now use `checkBrainReadiness`. No duplicate HTTP implementations.
+  - Files: `src/brain/index.ts`.
+
+- **Priority C — Terminal UX:** Deferred. Reliability work was substantial; rushing a UX change would risk validation. Recommended next: improve `/help` command output in chat REPL or add model-readiness indicator to `air status`.
+
+- **Tests added:** 10 new brain tests covering model readiness (server unavailable, model missing, model present, malformed responses, config errors, env override). Updated fetch mock to handle `/api/version` and `/api/tags` URLs. Existing 5 brain tests still pass (15 total).
+
+- **Validation:** typecheck, typecheck:test, lint, build all pass. Brain tests: 15/15. Full suite pending.
+
+- **Remaining limitations:** Shutdown safety timeout (25s) is a hard cap; if a provider hangs beyond internal timeouts, the process exits after 25s without persisting. Multiple concurrent brain answers share the `conv` variable but reload from disk, so persistence is safe. No caching of model availability checks (short timeouts keep per-message overhead low).
 
 - Added src/evals/sandbox/os-sandbox.ts: platform detection, capability probe, and unOsSandboxed() wrapping real OS mechanisms (Linux unshare net/pid/mount namespace; macOS sandbox-exec Seatbelt profile; Windows fail-closed unsupported). Fail-closed on unavailable mechanisms.
 - Added 	ests/evals/os-sandbox.test.ts (4 tests).

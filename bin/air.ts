@@ -175,6 +175,7 @@ function showStatus(options: { json?: boolean }) {
       version: AIR_VERSION,
       tools: adapterStatus(),
       localWorker,
+      brain: { available: false, reason: 'unknown' },
       cooldowns: snap.cooldowns.map((c) => ({
         provider: c.provider,
         model: c.model,
@@ -188,6 +189,11 @@ function showStatus(options: { json?: boolean }) {
         hasActiveCooldown: snap.hasActiveCooldown,
       },
     };
+    try {
+      const { isBrainAvailable } = await import('../src/brain');
+      const available = await isBrainAvailable();
+      data.brain = { available, reason: available ? 'ready' : 'unavailable' };
+    } catch { /* noop */ }
     if (options.json) {
       process.stdout.write(JSON.stringify(data) + '\n');
       return;
@@ -201,7 +207,8 @@ function showStatus(options: { json?: boolean }) {
       out.gray('Local worker:'),
       localWorker.provisioned ? `provisioned (${localWorker.python})` : 'not provisioned (run `air setup local`)',
     );
-    console.log(out.gray('Cooldowns:'), data.cooldowns.length);
+    console.log(out.gray('Brain:'),
+      data.brain.available ? `available` : `unavailable`);
     console.log(out.gray('Successes:'), snap.totalSuccesses);
     console.log(out.gray('Failures:'), snap.totalFailures);
     console.log(out.gray('Active cooldown:'), snap.hasActiveCooldown ? 'yes' : 'no');
@@ -393,19 +400,14 @@ program
 program
   .command('commands')
   .description('List available commands (side-panel help)')
-  .action(() => {
-    console.log('AIR commands:');
-    console.log('  /run <task>        Run a task');
-    console.log('  /status            Show health and cooldowns');
-    console.log('  /dashboard         Show sessions and events');
-    console.log('  /export            Export session log');
-    console.log('  /models            List models');
-    console.log('  /verify <cmd...>   Run verification');
-    console.log('  /merge <jobId>     Preview a completed job worktree (add --apply to merge)');
-    console.log('  /setup local       Provision the internal local worker');
-    console.log('  /doctor            Check whether a local job can run');
-    console.log('  /mcp               Start MCP server');
-    console.log('Type "/" then a command, or run "air <command>".');
+  .action(async () => {
+    const { formatHelpText } = await import('../src/cli/commands');
+    console.log(formatHelpText());
+    console.log('');
+    console.log('Top-level commands: air run, air status, air doctor, air setup local,');
+    console.log('  air models, air verify, air merge, air export, air mcp, air commands');
+    console.log('');
+    console.log('Type "/" then a command in chat, or run "air <command>".');
   });
 
 program
@@ -684,10 +686,12 @@ program
 
     const waiters = new Map<string, Promise<void>>();
     const jobHandles = new Map<string, { orch: any; controller: AbortController }>();
-    // brainAnswer is async, so a /quit during a brain call must not be
-    // short-circuited by process.exit(0) in the close handler. Track the
-    // outstanding call and drain it before exiting.
-    let pendingBrain: Promise<void> | null = null;
+    // Track ALL in-flight brain answers (not just one) so /quit can drain
+    // every pending answer before exiting. A single reference is unsafe when
+    // multiple messages arrive before a previous answer completes.
+    const pendingBrains = new Set<Promise<void>>();
+    // Once /quit (or /exit) is received, no new brain answers should start.
+    let shuttingDown = false;
 
     async function runJob(task: string, _workId?: string, hints?: { requiresWrite?: boolean; requiresCode?: boolean }): Promise<void> {
       const requiresWrite = hints?.requiresWrite !== false;
@@ -711,6 +715,7 @@ program
       logEvent('job_started', session.runId);
       logEvent('notice_printed', `Started job ${session.runId}`);
       console.log(out.green(`Started job ${session.runId}`));
+      console.log(out.gray(`  Job ID: ${session.runId}  (use /cancel ${session.runId} to stop)`));
       // Background waiter.
       const p = (async () => {
         try {
@@ -743,8 +748,13 @@ program
           });
           logEvent('job_finished', `${session.runId}: ${summary.split('.')[0]}`);
           console.log(out.gray(`job ${session.runId} finished: ${summary.split('.')[0]}.`));
+          if (facts.changedFiles && facts.changedFiles.length > 0) {
+            console.log(out.gray(`  ${facts.changedFiles.length} file(s) changed. Use "air merge ${session.runId}" to preview.`));
+          }
+          rl.prompt();
         } catch (err) {
           console.log(out.red(`job ${session.runId} error: ${String(err)}`));
+          rl.prompt();
         } finally {
           jobHandles.delete(session.runId);
         }
@@ -752,29 +762,39 @@ program
       waiters.set(session.runId, p);
     }
 
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'air> ' });
+    rl.prompt();
     rl.on('line', async (line: string) => {
       const trimmed = line.trim();
-      if (!trimmed) return;
+      if (!trimmed) { rl.prompt(); return; }
       logEvent('command_handled', trimmed);
       logEvent('message_received', trimmed);
-      if (trimmed === '/quit' || trimmed === '/exit') { rl.close(); return; }
-      if (trimmed === '/help') {
-        console.log(out.gray('Commands: /run <task>, /plan <goal>, /status, /jobs, /cancel [id], /last, /stats, /tasks, /quit'));
+      if (trimmed === '/quit' || trimmed === '/exit' || trimmed === '/q') {
+        shuttingDown = true;
+        rl.close();
         return;
       }
-      if (trimmed === '/status') { const c = (await import('../src/conversation')).loadConversation(conv!.id) ?? conv!; console.log(out.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`)); return; }
+      if (trimmed === '/help' || trimmed === '/h' || trimmed === '/?') {
+        const { formatHelpText } = await import('../src/cli/commands');
+        console.log(out.gray(formatHelpText()));
+        rl.prompt();
+        return;
+      }
+      if (trimmed === '/status') { const c = (await import('../src/conversation')).loadConversation(conv!.id) ?? conv!; console.log(out.gray(`messages=${c.messages.length} active=${c.activeWorkIds.join(',')}`)); rl.prompt(); return; }
       if (trimmed === '/jobs' || trimmed === '/tasks') {
         console.log(out.gray(`active: ${conv!.activeWorkIds.join(',') || '(none)'}`));
+        rl.prompt();
         return;
       }
       if (trimmed === '/stats') {
         console.log(out.gray(`messages=${conv!.messages.length} tasks=${conv!.activeWorkIds.length} facts=${conv!.facts.length}`));
+        rl.prompt();
         return;
       }
       if (trimmed === '/last') {
         const last = [...conv!.messages].reverse().find((m) => m.role === 'tool');
         console.log(out.gray(last ? last.content : '(no result yet)'));
+        rl.prompt();
         return;
       }
        if (trimmed.startsWith('/cancel ')) {
@@ -789,12 +809,14 @@ program
         await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== id); });
         jobHandles.delete(id);
         console.log(out.yellow(`Cancelled ${id}`));
+        rl.prompt();
         return;
       }
       if (trimmed.startsWith('/run ') || trimmed.startsWith('/plan ')) {
         const task = trimmed.replace(/^\/(run|plan) /, '').trim();
         await appendMessage(conv!.id, { role: 'user', content: task });
         void runJob(task);
+        rl.prompt();
         return;
       }
       // Handle bare /cancel directly using jobHandles (avoids stale conv.activeWorkIds).
@@ -809,10 +831,18 @@ program
           await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== last); });
           jobHandles.delete(last);
           console.log(out.yellow(`Cancelled ${last}`));
+          rl.prompt();
           return;
         }
       }
-      // Decision loop.
+if (trimmed.startsWith('/')) {
+        const { isKnownCommand } = await import('../src/cli/commands');
+        if (!isKnownCommand(trimmed)) {
+          console.log(out.yellow(`Unknown command: ${trimmed.split(/\s+/)[0]}. Type /help for available commands.`));
+          rl.prompt();
+          return;
+        }
+      }
       // Reload conv from disk to avoid stale state.
       const freshConv = loadConversation(conv!.id);
       if (freshConv) conv = freshConv;
@@ -822,8 +852,16 @@ program
         if (a.type === 'spawn_job') {
           logEvent('job_submitted', a.goal);
           void runJob(a.goal, undefined, a.hints);
+          rl.prompt();
         } else if (a.type === 'answer') {
-          pendingBrain = (async () => {
+          if (shuttingDown) {
+            // Do not start new brain answers during shutdown; acknowledge
+            // immediately so the user gets a response.
+            await appendMessage(conv!.id, { role: 'assistant', content: 'Acknowledged.' });
+            console.log(out.gray('air: Acknowledged.'));
+            return;
+          }
+          const brainPromise = (async () => {
             const { brainAnswer, isBrainAvailable } = await import('../src/brain');
             let reply = 'Acknowledged.';
             if (await isBrainAvailable()) {
@@ -841,16 +879,20 @@ program
             }
             await appendMessage(conv!.id, { role: 'assistant', content: reply });
             console.log(out.gray(`air: ${reply}`));
+            rl.prompt();
           })().catch((err) => {
             console.log(out.red(`brain error: ${String(err)}`));
-          }).finally(() => {
-            pendingBrain = null;
+            rl.prompt();
           });
+          pendingBrains.add(brainPromise);
+          brainPromise.finally(() => { pendingBrains.delete(brainPromise); });
         } else if (a.type === 'clarify') {
           await appendMessage(conv!.id, { role: 'assistant', content: a.question });
           console.log(out.gray(`air: ${a.question}`));
+          rl.prompt();
         } else if (a.type === 'status') {
           console.log(out.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`));
+          rl.prompt();
         } else if (a.type === 'cancel_job') {
           const entry = jobHandles.get(a.jobId);
           if (entry) {
@@ -859,16 +901,26 @@ program
           }
           await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== a.jobId); });
           console.log(out.yellow(`Cancelled ${a.jobId}`));
+          rl.prompt();
         }
       }
     });
     rl.on('close', async () => {
-      // Drain any outstanding brain call before exiting so /quit during a
-      // brain answer still persists the assistant message (brainAnswer is async).
-      if (pendingBrain) {
-        try { await Promise.race([pendingBrain, new Promise((r) => setTimeout(r, 5000))]); } catch {}
+      // Drain ALL outstanding brain calls before exiting so /quit during a
+      // brain answer still persists the assistant message. The safety timeout
+      // (25s) is larger than the worst-case brain answer (health 3s + health
+      // 5s + chat 10s = 18s) to avoid premature termination.
+      shuttingDown = true;
+      const brains = [...pendingBrains];
+      if (brains.length > 0) {
+        try {
+          await Promise.race([
+            Promise.all(brains.map((p) => p.catch(() => {}))),
+            new Promise((r) => setTimeout(r, 25000)),
+          ]);
+        } catch { /* noop */ }
       }
-      try { await Promise.all([...waiters.values()]); } catch {}
+      try { await Promise.all([...waiters.values()]); } catch { /* noop */ }
       process.exit(0);
     });
   });
