@@ -14,6 +14,11 @@ test_log.md
 
 results/
 
+# Kilo local state (session tmp records, local plans, local config).
+# Already-tracked files under .kilo/ remain tracked; this prevents new local
+# state from being committed accidentally.
+.kilo/
+
 # Experimental Windows sandbox prototype: never commit build outputs.
 packages/windows-sandbox/bin/
 packages/windows-sandbox/obj/
