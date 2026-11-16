@@ -325,12 +325,20 @@ L0-05 is complete only because every non-deferred mandatory criterion below is s
 - Acceptance: no silent paid fallback; role assignment is independent of execution adapter.
 
 ### L2-04 — Local adapter and worker contract alignment
-- Status: TODO
-- Owner: unassigned
+- Status: DONE (commit `57e6a11`)
+- Owner: integration agent
 - Depends on: L2-02, L2-03
 - Scope: remove hardcoded model identity from LocalAdapter; propagate role/model in a versioned job request; converge worker config with canonical effective config.
-- Likely files: src/adapters/local.ts; contracts/job.schema.json; TS/Python contract validators; packages/local-worker/air_local/run.py; models.py; tests.
-- Acceptance: configured coder role reaches the Ollama request; no stale worker default overrides it.
+- Implementation:
+  - `src/adapters/local.ts`: removed `DEFAULT_MODEL`; resolves coder role via `resolveModelRole` from AIR's config; includes `role`, `provider`, `model` in contract request.
+  - `src/contracts/job.ts`: bumped `CONTRACT_VERSION` to 2; added `role?` and `provider?` fields to `JobRequest`.
+  - `contracts/job.schema.json`: contractVersion enum [1, 2]; added `role` and `provider` properties.
+  - `packages/local-worker/air_local/contract.py`: `CONTRACT_VERSION = 2`.
+  - `packages/local-worker/air_local/run.py`: uses model from contract; v2 requires explicit model (fail closed); v1 falls back to worker default for backward compat.
+- Compatibility: contract v1 requests still accepted (backward compat). v2 requests require explicit model. No silent fallback for v2.
+- Tests: local-adapter (12 tests), contract (22 Python + 14 TS), shared examples.
+- Validation: typecheck, typecheck:test, lint, build, pack --dry-run, full test suite (484 passed, 16 skipped), Python worker (ruff, mypy, pytest 103 passed) all green.
+- Acceptance: configured coder role reaches the Ollama request; no stale worker default overrides it for v2.
 
 ## L3 — Resource-aware model manager
 
