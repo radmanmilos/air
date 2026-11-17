@@ -662,8 +662,16 @@ export async function startMcp(transport) {
                 })();
             }
             else if (a.type === 'answer') {
-                await appendMessage(conv.id, { role: 'assistant', content: 'Acknowledged.' });
-                replies.push('Acknowledged.');
+                // Use the actual configured coordinator instead of a fixed acknowledgement.
+                const { isBrainAvailable, brainAnswer } = await import('../brain/index.js');
+                let reply = 'Acknowledged.';
+                if (await isBrainAvailable()) {
+                    const freshConv = loadConversation(conv.id) ?? conv;
+                    const r = await brainAnswer(args.message, { history: freshConv.messages, jobs: freshConv.activeWorkIds });
+                    reply = r.text;
+                }
+                await appendMessage(conv.id, { role: 'assistant', content: reply });
+                replies.push(reply);
             }
             else if (a.type === 'clarify') {
                 await appendMessage(conv.id, { role: 'assistant', content: a.question });

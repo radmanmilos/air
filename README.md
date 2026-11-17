@@ -90,11 +90,33 @@ Components:
 - `contracts/` — the canonical job contract (`job.schema.json`) shared by the control plane and the worker, plus shared examples both test suites read.
 - `docs/` — behavior spec, adapter notes, and the active task ledger.
 
-## Quick start
+## Quick start (local-first)
 
 ```bash
-npm ci
-npm run dev -- --help
+# 1. Install AIR
+npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.gz"
+
+# 2. Install and start Ollama (https://ollama.com)
+ollama pull qwen3.5:4b        # coordinator (default)
+ollama pull qwen2.5-coder:7b  # coder (default)
+
+# 3. Provision the internal worker
+air setup local
+
+# 4. Validate
+air doctor
+
+# 5. Start chatting
+air chat
+
+# 6. Run a safe first task
+# In chat: /run "explain the README"
+```
+
+Optional real-model pilot tests (requires Ollama + models):
+
+```bash
+AIR_PILOT_LOCAL=1 npm run pilot:local
 ```
 
 For a global CLI on your shell PATH:

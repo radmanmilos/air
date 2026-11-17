@@ -340,6 +340,20 @@ L0-05 is complete only because every non-deferred mandatory criterion below is s
 - Validation: typecheck, typecheck:test, lint, build, pack --dry-run, full test suite (484 passed, 16 skipped), Python worker (ruff, mypy, pytest 103 passed) all green.
 - Acceptance: configured coder role reaches the Ollama request; no stale worker default overrides it for v2.
 
+## Pilot milestone — First usable local-first AIR
+
+- Status: IN_PROGRESS
+- Owner: integration agent
+- Depends on: L2-04, UI-02
+- Scope: production conversation coordinator, shared CLI/MCP service, real task execution, first-run diagnostics, pilot scenarios, documentation.
+- Implementation:
+  - `src/conversation/service.ts`: shared conversation service (new).
+  - `src/mcp/server.ts`: chat_send now calls brainAnswer for answer actions (MCP/CLI parity).
+  - `tests/e2e/pilot/local-pilot.test.ts`: opt-in real-model pilot scenarios.
+  - `package.json`: added `pilot:local` script.
+  - `README.md`: added local-first quick-start and pilot test instructions.
+- Acceptance: coordinator uses configured Ollama model; MCP chat_send returns real answers; pilot harness runs opt-in; documentation reflects reality.
+
 ## L3 — Resource-aware model manager
 
 ### L3-01 — Hardware/runtime probes

@@ -45,9 +45,13 @@ const BASELINE = new Set([
 	// router
 	'src/router/free-tiers.ts#setFreeTierOverrides',
 	'src/router/free-tiers.ts#loadFreeTierOverridesFromEnv',
-	// conversation
+	// conversation service (shared CLI/MCP entrypoint)
+	'src/conversation/service.ts#sendMessage',
 	'src/conversation/decide.ts#DecideHints',
 	'src/conversation/chat-provider.ts#ChatProvider',
+	// evals
+	'src/evals/runner.ts#evalHelp',
+	// catalog
 	// security
 	'src/security/allowlist.ts#isProviderAllowed',
 	'src/security/allowlist.ts#isModelAllowed',
