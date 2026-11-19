@@ -26,7 +26,7 @@ describe('write jobs fail closed when worktree creation fails', () => {
   afterEach(() => {
     delete process.env.AIR_CACHE_DIR;
     delete process.env.AIR_CONFIG_DIR;
-    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     vi.resetModules();
   });
 

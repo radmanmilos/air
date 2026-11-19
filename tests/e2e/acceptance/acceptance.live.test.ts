@@ -140,7 +140,7 @@ describe.skipIf(!ENABLED)('acceptance: real local coding task', () => {
           }
         }
       }
-      rmSync(root, { recursive: true, force: true });
+      rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   }, 600000);
 });
