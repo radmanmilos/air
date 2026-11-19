@@ -573,6 +573,25 @@ export class Orchestrator {
     const s = this.sessions.get(runId);
     if (s) return s;
     throw new Error(`Hop cap reached (${maxHops}).`);
+  } catch (err) {
+    const s = this.sessions.get(runId);
+    if (s) {
+      s.state = 'FAILED';
+      s.endedAt = new Date().toISOString();
+      s.result = 'FAILED';
+      this.sessions.set(runId, s);
+      this.persist();
+    }
+    try {
+      const { readTaskState, writeTaskState } = await import('../execution/task-state');
+      const existing = await readTaskState(runId);
+      if (existing) {
+        await writeTaskState({ ...existing, state: 'FAILED', result: 'FAILED', endedAt: new Date().toISOString(), error: { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) } });
+      } else if (s) {
+        await writeTaskState({ runId, task: s.task, cwd: s.cwd, adapter: s.adapterId || 'none', provider: s.provider || 'none', model: s.model || 'none', state: 'FAILED', result: 'FAILED', startedAt: s.startedAt, endedAt: new Date().toISOString(), hops: 0, maxHops: 3, error: { category: 'PROCESS_CRASH', message: String(err).slice(0, 500) } });
+      }
+    } catch { /* noop */ }
+    return this.sessions.get(runId)!;
   } finally {
     process.removeListener('SIGINT', onSig);
     process.removeListener('SIGTERM', onSig);

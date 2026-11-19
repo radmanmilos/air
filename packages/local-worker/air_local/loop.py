@@ -5,6 +5,7 @@ the tools, never by prompting a human.
 """
 from __future__ import annotations
 
+import json
 import sys
 
 from air_local.models import Router
@@ -21,7 +22,9 @@ except Exception:  # pragma: no cover - not a TTY
 
 BASE_SYSTEM_PROMPT = """You are the local worker inside AIR, a unified AI tool orchestrator.
 You have tools to read and write files, run allowlisted commands, inspect git, and fetch web pages.
+You MUST use these tools to complete the task. Do not just describe code.
 Work step by step: call a tool when you need information or need to change the workspace.
+To fix a bug: first read the relevant file, then use write_file to modify it, then use run_shell to run tests.
 When the task is complete, reply with a short final answer and no tool calls.
 Be concise. Prefer doing over explaining. Do not claim success without evidence from tool output.
 """
@@ -73,6 +76,38 @@ class Agent:
             messages.append(msg)
 
             tool_calls = msg.get("tool_calls") or []
+            if not tool_calls:
+                content = msg.get("content", "") or ""
+                # Some models emit a tool call as a JSON object in content
+                # instead of using Ollama's native tool_calls field. Recover
+                # those so the worker can still act.
+                candidate = None
+                stripped = content.strip()
+                if stripped.startswith("{") and stripped.endswith("}"):
+                    try:
+                        candidate = json.loads(stripped)
+                    except json.JSONDecodeError:
+                        candidate = None
+                if isinstance(candidate, dict) and "name" in candidate:
+                    args = candidate.get("arguments", candidate.get("args", {}))
+                    if not isinstance(args, dict):
+                        args = {}
+                    name = candidate["name"]
+                    if self.registry is None or self.registry.get(name) is not None:
+                        tool_calls = [{"function": {"name": name, "arguments": args}}]
+                if isinstance(candidate, list):
+                    recovered = []
+                    for item in candidate:
+                        if isinstance(item, dict) and "name" in item:
+                            args = item.get("arguments", item.get("args", {}))
+                            if not isinstance(args, dict):
+                                args = {}
+                            name = item["name"]
+                    if self.registry is None or self.registry.get(name) is not None:
+                                recovered.append({"function": {"name": name, "arguments": args}})
+                    if recovered:
+                        tool_calls = recovered
+
             if not tool_calls:
                 content = msg.get("content", "") or ""
                 self._log(f"[done] {content[:500]}")

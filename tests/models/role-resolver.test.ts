@@ -8,7 +8,7 @@ describe('resolveModelRole', () => {
     expect(resolved).toMatchObject({
       role: 'coder',
       providerId: 'ollama',
-      model: 'qwen2.5-coder:7b',
+      model: 'qwen3.5:4b',
       baseUrl: 'http://127.0.0.1:11434',
       maxConcurrentGenerative: 1,
     });
@@ -24,7 +24,7 @@ describe('resolveModelRole', () => {
       },
     });
     expect(resolveModelRole(config, 'coordinator').model).toBe('qwen3.5:4b-custom');
-    expect(resolveModelRole(config, 'coder').model).toBe('qwen2.5-coder:7b');
+    expect(resolveModelRole(config, 'coder').model).toBe('qwen3.5:4b');
   });
 
   it('does not silently fall back when the configured provider is disabled', () => {

@@ -40,7 +40,7 @@ def _fake_agent(monkeypatch, *, answer="done", error=None, steps=1, calls=None):
     """Replace the real Ollama-backed agent with a deterministic stub."""
 
     class FakeAgent:
-        def __init__(self, max_steps=40, verbose=False):
+        def __init__(self, max_steps=40, verbose=False, registry=None):
             self.max_steps = max_steps
             self.verbose = verbose
             self.steps_used = steps
@@ -246,7 +246,7 @@ def test_max_steps_reaches_the_agent(tmp_path, monkeypatch):
     seen = {}
 
     class FakeAgent:
-        def __init__(self, max_steps=40, verbose=False):
+        def __init__(self, max_steps=40, verbose=False, registry=None):
             seen["max_steps"] = max_steps
             self.steps_used = 0
             self.tool_calls = []
