@@ -104,8 +104,8 @@ export class LocalAdapter implements AgentAdapter {
           }
         }
       }
-    } catch {
-      // Config read/parse failed; use defaults.
+    } catch (err) {
+      throw new Error(`local adapter: failed to read/parse global config: ${String(err)}`);
     }
     const resolved = resolveModelRole(config, 'coder');
     return { role: 'coder', provider: resolved.providerId, model: resolved.model };

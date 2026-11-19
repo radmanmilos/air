@@ -164,11 +164,14 @@ export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<B
   // Check readiness first (server + model).
   const readiness = await checkBrainReadiness();
   if (!readiness.available) {
-    return { text: 'Acknowledged.', model: 'none', provider: 'none' };
+    const detail = readiness.detail ? `: ${readiness.detail}` : '';
+    return { text: `AI unavailable (${readiness.reason})${detail}`, model: 'none', provider: 'none' };
   }
 
   const local = await resolveLocalBrain();
-  if (!local) return { text: 'Acknowledged.', model: 'none', provider: 'none' };
+  if (!local) {
+    return { text: 'AI unavailable (config_error): could not resolve local coordinator', model: 'none', provider: 'none' };
+  }
   const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
   if (envModel) {
     const cli = await tryOllamaCli(fullPrompt, envModel);
@@ -183,10 +186,10 @@ export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<B
     const content = result.message?.content;
     const text = typeof content === 'string' ? content.trim() : '';
     if (text) return { text, model: result.model || local.model, provider: 'ollama' };
-  } catch {
-    // Local provider unavailable or failed: do not fall back to external CLIs.
+    return { text: 'AI returned an empty response.', model: local.model, provider: 'ollama' };
+  } catch (err: any) {
+    return { text: `AI request failed: ${String(err?.message || err)}`, model: 'none', provider: 'none' };
   }
-  return { text: 'Acknowledged.', model: 'none', provider: 'none' };
 }
 
 export async function isBrainAvailable(): Promise<boolean> {

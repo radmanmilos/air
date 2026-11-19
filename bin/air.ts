@@ -662,7 +662,6 @@ program
       }
     }
     const { createConversation, loadConversation, saveConversation, appendMessage, injectResult, mutateConversation } = await import('../src/conversation');
-    const { decide } = await import('../src/conversation/decide');
     const { planFromRequest } = await import('../src/planner');
     const { compileJobResult } = await import('../src/result-compiler');
     const { loadConfig } = await import('../src/config/loader');
@@ -844,66 +843,48 @@ if (trimmed.startsWith('/')) {
         }
       }
       // Reload conv from disk to avoid stale state.
-      const freshConv = loadConversation(conv!.id);
-      if (freshConv) conv = freshConv;
-      await appendMessage(conv!.id, { role: 'user', content: trimmed });
-      const actions = decide(trimmed, conv!);
-      for (const a of actions) {
-        if (a.type === 'spawn_job') {
-          logEvent('job_submitted', a.goal);
-          void runJob(a.goal, undefined, a.hints);
-          rl.prompt();
-        } else if (a.type === 'answer') {
-          if (shuttingDown) {
-            // Do not start new brain answers during shutdown; acknowledge
-            // immediately so the user gets a response.
-            await appendMessage(conv!.id, { role: 'assistant', content: 'Acknowledged.' });
-            console.log(out.gray('air: Acknowledged.'));
-            return;
-          }
-          const brainPromise = (async () => {
-            const { brainAnswer, isBrainAvailable } = await import('../src/brain');
-            let reply = 'Acknowledged.';
-            if (await isBrainAvailable()) {
-              logEvent('brain_start', trimmed);
-              // No interstitial in non-TTY mode: a cleared "thinking..." line
-              // leaks to piped output and breaks scripted consumers.
-              if (isInteractive()) {
-                process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
-              }
-              const freshConv = loadConversation(conv!.id) ?? conv!;
-              const r = await brainAnswer(trimmed, { history: freshConv.messages, jobs: freshConv.activeWorkIds });
-              if (isInteractive()) process.stderr.write('\u001b[2K\r');
-              logEvent('brain_end', r.text.slice(0, 200));
-              reply = r.text;
-            }
-            await appendMessage(conv!.id, { role: 'assistant', content: reply });
-            console.log(out.gray(`air: ${reply}`));
-            rl.prompt();
-          })().catch((err) => {
-            console.log(out.red(`brain error: ${String(err)}`));
-            rl.prompt();
-          });
-          pendingBrains.add(brainPromise);
-          brainPromise.finally(() => { pendingBrains.delete(brainPromise); });
-        } else if (a.type === 'clarify') {
-          await appendMessage(conv!.id, { role: 'assistant', content: a.question });
-          console.log(out.gray(`air: ${a.question}`));
-          rl.prompt();
-        } else if (a.type === 'status') {
-          console.log(out.gray(`messages=${conv!.messages.length} active=${conv!.activeWorkIds.join(',')}`));
-          rl.prompt();
-        } else if (a.type === 'cancel_job') {
-          const entry = jobHandles.get(a.jobId);
-          if (entry) {
-            try { await entry.orch.cancel(a.jobId); } catch { /* noop */ }
-            entry.controller.abort();
-          }
-          await mutateConversation(conv!.id, (c) => { c.activeWorkIds = c.activeWorkIds.filter((x) => x !== a.jobId); });
-          console.log(out.yellow(`Cancelled ${a.jobId}`));
-          rl.prompt();
-        }
+      const freshConv0 = loadConversation(conv!.id);
+      if (freshConv0) conv = freshConv0;
+      if (shuttingDown) {
+        await appendMessage(conv!.id, { role: 'assistant', content: 'Acknowledged.' });
+        console.log(out.gray('air: Acknowledged.'));
+        rl.prompt();
+        return;
       }
+      const { sendMessage: sendConversationMessage } = await import('../src/conversation/service');
+      const msgPromise = (async () => {
+        if (isInteractive()) {
+          process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
+        }
+        const result = await sendConversationMessage(conv!.id, trimmed, {
+          cwd,
+          freeOnly: conv!.userPreferences.freeOnly,
+          onJobFinished: (runId: string, summary: string) => {
+            console.log(out.gray(`job ${runId} finished: ${summary.split('.')[0]}.`));
+            rl.prompt();
+          },
+        });
+        if (isInteractive()) process.stderr.write('\u001b[2K\r');
+        const freshConv = loadConversation(conv!.id);
+        if (freshConv) conv = freshConv;
+        for (const reply of result.replies) {
+          if (reply.startsWith('Started job ')) {
+            const runId = reply.replace('Started job ', '').replace(/\.$/, '');
+            logEvent('job_submitted', runId);
+            console.log(out.green(`Started job ${runId}`));
+            console.log(out.gray(`  Job ID: ${runId}  (use /cancel ${runId} to stop)`));
+          } else {
+            logEvent('brain_end', reply.slice(0, 200));
+            console.log(out.gray(`air: ${reply}`));
+          }
+        }
+        rl.prompt();
+      })().catch((err) => {
+        console.log(out.red(`brain error: ${String(err)}`));
+        rl.prompt();
+      });
+      pendingBrains.add(msgPromise);
+      msgPromise.finally(() => { pendingBrains.delete(msgPromise); });
     });
     rl.on('close', async () => {
       // Drain ALL outstanding brain calls before exiting so /quit during a

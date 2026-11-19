@@ -99,9 +99,10 @@ describe('brain answer path (P1-02 local-first, no external CLI egress)', () => 
   });
 
   it('does not fall back to external CLIs when local provider fails', async () => {
-    vi.stubGlobal('fetch', makeFetchMock({ throwOn: '/api/chat' }));
+    vi.stubGlobal('fetch', makeFetchMock({ chatStatus: 500 }));
     const r = await brainAnswer('hello');
-    expect(r).toMatchObject({ provider: 'none', text: 'Acknowledged.' });
+    expect(r).toMatchObject({ provider: 'none' });
+    expect(r.text).toContain('AI request failed');
     expect(spawnCalls.some((c) => c.cmd === 'kilo' || c.cmd === 'opencode' || c.cmd === 'kilocode')).toBe(false);
   });
 
@@ -198,9 +199,10 @@ describe('brain answer path (P1-02 local-first, no external CLI egress)', () => 
     await expect(isBrainAvailable()).resolves.toBe(false);
   });
 
-  it('brainAnswer returns Acknowledged when model is not installed', async () => {
+  it('brainAnswer returns unavailable when model is not installed', async () => {
     vi.stubGlobal('fetch', makeFetchMock({ tags: { models: [{ name: 'other-model:latest' }] } }));
     const r = await brainAnswer('hello');
-    expect(r).toMatchObject({ provider: 'none', text: 'Acknowledged.' });
+    expect(r).toMatchObject({ provider: 'none' });
+    expect(r.text).toContain('AI unavailable');
   });
 });
