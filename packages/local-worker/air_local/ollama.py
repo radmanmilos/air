@@ -16,7 +16,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "ollama": {"base_url": "http://localhost:11434", "keep_alive": "5m"},
     "models": {
         "brain": "qwen3.5:4b",
-        "coder": "qwen2.5-coder:7b",
+        "coder": "qwen3.5:4b",
         "reasoner": "deepseek-r1:1.5b",
         "embed": "nomic-embed-text",
     },

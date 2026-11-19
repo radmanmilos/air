@@ -719,13 +719,9 @@ program
       const p = (async () => {
         try {
           // poll task state until terminal
+          try { await orch.waitFor(session.runId); } catch { /* noop */ }
           const { readTaskState } = await import('../src/execution/task-state');
-          let state: any = null;
-          while (true) {
-            state = await readTaskState(session.runId);
-            if (state && (state.state === 'COMPLETED' || state.state === 'FAILED' || state.state === 'CANCELLED')) break;
-            await new Promise((r) => setTimeout(r, 500));
-          }
+          const state: any = await readTaskState(session.runId);
           const facts = {
             runId: session.runId,
             result: state?.result ?? state?.state ?? 'FAILED',

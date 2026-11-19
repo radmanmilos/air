@@ -248,7 +248,10 @@ def run(
 
     _install_signal_handlers()
 
+    from air_local.tools.builtin import build_registry
+
     agent = Agent(
+        registry=build_registry(),
         max_steps=int(request.get("maxSteps", 40)),
         verbose=verbose or os.environ.get("AIR_LOCAL_VERBOSE") == "1",
     )

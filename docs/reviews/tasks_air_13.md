@@ -643,3 +643,14 @@ unOsSandboxed() wrapping real OS mechanisms (Linux unshare net/pid/mount namespa
 - `eval:models` restored in `package.json`; `pilot:local` retained.
 - Local adapter config parse errors now propagate instead of silently falling back.
 - Validation: typecheck, typecheck:test, lint, tests, build, check:dist, pack --dry-run, Python ruff/mypy/pytest all pass.
+## Incremental progress note (real-world local acceptance, 2026-11-19)
+
+- Added reproducible live acceptance scenario (`tests/e2e/acceptance/acceptance.live.test.ts`) using a disposable Git repository with a seeded discount bug.
+- The test drives AIR through the real CLI conversation service, real Ollama coordinator/coder roles (qwen3.5:4b), real Python worker, real file edits, and independently verifies the Git diff and pytest results.
+- Fixed worker to register its tool registry (run.py) and to recover tool calls emitted as JSON by models lacking native tool support.
+- Fixed orchestrator to catch outer runPromise failures and write FAILED task state instead of leaving RUNNING.
+- Changed default coder model to qwen3.5:4b (tool-capable) in TS schema and Python default.
+- Cleared health/cooldown state in acceptance test for clean runs.
+- Three successful live runs recorded (run IDs: run-mwnif289-slvopc, run-mwnijf27-fffhui, run-mwniosi2-idtqby).
+- Added scripts: acceptance:det, acceptance:local.
+- Validation: typecheck, typecheck:test, lint, tests, build, Python ruff/mypy/pytest all pass.

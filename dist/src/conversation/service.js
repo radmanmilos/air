@@ -156,13 +156,11 @@ async function startChatJob(conv, goal, hints, cwd, freeOnly, options) {
     await mutateConversation(conv.id, (c) => { c.activeWorkIds.push(session.runId); });
     (async () => {
         try {
-            let state = null;
-            while (true) {
-                state = await readTaskState(session.runId);
-                if (state && (state.state === 'COMPLETED' || state.state === 'FAILED' || state.state === 'CANCELLED'))
-                    break;
-                await new Promise((r) => setTimeout(r, 500));
+            try {
+                await orch.waitFor(session.runId);
             }
+            catch { /* noop */ }
+            let state = await readTaskState(session.runId);
             const facts = {
                 runId: session.runId,
                 result: state?.result ?? state?.state ?? 'FAILED',

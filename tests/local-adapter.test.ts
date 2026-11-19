@@ -61,7 +61,7 @@ describe('local adapter', () => {
     const adapter = new LocalAdapter({
       command: WORKER,
       cacheDir,
-      model: 'qwen2.5-coder:7b',
+      model: 'qwen3.5:4b',
     });
 
     const spec = adapter.buildCommand(
@@ -86,7 +86,7 @@ describe('local adapter', () => {
       allowNetwork: false,
       role: 'coder',
       provider: 'ollama',
-      model: 'qwen2.5-coder:7b',
+      model: 'qwen3.5:4b',
     });
     expect(requestPath.endsWith('.json')).toBe(true);
     expect(resultPath.endsWith('.json')).toBe(true);
@@ -104,8 +104,8 @@ describe('local adapter', () => {
     expect(request.contractVersion).toBe(2);
     expect(request.role).toBe('coder');
     expect(request.provider).toBe('ollama');
-    expect(request.model).toBe('qwen2.5-coder:7b');
-    expect(adapter.model).toBe('qwen2.5-coder:7b');
+    expect(request.model).toBe('qwen3.5:4b');
+    expect(adapter.model).toBe('qwen3.5:4b');
   });
 
   it('prefers a task model over the adapter model', () => {

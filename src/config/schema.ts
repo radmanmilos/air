@@ -60,7 +60,7 @@ const ProviderSettingsSchema = z.object({
 const DEFAULT_MODEL_ROLES = {
   coordinator: { provider: 'ollama', model: 'qwen3.5:4b' },
   planner: { provider: 'ollama', model: 'qwen3.5:4b' },
-  coder: { provider: 'ollama', model: 'qwen2.5-coder:7b' },
+  coder: { provider: 'ollama', model: 'qwen3.5:4b' },
   reviewer: { provider: 'ollama', model: 'qwen3.5:4b' },
   reasoner: { provider: 'ollama', model: 'deepseek-r1:1.5b' },
   summarizer: { provider: 'ollama', model: 'qwen3.5:4b' },

@@ -36,6 +36,8 @@
         "e2e:live": "vitest run --config vitest.live.config.ts",
         "eval:models": "tsx scripts/eval-models.ts",
 "pilot:local": "vitest run tests/e2e/pilot/",
+"acceptance:det": "vitest run tests/e2e/scenarios/",
+"acceptance:local": "vitest run tests/e2e/acceptance/",
         "postbuild": "node scripts/fix-imports.mjs",
         "prebuild": "node -e \"require('fs').rmSync('dist', {recursive:true, force:true})\"",
         "typecheck": "tsc --noEmit",

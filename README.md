@@ -118,8 +118,8 @@ Optional real-model pilot tests (requires Ollama + models):
 ```bash
 AIR_PILOT_LOCAL=1 npm run pilot:local
 
-# Restore model evaluation workflow
-npm run eval:models
+# Live acceptance (real local model)
+AIR_ACCEPTANCE_LOCAL=1 npm run acceptance:local
 ```
 
 For a global CLI on your shell PATH:
