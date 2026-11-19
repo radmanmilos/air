@@ -856,14 +856,18 @@ if (trimmed.startsWith('/')) {
         if (isInteractive()) {
           process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
         }
-        const result = await sendConversationMessage(conv!.id, trimmed, {
-          cwd,
-          freeOnly: conv!.userPreferences.freeOnly,
+      const result = await sendConversationMessage({
+        conversationId: conv!.id,
+        message: trimmed,
+        cwd,
+        freeOnly: conv!.userPreferences.freeOnly,
+        options: {
           onJobFinished: (runId: string, summary: string) => {
             console.log(out.gray(`job ${runId} finished: ${summary.split('.')[0]}.`));
             rl.prompt();
           },
-        });
+        },
+      });
         if (isInteractive()) process.stderr.write('\u001b[2K\r');
         const freshConv = loadConversation(conv!.id);
         if (freshConv) conv = freshConv;

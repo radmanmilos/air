@@ -857,12 +857,16 @@ program
             if (isInteractive()) {
                 process.stderr.write(out.gray('air: thinking... ') + '\u001b[2K\r');
             }
-            const result = await sendConversationMessage(conv.id, trimmed, {
+            const result = await sendConversationMessage({
+                conversationId: conv.id,
+                message: trimmed,
                 cwd,
                 freeOnly: conv.userPreferences.freeOnly,
-                onJobFinished: (runId, summary) => {
-                    console.log(out.gray(`job ${runId} finished: ${summary.split('.')[0]}.`));
-                    rl.prompt();
+                options: {
+                    onJobFinished: (runId, summary) => {
+                        console.log(out.gray(`job ${runId} finished: ${summary.split('.')[0]}.`));
+                        rl.prompt();
+                    },
                 },
             });
             if (isInteractive())
