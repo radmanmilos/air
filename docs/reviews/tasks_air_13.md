@@ -598,8 +598,10 @@ Copy this into the PR description or update the relevant package entry at the en
 
 ## Incremental progress note (this session)
 
-- Added recursive secret-redaction helper edactValue to src/security/redact.ts (exported from src/security/index.ts) covering strings, arrays, objects, Error messages/stacks, and malformed/circular values with depth guard.
-- Applied edact() to Ollama provider error messages sourced from response bodies (P2-03).
+- Added recursive secret-redaction helper
+edactValue to src/security/redact.ts (exported from src/security/index.ts) covering strings, arrays, objects, Error messages/stacks, and malformed/circular values with depth guard.
+- Applied
+edact() to Ollama provider error messages sourced from response bodies (P2-03).
 - Added regression tests in 	ests/redaction.test.ts (P2-03 recursive/nested/malformed).
 - P1-05 remains PARTIAL/NOT DONE: no OS-enforced sandbox implemented; fail-closed boundary contract retained.
 - P1-04/P1-06/P1-07/P2-01/P2-02 remain PARTIAL per ledger acceptance criteria.
@@ -626,8 +628,18 @@ Copy this into the PR description or update the relevant package entry at the en
 
 - **Remaining limitations:** Shutdown safety timeout (25s) is a hard cap; if a provider hangs beyond internal timeouts, the process exits after 25s without persisting. Multiple concurrent brain answers share the `conv` variable but reload from disk, so persistence is safe. No caching of model availability checks (short timeouts keep per-message overhead low).
 
-- Added src/evals/sandbox/os-sandbox.ts: platform detection, capability probe, and unOsSandboxed() wrapping real OS mechanisms (Linux unshare net/pid/mount namespace; macOS sandbox-exec Seatbelt profile; Windows fail-closed unsupported). Fail-closed on unavailable mechanisms.
+- Added src/evals/sandbox/os-sandbox.ts: platform detection, capability probe, and
+unOsSandboxed() wrapping real OS mechanisms (Linux unshare net/pid/mount namespace; macOS sandbox-exec Seatbelt profile; Windows fail-closed unsupported). Fail-closed on unavailable mechanisms.
 - Added 	ests/evals/os-sandbox.test.ts (4 tests).
 - Updated scripts/check-dead-code.mjs baseline for new exports.
 - P1-05 remains PARTIAL: eval execution boundary not yet wired to use os-sandbox; Windows has no OS enforcement; Linux/macOS enforcement depends on host privileges and remains unverified in CI (no macOS runner).
 - L3/L4 remain BLOCKED.
+## Incremental progress note (conversation integration, 2026-11-19)
+
+- Shared conversation service (`src/conversation/service.ts`) now owns message persistence, coordinator action validation/dispatch, answer/clarify/status, spawn, cancellation, and result injection. Both CLI (`bin/air.ts`) and MCP (`src/mcp/server.ts` chat_send) use it.
+- String markers (`SPAWN_JOB:`/`CANCEL_JOB:`) removed in favor of typed `Action` results and real execution.
+- Brain unavailable states now return actionable `AI unavailable (...)` errors instead of `Acknowledged.`.
+- Pilot tests use `describe.skipIf` and fail when explicitly enabled prerequisites are missing.
+- `eval:models` restored in `package.json`; `pilot:local` retained.
+- Local adapter config parse errors now propagate instead of silently falling back.
+- Validation: typecheck, typecheck:test, lint, tests, build, check:dist, pack --dry-run, Python ruff/mypy/pytest all pass.
