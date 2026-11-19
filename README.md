@@ -22,7 +22,7 @@ npm install -g "https://github.com/radmanmilos/air/archive/refs/heads/main.tar.g
 
 *AIR is free and so are we.*
 
-**Status:** Release candidate; local-first intelligence milestone is in progress. Existing CLI/MCP execution remains available. The active local-first implementation ledger is `docs/reviews/tasks_air_13.md`; the provider runtime and model-role config are being introduced incrementally and are not yet wired into the chat coordinator.
+**Status:** Release candidate; local-first intelligence milestone in progress. CLI/MCP chat uses the configured local Ollama coordinator role for answer replies (local-only, no external CLI egress). The active ledger is `docs/reviews/tasks_air_13.md`.
 
 AIR is a single terminal entrypoint and MCP server that routes tasks across AI coding tools (aider, goose, opencode, kilocode, codex, github-copilot, ollama, and its bundled local worker) with automatic failover on rate limits, preserving context so work continues seamlessly. It presents one conversational agent to the user while every other model/tool acts as an internal worker.
 
@@ -189,7 +189,7 @@ Cache: platform cache directory / `air/`
 Precedence: CLI > env > repo `.airrc.yaml` > global > defaults.
 Repo config cannot set global-only keys (failover, permission, redaction, trustedRepos, tools, concurrency, verify, catalog, timeouts, buffers, logging, models). Model role/provider assignments live only in global config; see [model roles and configuration](docs/configuration/model-roles.md).
 
-Model role assignments and the local provider defaults are documented in [model roles and configuration](docs/configuration/model-roles.md). The provider runtime is not yet used by CLI/MCP chat and does not download models.
+Model role assignments and the local provider defaults are documented in [model roles and configuration](docs/configuration/model-roles.md). CLI/MCP chat answer replies use the configured local Ollama coordinator role (or `AIR_BRAIN_MODEL_OLLAMA` override); no models are downloaded automatically.
 
 ## Adapters
 
@@ -232,7 +232,7 @@ npm run dev            # tsx bin/air.ts
 
 - Aider, goose, opencode, kilocode, ollama, and the bundled local worker are verified and eligible for routing; codex and github-copilot are unverified spikes.
 - Verified adapters require the external CLI installed and on PATH. The local adapter instead requires `air setup local`.
-- The TypeScript model-provider API and Ollama implementation are not yet wired into CLI/MCP chat; the existing Python worker still uses its worker-local model slots.
+- The TypeScript model-provider API and Ollama implementation back CLI/MCP chat answer replies. The bundled Python worker still uses worker-local model slots for coding tasks; role/model propagation to the worker is future work.
 - Cross-provider front-agent fallback is not implemented; only Ollama is accepted by the current model-role config.
 - Daemon/IPC mode is not yet implemented; state is file-based with atomic writes and crash recovery.
 - Web UI not included; CLI + MCP only.
