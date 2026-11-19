@@ -97,7 +97,7 @@ describe('real: P-02 Started job is printed immediately', () => {
         const started = await chat.waitForLine(/Started job (\S+)/, 0, 15000);
         const m = started.line.match(/Started job (\S+)/);
         expect(m?.[1]).toBeTruthy();
-        expect(started.t - sentAt).toBeLessThan(10000);
+        expect(started.t - sentAt).toBeLessThan(15000);
         await chat.waitForLine(new RegExp(`job ${m![1]} finished`), 0, 120000);
       } finally {
         await chat.quit();

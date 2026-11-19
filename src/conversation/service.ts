@@ -160,9 +160,10 @@ async function sendConversationMessage(params: {
   }
 
   if (replies.length === 0) {
-    const reply = 'Acknowledged.';
+    const reply = 'I could not determine a valid action for that message. Please rephrase or use /help.';
     await appendMessage(conv.id, { role: 'assistant', content: reply });
     replies.push(reply);
+    errors.push(reply);
     options.onReply?.(reply);
   }
 

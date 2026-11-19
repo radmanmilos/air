@@ -137,15 +137,6 @@ export async function checkBrainReadiness() {
     return { available: true, reason: 'ready' };
 }
 export async function brainAnswer(prompt, ctx) {
-    const parts = [];
-    if (ctx?.history && ctx.history.length > 0) {
-        parts.push('Conversation history:\n' + ctx.history.slice(-10).map((m) => `${m.role}: ${m.content}`).join('\n'));
-    }
-    if (ctx?.jobs && ctx.jobs.length > 0) {
-        parts.push('Active jobs: ' + ctx.jobs.join(', '));
-    }
-    const fullPrompt = parts.length > 0 ? parts.join('\n\n') + '\n\nUser: ' + prompt : prompt;
-    // Check readiness first (server + model).
     const readiness = await checkBrainReadiness();
     if (!readiness.available) {
         const detail = readiness.detail ? `: ${readiness.detail}` : '';
@@ -155,8 +146,21 @@ export async function brainAnswer(prompt, ctx) {
     if (!local) {
         return { text: 'AI unavailable (config_error): could not resolve local coordinator', model: 'none', provider: 'none' };
     }
+    const messages = [];
+    if (ctx?.history && ctx.history.length > 0) {
+        for (const m of ctx.history.slice(-20)) {
+            const role = m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'system' : 'user');
+            const prefix = (m.role === 'tool' || m.role === 'job') ? '[tool result] ' : '';
+            messages.push({ role, content: prefix + m.content });
+        }
+    }
+    if (ctx?.jobs && ctx.jobs.length > 0) {
+        messages.push({ role: 'system', content: 'Active jobs: ' + ctx.jobs.join(', ') });
+    }
+    messages.push({ role: 'user', content: prompt });
     const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
     if (envModel) {
+        const fullPrompt = messages.map((m) => `${m.role}: ${m.content}`).join('\n\n');
         const cli = await tryOllamaCli(fullPrompt, envModel);
         if (cli)
             return cli;
@@ -164,7 +168,7 @@ export async function brainAnswer(prompt, ctx) {
     try {
         const result = await local.provider.chat({
             model: local.model,
-            messages: [{ role: 'user', content: fullPrompt }],
+            messages,
             timeoutMs: 10000,
         });
         const content = result.message?.content;
