@@ -8,6 +8,7 @@ process.noDeprecation = true;
 import { loadConfig } from '../config/loader';
 import { resolveModelRole } from '../models/role-resolver';
 import { OllamaProvider } from '../models/providers/ollama';
+import type { ModelMessage } from '../models/types';
 
 export interface BrainResult {
   text: string;
@@ -152,16 +153,6 @@ export async function checkBrainReadiness(): Promise<BrainReadiness> {
 }
 
 export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<BrainResult> {
-  const parts: string[] = [];
-  if (ctx?.history && ctx.history.length > 0) {
-    parts.push('Conversation history:\n' + ctx.history.slice(-10).map((m) => `${m.role}: ${m.content}`).join('\n'));
-  }
-  if (ctx?.jobs && ctx.jobs.length > 0) {
-    parts.push('Active jobs: ' + ctx.jobs.join(', '));
-  }
-  const fullPrompt = parts.length > 0 ? parts.join('\n\n') + '\n\nUser: ' + prompt : prompt;
-
-  // Check readiness first (server + model).
   const readiness = await checkBrainReadiness();
   if (!readiness.available) {
     const detail = readiness.detail ? `: ${readiness.detail}` : '';
@@ -172,15 +163,30 @@ export async function brainAnswer(prompt: string, ctx?: BrainContext): Promise<B
   if (!local) {
     return { text: 'AI unavailable (config_error): could not resolve local coordinator', model: 'none', provider: 'none' };
   }
+
+  const messages: ModelMessage[] = [];
+  if (ctx?.history && ctx.history.length > 0) {
+    for (const m of ctx.history.slice(-20)) {
+      const role: ModelMessage['role'] = m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'system' : 'user');
+      const prefix = (m.role === 'tool' || m.role === 'job') ? '[tool result] ' : '';
+      messages.push({ role, content: prefix + m.content });
+    }
+  }
+  if (ctx?.jobs && ctx.jobs.length > 0) {
+    messages.push({ role: 'system', content: 'Active jobs: ' + ctx.jobs.join(', ') });
+  }
+  messages.push({ role: 'user', content: prompt });
+
   const envModel = process.env.AIR_BRAIN_MODEL_OLLAMA;
   if (envModel) {
+    const fullPrompt = messages.map((m) => `${m.role}: ${m.content}`).join('\n\n');
     const cli = await tryOllamaCli(fullPrompt, envModel);
     if (cli) return cli;
   }
   try {
     const result = await local.provider.chat({
       model: local.model,
-      messages: [{ role: 'user', content: fullPrompt }],
+      messages,
       timeoutMs: 10000,
     });
     const content = result.message?.content;
